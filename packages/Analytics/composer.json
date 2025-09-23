@@ -1,0 +1,19 @@
+{
+  "name": "fluxio/analytics",
+  "description": "Analytics module for Fluxio",
+  "version": "0.1.0",
+  "type": "library",
+  "autoload": {
+    "psr-4": {
+      "Fluxio\\Analytics\\": "src/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Fluxio\\Analytics\\Providers\\AnalyticsServiceProvider"
+      ]
+    }
+  },
+  "require": {}
+}
