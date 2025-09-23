@@ -1,0 +1,17 @@
+{
+  "name": "fluxio/calendar",
+  "description": "Calendar module for Fluxio",
+  "version": "0.1.0",
+  "type": "library",
+  "autoload": {
+    "psr-4": { "Fluxio\\Calendar\\": "src/" }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Fluxio\\Calendar\\Providers\\CalendarServiceProvider"
+      ]
+    }
+  },
+  "require": {}
+}
