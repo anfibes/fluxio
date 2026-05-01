@@ -9,6 +9,7 @@
         "php": "^8.2",
         "fluxio/analytics": "^0.1",
         "fluxio/calendar": "^0.1",
+        "fluxio/core": "^0.1",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1"
     },

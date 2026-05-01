@@ -1,0 +1,17 @@
+{
+  "name": "fluxio/core",
+  "description": "Core module for Fluxio (shared API layer, base classes)",
+  "version": "0.1.0",
+  "type": "library",
+  "autoload": {
+    "psr-4": { "Fluxio\\Core\\": "src/" }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Fluxio\\Core\\Providers\\CoreServiceProvider"
+      ]
+    }
+  },
+  "require": {}
+}

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "27d674dbde1909b33680f3b9dec8378e",
+    "content-hash": "144c9d416d4749624f2d7876323874de",
     "packages": [
         {
             "name": "brick/math",
@@ -557,6 +557,32 @@
                 }
             },
             "description": "Calendar module for Fluxio",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "fluxio/core",
+            "version": "0.1.0",
+            "dist": {
+                "type": "path",
+                "url": "../../packages/Core",
+                "reference": "4364c9e84c65f58e45066aac13ccb13689f581be"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Fluxio\\Core\\Providers\\CoreServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Fluxio\\Core\\": "src/"
+                }
+            },
+            "description": "Core module for Fluxio (shared API layer, base classes)",
             "transport-options": {
                 "relative": true
             }
