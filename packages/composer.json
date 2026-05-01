@@ -1,0 +1,14 @@
+{
+  "name": "fluxio/",
+  "description": " module for Fluxio",
+  "type": "library",
+  "autoload": { "psr-4": { "Fluxio\\\\": "src/" } },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Fluxio\\\\Providers\\ServiceProvider"
+      ]
+    }
+  },
+  "require": {}
+}
