@@ -6,3 +6,9 @@ CLAUDE.md
 .env
 *.log
 .DS_Store
+
+# Nuxt / Frontend
+apps/web/node_modules/
+apps/web/.nuxt/
+apps/web/.output/
+apps/web/dist/
