@@ -1,0 +1,20 @@
+{
+  "name": "fluxio/identity",
+  "description": "Identity and authentication module for Fluxio",
+  "version": "0.1.0",
+  "type": "library",
+  "autoload": {
+    "psr-4": { "Fluxio\\Identity\\": "src/" }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Fluxio\\Identity\\Providers\\IdentityServiceProvider"
+      ]
+    }
+  },
+  "require": {
+    "fluxio/core": "^0.1",
+    "laravel/sanctum": "^4.0"
+  }
+}
