@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a21d2edff880c7429437744e1823ce7e",
+    "content-hash": "e3e7da640f97c93e16929ab404b61e4e",
     "packages": [
         {
             "name": "brick/math",
@@ -508,6 +508,35 @@
                 }
             ],
             "time": "2025-03-06T22:45:56+00:00"
+        },
+        {
+            "name": "fluxio/actions",
+            "version": "0.1.0",
+            "dist": {
+                "type": "path",
+                "url": "../../packages/Actions",
+                "reference": "427d6d1148f314dc90f5e884bb4ce458e1afccbf"
+            },
+            "require": {
+                "fluxio/core": "^0.1"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Fluxio\\Actions\\Providers\\ActionsServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Fluxio\\Actions\\": "src/"
+                }
+            },
+            "description": "Actions module for Fluxio — natural-language command interpreter",
+            "transport-options": {
+                "relative": true
+            }
         },
         {
             "name": "fluxio/analytics",

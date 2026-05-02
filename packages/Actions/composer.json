@@ -1,0 +1,19 @@
+{
+  "name": "fluxio/actions",
+  "description": "Actions module for Fluxio — natural-language command interpreter",
+  "version": "0.1.0",
+  "type": "library",
+  "autoload": {
+    "psr-4": { "Fluxio\\Actions\\": "src/" }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Fluxio\\Actions\\Providers\\ActionsServiceProvider"
+      ]
+    }
+  },
+  "require": {
+    "fluxio/core": "^0.1"
+  }
+}
