@@ -68,6 +68,63 @@ class InterpretActionTest extends TestCase
         $this->assertLessThanOrEqual(1.0, $response->json('data.confidence'));
     }
 
+    public function test_create_task_missing_is_empty(): void
+    {
+        $this->actingAsUser();
+
+        $response = $this->postJson('/api/actions/interpret', [
+            'text' => 'Create a task for Rossini',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertCount(0, $response->json('data.missing'));
+    }
+
+    public function test_create_task_editable_fields_contain_title_and_lead(): void
+    {
+        $this->actingAsUser();
+
+        $response = $this->postJson('/api/actions/interpret', [
+            'text' => 'Create a task for Rossini',
+        ]);
+
+        $fields = collect($response->json('data.editable_fields'));
+
+        $keys = $fields->pluck('key');
+        $this->assertContains('title', $keys);
+        $this->assertContains('lead', $keys);
+    }
+
+    public function test_create_task_lead_field_has_source_detected(): void
+    {
+        $this->actingAsUser();
+
+        $response = $this->postJson('/api/actions/interpret', [
+            'text' => 'Create a task for Rossini',
+        ]);
+
+        $leadField = collect($response->json('data.editable_fields'))
+            ->firstWhere('key', 'lead');
+
+        $this->assertNotNull($leadField);
+        $this->assertEquals('detected', $leadField['source']);
+        $this->assertEquals('Rossini', $leadField['value']);
+    }
+
+    public function test_create_task_changes_contain_create_tasks_entry(): void
+    {
+        $this->actingAsUser();
+
+        $response = $this->postJson('/api/actions/interpret', [
+            'text' => 'Create a task for Rossini',
+        ]);
+
+        $changes = $response->json('data.changes');
+        $this->assertNotEmpty($changes);
+        $this->assertEquals('create', $changes[0]['type']);
+        $this->assertEquals('tasks', $changes[0]['module']);
+    }
+
     public function test_create_task_without_lead_returns_draft_proposal(): void
     {
         $this->actingAsUser();
@@ -95,9 +152,51 @@ class InterpretActionTest extends TestCase
             ->assertJsonPath('data.intent', 'schedule_call')
             ->assertJsonPath('data.status', 'draft');
 
+        $missingKeys = collect($response->json('data.missing'))->pluck('key');
+        $this->assertContains('date', $missingKeys);
+        $this->assertContains('time', $missingKeys);
+    }
+
+    public function test_schedule_call_missing_fields_are_structured_objects(): void
+    {
+        $this->actingAsUser();
+
+        $response = $this->postJson('/api/actions/interpret', [
+            'text' => 'Schedule a call with Rossini',
+        ]);
+
         $missing = $response->json('data.missing');
-        $this->assertContains('date', $missing);
-        $this->assertContains('time', $missing);
+        $this->assertCount(2, $missing);
+
+        foreach ($missing as $field) {
+            $this->assertArrayHasKey('key', $field);
+            $this->assertArrayHasKey('label', $field);
+            $this->assertArrayHasKey('reason', $field);
+            $this->assertArrayHasKey('required', $field);
+            $this->assertTrue($field['required']);
+        }
+    }
+
+    public function test_schedule_call_editable_fields_include_date_and_time_as_missing(): void
+    {
+        $this->actingAsUser();
+
+        $response = $this->postJson('/api/actions/interpret', [
+            'text' => 'Schedule a call with Rossini',
+        ]);
+
+        $fields = collect($response->json('data.editable_fields'));
+
+        $dateField = $fields->firstWhere('key', 'date');
+        $timeField = $fields->firstWhere('key', 'time');
+
+        $this->assertNotNull($dateField);
+        $this->assertEquals('missing', $dateField['source']);
+        $this->assertNull($dateField['value']);
+
+        $this->assertNotNull($timeField);
+        $this->assertEquals('missing', $timeField['source']);
+        $this->assertNull($timeField['value']);
     }
 
     // --- unknown intent ---
@@ -113,6 +212,72 @@ class InterpretActionTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonPath('data.intent', 'unknown')
             ->assertJsonPath('data.status', 'draft');
+
+        $this->assertCount(0, $response->json('data.changes'));
+    }
+
+    // --- case-insensitivity ---
+
+    public function test_create_task_is_detected_case_insensitive(): void
+    {
+        $this->actingAsUser();
+
+        $response = $this->postJson('/api/actions/interpret', [
+            'text' => 'CREATE A TASK FOR ROSSINI',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.intent', 'create_task');
+    }
+
+    public function test_lead_detection_is_case_insensitive(): void
+    {
+        $this->actingAsUser();
+
+        $response = $this->postJson('/api/actions/interpret', [
+            'text' => 'Create a task for rossini',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertEquals('Rossini', $response->json('data.entities.lead'));
+    }
+
+    // --- field structures ---
+
+    public function test_editable_fields_have_expected_structure(): void
+    {
+        $this->actingAsUser();
+
+        $response = $this->postJson('/api/actions/interpret', [
+            'text' => 'Create a task for Rossini',
+        ]);
+
+        $fields = $response->json('data.editable_fields');
+        foreach ($fields as $field) {
+            $this->assertArrayHasKey('key', $field);
+            $this->assertArrayHasKey('label', $field);
+            $this->assertArrayHasKey('value', $field);
+            $this->assertArrayHasKey('source', $field);
+            $this->assertArrayHasKey('required', $field);
+        }
+    }
+
+    public function test_changes_have_expected_structure(): void
+    {
+        $this->actingAsUser();
+
+        $response = $this->postJson('/api/actions/interpret', [
+            'text' => 'Create a task for Rossini',
+        ]);
+
+        $changes = $response->json('data.changes');
+        $this->assertNotEmpty($changes);
+        foreach ($changes as $change) {
+            $this->assertArrayHasKey('type', $change);
+            $this->assertArrayHasKey('label', $change);
+            $this->assertArrayHasKey('module', $change);
+            $this->assertArrayHasKey('payload', $change);
+        }
     }
 
     // --- proposal shape ---

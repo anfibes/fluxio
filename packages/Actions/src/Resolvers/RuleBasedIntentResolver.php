@@ -9,7 +9,7 @@ class RuleBasedIntentResolver implements IntentResolverInterface
 {
     public function resolve(string $text): ParsedIntent
     {
-        $lower = strtolower($text);
+        $lower = mb_strtolower($text);
 
         $intent = match (true) {
             str_contains($lower, 'task') => 'create_task',
@@ -19,7 +19,7 @@ class RuleBasedIntentResolver implements IntentResolverInterface
 
         $entities = [];
 
-        if (str_contains($text, 'Rossini')) {
+        if (str_contains($lower, 'rossini')) {
             $entities['lead'] = 'Rossini';
         }
 

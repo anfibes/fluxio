@@ -4,6 +4,11 @@ namespace Fluxio\Actions\DTO;
 
 class ActionProposal
 {
+    /**
+     * @param MissingField[]   $missing
+     * @param EditableField[]  $editable_fields
+     * @param ProposedChange[] $changes
+     */
     public function __construct(
         public readonly string $id,
         public readonly string $intent,
@@ -27,10 +32,10 @@ class ActionProposal
             'confidence' => $this->confidence,
             'source_text' => $this->source_text,
             'entities' => $this->entities,
-            'missing' => $this->missing,
+            'missing' => array_map(fn (MissingField $f) => $f->toArray(), $this->missing),
             'warnings' => $this->warnings,
-            'editable_fields' => $this->editable_fields,
-            'changes' => $this->changes,
+            'editable_fields' => array_map(fn (EditableField $f) => $f->toArray(), $this->editable_fields),
+            'changes' => array_map(fn (ProposedChange $c) => $c->toArray(), $this->changes),
             'needs_confirmation' => $this->needs_confirmation,
         ];
     }
