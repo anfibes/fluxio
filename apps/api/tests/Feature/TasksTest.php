@@ -372,6 +372,28 @@ class TasksTest extends TestCase
             ->assertJsonStructure(['errors' => ['status']]);
     }
 
+    public function test_update_returns_422_on_invalid_priority(): void
+    {
+        $this->actingAsUser();
+        $task = Task::factory()->create();
+
+        $response = $this->patchJson("/api/tasks/{$task->id}", ['priority' => 'urgent']);
+
+        $response->assertStatus(422)
+            ->assertJsonStructure(['errors' => ['priority']]);
+    }
+
+    public function test_update_returns_422_on_nonexistent_lead_id(): void
+    {
+        $this->actingAsUser();
+        $task = Task::factory()->create();
+
+        $response = $this->patchJson("/api/tasks/{$task->id}", ['lead_id' => 9999]);
+
+        $response->assertStatus(422)
+            ->assertJsonStructure(['errors' => ['lead_id']]);
+    }
+
     public function test_update_returns_404_for_missing_task(): void
     {
         $this->actingAsUser();
