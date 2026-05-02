@@ -1,0 +1,8 @@
+# AI tooling
+.claude/
+CLAUDE.md
+
+# global
+.env
+*.log
+.DS_Store

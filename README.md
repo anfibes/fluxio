@@ -72,6 +72,7 @@ Modules communicate through events and listeners:
 ---
 ### No Direct Cross-Domain Coupling
 Direct cross-domain calls are avoided.
+
 Incorrect:
 ```php
 Lead::createTaskDirectly();
