@@ -139,8 +139,7 @@ Error response
 ```json
 {
   "success": false,
-  "message": "Error message.",
-  "errors": {}
+  "message": "Error message."
 }
 ```
 Validation error
@@ -155,18 +154,24 @@ Validation error
 ```
 ### Example Endpoint
 
-POST /api/tasks
+POST /api/leads
 
 Response:
 
 ```json
 {
   "success": true,
-  "message": "Task created successfully.",
+  "message": "Lead created successfully.",
   "data": {
     "id": 1,
-    "title": "Follow up with Rossini",
-    "status": "pending"
+    "name": "Rossini",
+    "company": "Rossini SRL",
+    "email": "rossini@example.com",
+    "phone": null,
+    "status": "new",
+    "notes": null,
+    "created_at": "2026-05-02T10:00:00.000000Z",
+    "updated_at": "2026-05-02T10:00:00.000000Z"
   }
 }
 ```
@@ -210,7 +215,7 @@ The interface is designed to be interaction-focused rather than form-driven.
 ### Frontend
 - Vue 3
 - Composition API
-- Nuxt 3
+- Nuxt 4
 - Tailwind CSS
 - i18n support
 ---
@@ -244,26 +249,23 @@ php artisan serve
 ```
 ---
 ## Project Status
-Fluxio is currently in early development.
 
-Implemented
+Fluxio is in active development. The backend foundation is complete; the command-first UI and Actions interpreter are next.
 
-* Modular project structure
-* Core module
-* Standardized API response layer
-* Centralized exception handling
+**Implemented**
 
-In Progress
+* Modular project structure (Laravel 12 + Nuxt 4)
+* Core API response layer and centralized exception handling
+* Identity module — Sanctum token authentication (login, logout, me)
+* Leads module — protected CRUD, paginated list, search, status filter
 
-* Actions module (natural language interpreter)
-* Identity module
+**Not yet implemented**
 
-Planned
+* Tasks module
+* Actions module (natural language interpreter and proposal engine)
+* Frontend application (placeholder only)
 
-* Leads and Tasks core features
-* Initial UI implementation
-
-The project is actively evolving and focused on architecture-first development.
+The project is architecture-first. The goal is a minimal, demonstrable command-first workflow before expanding scope.
 ---
 
 ## Project Goal
