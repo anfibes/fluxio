@@ -3,6 +3,7 @@
 namespace Fluxio\Core\Http\Controllers;
 
 use Fluxio\Core\Http\Responses\ApiResponse;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
@@ -37,5 +38,10 @@ abstract class BaseApiController extends Controller
     protected function sendForbidden(string $message = 'core::api.forbidden'): JsonResponse
     {
         return ApiResponse::forbidden($message);
+    }
+
+    protected function sendPaginated(LengthAwarePaginator $paginator, ?string $message = null): JsonResponse
+    {
+        return ApiResponse::paginated($paginator, $message);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Fluxio\Core\Http\Responses;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
@@ -9,7 +10,7 @@ use Illuminate\Support\Facades\Lang;
 
 class ApiResponse
 {
-    public static function success(mixed $data = null, string|null $message = null, int $status = Response::HTTP_OK, array $headers = []): JsonResponse
+    public static function success(mixed $data = null, ?string $message = null, int $status = Response::HTTP_OK, array $headers = []): JsonResponse
     {
         return new JsonResponse([
             'success' => true,
@@ -50,6 +51,21 @@ class ApiResponse
     public static function forbidden(string $message = 'core::api.forbidden'): JsonResponse
     {
         return self::error($message, Response::HTTP_FORBIDDEN);
+    }
+
+    public static function paginated(LengthAwarePaginator $paginator, ?string $message = null, array $headers = []): JsonResponse
+    {
+        return new JsonResponse([
+            'success' => true,
+            'message' => self::translate($message),
+            'data' => $paginator->items(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'last_page' => $paginator->lastPage(),
+            ],
+        ], Response::HTTP_OK, $headers);
     }
 
     private static function translate(?string $message): ?string

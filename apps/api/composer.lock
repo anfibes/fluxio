@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7a76ebf971963145f9bec35039c104c3",
+    "content-hash": "390f34b60cfb11f81d6bc83d5bea2a05",
     "packages": [
         {
             "name": "brick/math",
@@ -613,6 +613,35 @@
                 }
             },
             "description": "Identity and authentication module for Fluxio",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "fluxio/leads",
+            "version": "0.1.0",
+            "dist": {
+                "type": "path",
+                "url": "../../packages/Leads",
+                "reference": "9bcd9a735ea8f13caedae66068f1bb17bdd525fb"
+            },
+            "require": {
+                "fluxio/core": "^0.1"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Fluxio\\Leads\\Providers\\LeadsServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Fluxio\\Leads\\": "src/"
+                }
+            },
+            "description": "Leads module for Fluxio",
             "transport-options": {
                 "relative": true
             }
