@@ -1,4 +1,7 @@
-# Fluxio is a command-first CRM/ERP that turns natural language into structured, validated business actions.
+# Fluxio
+
+Command-first CRM/ERP prototype that turns natural language into structured, validated business actions.
+
 ## Overview
 
 Fluxio is an open-source CRM/ERP prototype focused on natural-language business interactions.
