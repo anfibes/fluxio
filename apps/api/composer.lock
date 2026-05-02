@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "390f34b60cfb11f81d6bc83d5bea2a05",
+    "content-hash": "a21d2edff880c7429437744e1823ce7e",
     "packages": [
         {
             "name": "brick/math",
@@ -642,6 +642,36 @@
                 }
             },
             "description": "Leads module for Fluxio",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "fluxio/tasks",
+            "version": "0.1.0",
+            "dist": {
+                "type": "path",
+                "url": "../../packages/Tasks",
+                "reference": "77784afe95d70c80411a06529a01d36aa71c22d4"
+            },
+            "require": {
+                "fluxio/core": "^0.1",
+                "fluxio/leads": "^0.1"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Fluxio\\Tasks\\Providers\\TasksServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Fluxio\\Tasks\\": "src/"
+                }
+            },
+            "description": "Tasks module for Fluxio",
             "transport-options": {
                 "relative": true
             }

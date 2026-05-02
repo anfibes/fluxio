@@ -1,0 +1,20 @@
+{
+  "name": "fluxio/tasks",
+  "description": "Tasks module for Fluxio",
+  "version": "0.1.0",
+  "type": "library",
+  "autoload": {
+    "psr-4": { "Fluxio\\Tasks\\": "src/" }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Fluxio\\Tasks\\Providers\\TasksServiceProvider"
+      ]
+    }
+  },
+  "require": {
+    "fluxio/core": "^0.1",
+    "fluxio/leads": "^0.1"
+  }
+}

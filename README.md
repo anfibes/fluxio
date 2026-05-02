@@ -258,10 +258,10 @@ Fluxio is in active development. The backend foundation is complete; the command
 * Core API response layer and centralized exception handling
 * Identity module — Sanctum token authentication (login, logout, me)
 * Leads module — protected CRUD, paginated list, search, status filter
+* Tasks module — protected CRUD, paginated list, search, status/priority/lead_id filters, optional Lead relation
 
 **Not yet implemented**
 
-* Tasks module
 * Actions module (natural language interpreter and proposal engine)
 * Frontend application (placeholder only)
 
