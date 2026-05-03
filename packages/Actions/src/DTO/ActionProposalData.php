@@ -2,7 +2,7 @@
 
 namespace Fluxio\Actions\DTO;
 
-class ActionProposal
+class ActionProposalData
 {
     /**
      * @param MissingField[]   $missing

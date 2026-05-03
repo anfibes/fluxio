@@ -3,7 +3,7 @@
 namespace Fluxio\Actions\Services;
 
 use Fluxio\Actions\Contracts\IntentResolverInterface;
-use Fluxio\Actions\DTO\ActionProposal;
+use Fluxio\Actions\DTO\ActionProposalData;
 use Fluxio\Actions\DTO\EditableField;
 use Fluxio\Actions\DTO\MissingField;
 use Fluxio\Actions\DTO\ProposedChange;
@@ -13,7 +13,7 @@ class ActionInterpreterService
 {
     public function __construct(private readonly IntentResolverInterface $resolver) {}
 
-    public function interpret(string $text): ActionProposal
+    public function interpret(string $text): ActionProposalData
     {
         $parsed = $this->resolver->resolve($text);
 
@@ -29,7 +29,7 @@ class ActionInterpreterService
             default => ['draft', [], [], []],
         };
 
-        return new ActionProposal(
+        return new ActionProposalData(
             id: (string) Str::uuid(),
             intent: $parsed->intent,
             status: $status,

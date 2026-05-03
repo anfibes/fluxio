@@ -20,6 +20,7 @@ class ActionsServiceProvider extends ServiceProvider
             ->prefix('api/actions')
             ->group(__DIR__ . '/../../routes/api.php');
 
+        $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations');
         $this->loadTranslationsFrom(__DIR__ . '/../../lang', 'actions');
     }
 }

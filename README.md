@@ -149,13 +149,23 @@ Create a follow-up task for Rossini tomorrow morning
 Output:
 ```json
 {
-  "intent": "create_follow_up_task",
-  "entities": {
-    "lead_name": "Rossini",
-    "due_date": "tomorrow morning"
-  },
-  "confidence": 0.82,
-  "needs_confirmation": true
+  "success": true,
+  "message": "Command interpreted successfully.",
+  "data": {
+    "id": "uuid",
+    "intent": "create_task",
+    "status": "ready",
+    "confidence": 0.9,
+    "source_text": "Create a task for Rossini",
+    "entities": {
+      "lead": "Rossini"
+    },
+    "missing": [],
+    "warnings": [],
+    "editable_fields": [],
+    "changes": [],
+    "needs_confirmation": true
+  }
 }
 ```
 
@@ -307,7 +317,7 @@ php artisan serve
 
 ## Project Status
 
-Fluxio is in active development. The backend foundation is complete; the command-first UI and Actions interpreter are next.
+Fluxio is in active development. The backend foundation is complete, and the first Actions interpreter endpoint is implemented. The next major steps are proposal confirmation/execution and the command-first frontend UI.
 
 ### Implemented
 
@@ -316,10 +326,11 @@ Fluxio is in active development. The backend foundation is complete; the command
 - Identity module — Sanctum token authentication (login, logout, me)
 - Leads module — protected CRUD, paginated list, search, status filter
 - Tasks module — protected CRUD, paginated list, search, status/priority/lead_id filters, optional Lead relation
+- Actions module — protected interpret endpoint, rule-based intent resolver, structured ActionProposal contract
 
 ### Not yet implemented
 
-- Actions module (natural language interpreter and proposal engine)
+- Actions proposal persistence, confirmation and execution flow
 - Frontend application (placeholder only)
 
 The project is architecture-first. The goal is a minimal, demonstrable command-first workflow before expanding scope.
