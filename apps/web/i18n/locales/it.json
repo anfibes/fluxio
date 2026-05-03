@@ -14,8 +14,11 @@
   },
   "proposal": {
     "title": "Proposta di azione",
+    "fields": "Campi",
     "changes": "Modifiche proposte",
     "missing": "Campi mancanti",
+    "confirm_execute": "Conferma & Esegui",
+    "complete_to_confirm": "Completa per confermare",
     "status": {
       "draft": "Bozza",
       "ready": "Pronta",

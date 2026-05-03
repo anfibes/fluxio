@@ -27,7 +27,6 @@
 
 .app-content {
   flex: 1;
-  overflow-y: auto;
-  padding: 1.5rem;
+  overflow: hidden; /* pages manage their own scroll columns */
 }
 </style>

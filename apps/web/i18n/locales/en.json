@@ -14,8 +14,11 @@
   },
   "proposal": {
     "title": "Action Proposal",
+    "fields": "Fields",
     "changes": "Proposed changes",
     "missing": "Missing fields",
+    "confirm_execute": "Confirm & Execute",
+    "complete_to_confirm": "Complete to confirm",
     "status": {
       "draft": "Draft",
       "ready": "Ready",
