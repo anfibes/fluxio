@@ -1,10 +1,23 @@
+<script setup lang="ts">
+const { user, isAuthenticated, logout } = useAuth()
+</script>
+
 <template>
   <header class="topbar">
     <div class="topbar-left">
       <slot name="title" />
     </div>
     <div class="topbar-right">
-      <!-- user menu and actions will go here -->
+      <template v-if="isAuthenticated">
+        <span v-if="user" class="text-xs text-[var(--color-text-muted)]">{{ user.email }}</span>
+        <button
+          type="button"
+          class="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-xs text-[var(--color-muted)] transition-colors hover:border-[var(--color-border-subtle)] hover:text-[var(--color-text-muted)]"
+          @click="logout"
+        >
+          {{ $t('auth.logout') }}
+        </button>
+      </template>
     </div>
   </header>
 </template>

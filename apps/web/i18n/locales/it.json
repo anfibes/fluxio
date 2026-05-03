@@ -27,6 +27,14 @@
       "failed": "Fallita"
     }
   },
+  "auth": {
+    "email": "Email",
+    "password": "Password",
+    "login": "Accedi",
+    "logout": "Esci",
+    "logging_in": "Accesso in corso…",
+    "sign_in_to_continue": "Accedi per continuare"
+  },
   "errors": {
     "generic": "Si è verificato un errore. Riprova.",
     "unauthorized": "Non sei autorizzato a eseguire questa azione.",

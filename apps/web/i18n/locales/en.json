@@ -27,6 +27,14 @@
       "failed": "Failed"
     }
   },
+  "auth": {
+    "email": "Email",
+    "password": "Password",
+    "login": "Sign in",
+    "logout": "Sign out",
+    "logging_in": "Signing in…",
+    "sign_in_to_continue": "Sign in to continue"
+  },
   "errors": {
     "generic": "Something went wrong. Please try again.",
     "unauthorized": "You are not authorized to perform this action.",

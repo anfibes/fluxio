@@ -14,6 +14,9 @@ const mockProposalMap: Record<DemoState, ActionProposal> = {
   executed: mockProposalExecuted,
 }
 
+// ── auth ─────────────────────────────────────────────────────
+const { isAuthenticated } = useAuth()
+
 // ── live state ───────────────────────────────────────────────
 const commandText = ref('')
 const { proposal, loading, error, interpret } = useActionProposal()
@@ -30,8 +33,14 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="flex h-full">
-    <!-- ── Left column ─────────────────────────────────── -->
+  <!-- ── Auth gate ────────────────────────────────────────── -->
+  <div v-if="!isAuthenticated" class="flex h-full items-center justify-center bg-[var(--color-bg)]">
+    <AuthLoginPanel />
+  </div>
+
+  <!-- ── Main UI ───────────────────────────────────────────── -->
+  <div v-else class="flex h-full">
+    <!-- Left column -->
     <div class="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
       <!-- Dev mock switcher -->
       <div class="flex items-center gap-2">
@@ -69,7 +78,7 @@ async function handleSubmit() {
       <ContextTabs />
     </div>
 
-    <!-- ── Right rail ─────────────────────────────────── -->
+    <!-- Right rail -->
     <div class="flex w-[440px] shrink-0 flex-col overflow-hidden border-l border-[var(--color-border)] bg-[var(--color-surface)]">
       <div class="border-b border-[var(--color-border)] px-4 py-3">
         <p class="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
