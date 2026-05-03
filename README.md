@@ -144,7 +144,7 @@ It transforms natural-language input into structured action proposals.
 
 Input:
 
-Create a follow-up task for Rossini tomorrow morning
+Create a follow-up task for Rossini
 
 Output:
 ```json
@@ -156,14 +156,37 @@ Output:
     "intent": "create_task",
     "status": "ready",
     "confidence": 0.9,
-    "source_text": "Create a task for Rossini",
+    "source_text": "Create a follow-up task for Rossini",
     "entities": {
       "lead": "Rossini"
     },
     "missing": [],
     "warnings": [],
-    "editable_fields": [],
-    "changes": [],
+    "editable_fields": [
+      {
+        "key": "title",
+        "value": "Follow-up task",
+        "source": "inferred",
+        "required": true
+      },
+      {
+        "key": "lead",
+        "value": "Rossini",
+        "source": "detected",
+        "required": true
+      }
+    ],
+    "changes": [
+      {
+        "type": "create",
+        "module": "tasks",
+        "label": "Create task",
+        "payload": {
+          "title": "Follow-up task",
+          "lead": "Rossini"
+        }
+      }
+    ],
     "needs_confirmation": true
   }
 }
@@ -317,7 +340,7 @@ php artisan serve
 
 ## Project Status
 
-Fluxio is in active development. The backend foundation is complete, and the first Actions interpreter endpoint is implemented. The next major steps are proposal confirmation/execution and the command-first frontend UI.
+Fluxio is in active development. The backend MVP is complete. The next step is the command-first frontend UI.
 
 ### Implemented
 
@@ -326,12 +349,13 @@ Fluxio is in active development. The backend foundation is complete, and the fir
 - Identity module — Sanctum token authentication (login, logout, me)
 - Leads module — protected CRUD, paginated list, search, status filter
 - Tasks module — protected CRUD, paginated list, search, status/priority/lead_id filters, optional Lead relation
-- Actions module — protected interpret endpoint, rule-based intent resolver, structured ActionProposal contract
+- Actions module — rule-based interpreter, proposal persistence, confirmation gate, execution flow with task creation
 
 ### Not yet implemented
 
-- Actions proposal persistence, confirmation and execution flow
 - Frontend application (placeholder only)
+- Action events (ActionProposed, ActionExecuted, TaskCreatedFromAction)
+- Additional intent executors (schedule_call)
 
 The project is architecture-first. The goal is a minimal, demonstrable command-first workflow before expanding scope.
 

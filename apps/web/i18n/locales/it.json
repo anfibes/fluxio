@@ -1,0 +1,32 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "leads": "Lead",
+    "tasks": "Attività",
+    "calendar": "Calendario",
+    "settings": "Impostazioni"
+  },
+  "actions": {
+    "confirm": "Conferma",
+    "cancel": "Annulla",
+    "edit": "Modifica",
+    "execute": "Esegui"
+  },
+  "proposal": {
+    "title": "Proposta di azione",
+    "changes": "Modifiche proposte",
+    "missing": "Campi mancanti",
+    "status": {
+      "draft": "Bozza",
+      "ready": "Pronta",
+      "confirmed": "Confermata",
+      "executed": "Eseguita",
+      "failed": "Fallita"
+    }
+  },
+  "errors": {
+    "generic": "Si è verificato un errore. Riprova.",
+    "unauthorized": "Non sei autorizzato a eseguire questa azione.",
+    "not_found": "La risorsa richiesta non è stata trovata."
+  }
+}

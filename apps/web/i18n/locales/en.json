@@ -1,0 +1,32 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "leads": "Leads",
+    "tasks": "Tasks",
+    "calendar": "Calendar",
+    "settings": "Settings"
+  },
+  "actions": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "execute": "Execute"
+  },
+  "proposal": {
+    "title": "Action Proposal",
+    "changes": "Proposed changes",
+    "missing": "Missing fields",
+    "status": {
+      "draft": "Draft",
+      "ready": "Ready",
+      "confirmed": "Confirmed",
+      "executed": "Executed",
+      "failed": "Failed"
+    }
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "unauthorized": "You are not authorized to perform this action.",
+    "not_found": "The requested resource was not found."
+  }
+}
