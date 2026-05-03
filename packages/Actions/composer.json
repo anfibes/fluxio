@@ -14,6 +14,8 @@
     }
   },
   "require": {
-    "fluxio/core": "^0.1"
+    "fluxio/core": "^0.1",
+    "fluxio/leads": "^0.1",
+    "fluxio/tasks": "^0.1"
   }
 }

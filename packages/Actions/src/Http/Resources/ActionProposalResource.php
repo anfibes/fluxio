@@ -2,29 +2,39 @@
 
 namespace Fluxio\Actions\Http\Resources;
 
+use Fluxio\Actions\Models\ActionProposal;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class ActionProposalResource extends JsonResource
 {
+    public function __construct(ActionProposal $resource)
+    {
+        parent::__construct($resource);
+    }
+
     public function toArray(Request $request): array
     {
+        /** @var ActionProposal $proposal */
+        $proposal = $this->resource;
+
         return [
-            'id' => $this->resource->id,
-            'intent' => $this->resource->intent,
-            'status' => $this->resource->status,
-            'confidence' => $this->resource->confidence,
-            'source_text' => $this->resource->source_text,
-            'entities' => $this->resource->entities ?? [],
-            'missing' => $this->resource->missing ?? [],
-            'warnings' => $this->resource->warnings ?? [],
-            'editable_fields' => $this->resource->editable_fields ?? [],
-            'changes' => $this->resource->changes ?? [],
-            'needs_confirmation' => $this->resource->needs_confirmation,
-            'confirmed_at' => $this->resource->confirmed_at?->toIso8601String(),
-            'executed_at' => $this->resource->executed_at?->toIso8601String(),
-            'failed_at' => $this->resource->failed_at?->toIso8601String(),
-            'failure_reason' => $this->resource->failure_reason,
+            'id' => $proposal->id,
+            'intent' => $proposal->intent,
+            'status' => $proposal->status,
+            'confidence' => $proposal->confidence,
+            'source_text' => $proposal->source_text,
+            'entities' => $proposal->entities ?? [],
+            'missing' => $proposal->missing ?? [],
+            'warnings' => $proposal->warnings ?? [],
+            'editable_fields' => $proposal->editable_fields ?? [],
+            'changes' => $proposal->changes ?? [],
+            'needs_confirmation' => $proposal->needs_confirmation,
+            'confirmed_at' => $proposal->confirmed_at?->toIso8601String(),
+            'executed_at' => $proposal->executed_at?->toIso8601String(),
+            'failed_at' => $proposal->failed_at?->toIso8601String(),
+            'failure_reason' => $proposal->failure_reason,
+            'execution_result' => $proposal->execution_result,
         ];
     }
 }

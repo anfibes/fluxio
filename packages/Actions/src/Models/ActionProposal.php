@@ -30,6 +30,7 @@ class ActionProposal extends Model
         'executed_at',
         'failed_at',
         'failure_reason',
+        'execution_result',
     ];
 
     protected function casts(): array
@@ -45,6 +46,7 @@ class ActionProposal extends Model
             'confirmed_at' => 'datetime',
             'executed_at' => 'datetime',
             'failed_at' => 'datetime',
+            'execution_result' => 'array',
         ];
     }
 

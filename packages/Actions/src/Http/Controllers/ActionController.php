@@ -3,9 +3,11 @@
 namespace Fluxio\Actions\Http\Controllers;
 
 use Fluxio\Actions\Http\Requests\ConfirmActionProposalRequest;
+use Fluxio\Actions\Http\Requests\ExecuteActionProposalRequest;
 use Fluxio\Actions\Http\Requests\InterpretActionRequest;
 use Fluxio\Actions\Http\Resources\ActionProposalResource;
 use Fluxio\Actions\Models\ActionProposal;
+use Fluxio\Actions\Services\ActionExecutionService;
 use Fluxio\Actions\Services\ActionInterpreterService;
 use Fluxio\Actions\Services\ActionProposalConfirmationService;
 use Fluxio\Actions\Services\ActionProposalPersistenceService;
@@ -19,6 +21,7 @@ class ActionController extends BaseApiController
         private readonly ActionInterpreterService $interpreterService,
         private readonly ActionProposalPersistenceService $persistenceService,
         private readonly ActionProposalConfirmationService $confirmationService,
+        private readonly ActionExecutionService $executionService,
     ) {}
 
     public function interpret(InterpretActionRequest $request): JsonResponse
@@ -44,6 +47,20 @@ class ActionController extends BaseApiController
         return ApiResponse::success(
             (new ActionProposalResource($confirmed))->resolve(),
             'actions::actions.confirmed'
+        );
+    }
+
+    public function execute(ExecuteActionProposalRequest $request, ActionProposal $proposal): JsonResponse
+    {
+        if ($proposal->user_id !== $request->user()->id) {
+            abort(404);
+        }
+
+        $executed = $this->executionService->execute($proposal);
+
+        return ApiResponse::success(
+            (new ActionProposalResource($executed))->resolve(),
+            'actions::actions.executed'
         );
     }
 }

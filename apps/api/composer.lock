@@ -515,10 +515,12 @@
             "dist": {
                 "type": "path",
                 "url": "../../packages/Actions",
-                "reference": "427d6d1148f314dc90f5e884bb4ce458e1afccbf"
+                "reference": "f576ee04ccebf4e7359d784ab6ac719832905805"
             },
             "require": {
-                "fluxio/core": "^0.1"
+                "fluxio/core": "^0.1",
+                "fluxio/leads": "^0.1",
+                "fluxio/tasks": "^0.1"
             },
             "type": "library",
             "extra": {
