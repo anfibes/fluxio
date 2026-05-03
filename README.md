@@ -5,24 +5,36 @@ Command-first CRM/ERP prototype that turns natural language into structured, val
 ## Overview
 
 Fluxio is an open-source CRM/ERP prototype focused on natural-language business interactions.
+
 The goal of the project is not to build a traditional CRM, but to demonstrate how business systems can be controlled through structured, validated natural-language commands.
+
 Fluxio is designed as a technical and architectural showcase, highlighting:
+
 - modular backend design
 - domain separation
 - event-driven architecture
 - API consistency
 - command-first user interaction
+
 ---
+
 ## Why Fluxio
+
 Most business software still relies on rigid UI flows and manual data entry.
+
 Fluxio explores a different approach:
+
 - reduce friction in daily operations
 - enable faster interactions
 - bridge natural language and structured systems
 - maintain full control through validation and confirmation
+
 The goal is not blind automation, but controlled and transparent execution.
+
 ---
+
 ## Core Idea
+
 Traditional systems:
 
 User → UI → Form → Action
@@ -32,77 +44,103 @@ Fluxio:
 User → Natural Language → Action Proposal → Validation → Confirmation → Execution
 
 Natural language is never executed directly.
+
 It is always transformed into a structured action proposal that must be validated and explicitly confirmed before execution.
+
 ---
+
 ## Architecture
+
 ### Modular Monolith
+
 Fluxio is built as a modular monolith with clearly defined domain boundaries and future microservice extraction in mind.
-```php
+
+```bash
 packages/
-Core/
-Identity/
-Leads/
-Tasks/
-Actions/
-Calendar/
-Analytics/
-Notifications/
+    Core/
+    Identity/
+    Leads/
+    Tasks/
+    Actions/
+    Calendar/
+    Analytics/
+    Notifications/
 ```
+
 Each module is responsible for its own:
+
 - models
 - migrations
 - routes
 - services
 - events
+
 ---
+
 ## Architectural Principles
+
 ### Modular First, Microservices Later
+
 The system starts as a monolith with strong internal boundaries.
 Modules can be extracted into microservices only when necessary.
+
 ---
+
 ### Domain Separation
+
 Each domain owns its logic and responsibilities:
 - **Actions** → interprets user intent (natural language → structured action)
 - **Tasks** → execution layer
 - **Leads** → lead lifecycle
 - **Calendar** → scheduling and time-based operations
+
 ---
+
 ### Event-Driven Communication
+
 Modules communicate through events and listeners:
+
 - `LeadCreated`
 - `TaskCompleted`
 - `ActionExecuted`
+
 ---
+
 ### No Direct Cross-Domain Coupling
+
 Direct cross-domain calls are avoided.
 
-Incorrect:
+### Incorrect:
+
 ```php
 Lead::createTaskDirectly();
 ```
 
-Correct:
+### Correct:
+
 ```php
 dispatch(new CreateTaskFromLead(...));
 ```
+
 ---
+
 ## Actions Module
 
 The Actions module is the core of Fluxio.
 
 It transforms natural-language input into structured action proposals.
 
-Flow
+### Flow
 
-Input text
-→ Intent resolution
-→ Entity extraction
-→ Schema validation
-→ Action proposal
-→ User confirmation
-→ Execution
+- Input text
+- Intent resolution
+- Entity extraction
+- Schema validation
+- Action proposal
+- User confirmation
+- Execution
 
-Example
+### Example
 
 Input:
 
@@ -121,13 +159,13 @@ Output:
 }
 ```
 
-⸻
+---
 
-API Design
+## API Design
 
 Fluxio exposes a consistent JSON API designed for frontend applications and integrations.
 
-Success response
+### Success response
 ```json
 {
   "success": true,
@@ -135,14 +173,14 @@ Success response
   "data": {}
 }
 ```
-Error response
+### Error response
 ```json
 {
   "success": false,
   "message": "Error message."
 }
 ```
-Validation error
+### Validation error
 ```json
 {
   "success": false,
@@ -152,9 +190,11 @@ Validation error
   }
 }
 ```
-### Example Endpoint
 
+### Example: Create Lead
+```http
 POST /api/leads
+```
 
 Response:
 
@@ -175,37 +215,44 @@ Response:
   }
 }
 ```
+
 ---
 
-Exception Handling
+### Exception Handling
 
 All exceptions are standardized at the framework level.
 
-Handled cases
+### Handled cases
 
-* ValidationException → 422
-* AuthenticationException → 401
-* AuthorizationException → 403
-* NotFoundHttpException → 404
-* Generic exceptions → 500
+- ValidationException → 422
+- AuthenticationException → 401
+- AuthorizationException → 403
+- NotFoundHttpException → 404
+- Generic exceptions → 500
 
 In production, internal error details are not exposed.
 
+---
 
 ## UI Direction
+
 Fluxio is not form-driven. The UI is designed around intent, not data entry.
 
 Fluxio follows a command-first interface approach:
+
 - central command input
 - action suggestions
 - explicit confirmation before execution
 - minimal UI friction
+
 The interface is designed to be interaction-focused rather than form-driven.
+
 ---
 
 ## Technology Stack
 
 ### Backend
+
 - Laravel
 - PostgreSQL
 - Modular monolith architecture
@@ -213,29 +260,37 @@ The interface is designed to be interaction-focused rather than form-driven.
 - Standardized API responses
 
 ### Frontend
+
 - Vue 3
 - Composition API
 - Nuxt 4
 - Tailwind CSS
 - i18n support
+
 ---
 
 ## Localization
+
 Fluxio is designed as a multilingual system from the beginning.
+
 - backend uses Laravel translation files
 - frontend uses i18n
 - English is the primary language
 - additional languages can be added progressively
+
 ---
+
 ## Getting Started
 
 ### Requirements
+
 - PHP 8.2+
 - Composer
 - Node.js
 - PostgreSQL
 
 ### Installation
+
 ```bash
 git clone https://github.com/anfibes/fluxio.git
 cd fluxio/apps/api
@@ -247,25 +302,28 @@ npm run dev
 php artisan migrate
 php artisan serve
 ```
+
 ---
+
 ## Project Status
 
 Fluxio is in active development. The backend foundation is complete; the command-first UI and Actions interpreter are next.
 
-**Implemented**
+### Implemented
 
-* Modular project structure (Laravel 12 + Nuxt 4)
-* Core API response layer and centralized exception handling
-* Identity module — Sanctum token authentication (login, logout, me)
-* Leads module — protected CRUD, paginated list, search, status filter
-* Tasks module — protected CRUD, paginated list, search, status/priority/lead_id filters, optional Lead relation
+- Modular project structure (Laravel 12 + Nuxt 4)
+- Core API response layer and centralized exception handling
+- Identity module — Sanctum token authentication (login, logout, me)
+- Leads module — protected CRUD, paginated list, search, status filter
+- Tasks module — protected CRUD, paginated list, search, status/priority/lead_id filters, optional Lead relation
 
-**Not yet implemented**
+### Not yet implemented
 
-* Actions module (natural language interpreter and proposal engine)
-* Frontend application (placeholder only)
+- Actions module (natural language interpreter and proposal engine)
+- Frontend application (placeholder only)
 
 The project is architecture-first. The goal is a minimal, demonstrable command-first workflow before expanding scope.
+
 ---
 
 ## Project Goal
@@ -274,15 +332,15 @@ Fluxio is currently not production-ready.
 
 It is an evolving project designed to demonstrate:
 
-* backend architecture
-* domain-driven design principles
-* API consistency
-* event-driven systems
-* modern UX concepts for business applications
-* integration-ready design
+- backend architecture
+- domain-driven design principles
+- API consistency
+- event-driven systems
+- modern UX concepts for business applications
+- integration-ready design
 
 ---
 
-License
+## License
 
 MIT
