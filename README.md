@@ -473,6 +473,18 @@ The backend MVP and the first command-first frontend vertical slice are implemen
 
 ---
 
+# Documentation
+
+Detailed technical documentation is available inside the `docs/` directory.
+
+- [Architecture](docs/architecture.md)
+- [API Response Standard](docs/api-response-standard.md)
+- [Proposal Lifecycle](docs/proposal-lifecycle.md)
+- [Frontend Vision](docs/frontend-vision.md)
+- [Getting Started](docs/getting-started.md)
+
+---
+
 # Implemented
 
 ## Backend
