@@ -17,8 +17,10 @@ class ActionProposalRefinementService
             ]);
         }
 
-        if ($proposal->intent === 'schedule_call' && $this->mentionsTomorrowMorning($text)) {
-            return $this->applyTomorrowMorning($proposal, $text);
+        $effectiveText = $this->effectiveText($text, $proposal->source_text);
+
+        if ($proposal->intent === 'schedule_call' && $this->mentionsTomorrowMorning($effectiveText)) {
+            return $this->applyTomorrowMorning($proposal, $text, $effectiveText);
         }
 
         // Refinement not recognized — add warning, leave proposal unchanged.
@@ -27,6 +29,7 @@ class ActionProposalRefinementService
         $proposal->warnings = $warnings;
         $proposal->last_refinement = [
             'text' => $text,
+            'effective_text' => $effectiveText,
             'summary' => 'No changes applied.',
             'changes' => [],
         ];
@@ -35,12 +38,24 @@ class ActionProposalRefinementService
         return $proposal;
     }
 
+    private function effectiveText(string $text, string $sourceText): string
+    {
+        $text = trim($text);
+        $sourceText = trim($sourceText);
+
+        if ($sourceText !== '' && str_starts_with($text, $sourceText)) {
+            return trim(substr($text, strlen($sourceText)));
+        }
+
+        return $text;
+    }
+
     private function mentionsTomorrowMorning(string $text): bool
     {
         return (bool) preg_match('/tomorrow\s+morning/i', $text);
     }
 
-    private function applyTomorrowMorning(ActionProposal $proposal, string $text): ActionProposal
+    private function applyTomorrowMorning(ActionProposal $proposal, string $text, string $effectiveText): ActionProposal
     {
         $tomorrow = now()->addDay()->toDateString();
 
@@ -87,6 +102,7 @@ class ActionProposalRefinementService
         $proposal->confidence = $confidence;
         $proposal->last_refinement = [
             'text' => $text,
+            'effective_text' => $effectiveText,
             'summary' => 'Date and time added.',
             'changes' => $changes,
         ];

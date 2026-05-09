@@ -33,6 +33,7 @@ export interface ActionProposalRefinementChange {
 
 export interface ActionProposalRefinement {
   text: string
+  effective_text?: string
   summary: string
   changes: ActionProposalRefinementChange[]
 }

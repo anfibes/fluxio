@@ -177,6 +177,63 @@ class RefineActionProposalTest extends TestCase
             ->assertJsonPath('data.last_refinement.text', 'Tomorrow morning');
     }
 
+    public function test_effective_text_equals_raw_when_input_is_only_refinement(): void
+    {
+        $user = $this->actingAsUser();
+        $proposal = $this->scheduleCallProposal($user);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", [
+            'text' => 'Tomorrow morning',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.last_refinement.effective_text', 'Tomorrow morning');
+    }
+
+    public function test_effective_text_strips_source_text_prefix_from_full_command(): void
+    {
+        $user = $this->actingAsUser();
+        $proposal = $this->scheduleCallProposal($user);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", [
+            'text' => 'Schedule a call with Rossini Tomorrow morning',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.last_refinement.text', 'Schedule a call with Rossini Tomorrow morning')
+            ->assertJsonPath('data.last_refinement.effective_text', 'Tomorrow morning');
+    }
+
+    public function test_full_command_refinement_applies_date_time_changes(): void
+    {
+        $user = $this->actingAsUser();
+        $proposal = $this->scheduleCallProposal($user);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", [
+            'text' => 'Schedule a call with Rossini Tomorrow morning',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.status', 'ready');
+
+        $fields = collect($response->json('data.editable_fields'))->keyBy('key');
+        $this->assertEquals(now()->addDay()->toDateString(), $fields['date']['value']);
+        $this->assertEquals('09:00', $fields['time']['value']);
+    }
+
+    public function test_source_text_unchanged_when_full_command_used_for_refinement(): void
+    {
+        $user = $this->actingAsUser();
+        $proposal = $this->scheduleCallProposal($user);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", [
+            'text' => 'Schedule a call with Rossini Tomorrow morning',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.source_text', 'Schedule a call with Rossini');
+    }
+
     public function test_last_refinement_summary_is_date_and_time_added(): void
     {
         $user = $this->actingAsUser();
@@ -256,6 +313,7 @@ class RefineActionProposalTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonPath('data.last_refinement.text', 'Some unrelated text')
+            ->assertJsonPath('data.last_refinement.effective_text', 'Some unrelated text')
             ->assertJsonPath('data.last_refinement.summary', 'No changes applied.')
             ->assertJsonPath('data.last_refinement.changes', []);
     }

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { ActionProposalRefinement } from '~/types/actions'
 
-defineProps<{ refinement: ActionProposalRefinement }>()
+const props = defineProps<{ refinement: ActionProposalRefinement }>()
+
+const displayText = computed(() => props.refinement.effective_text ?? props.refinement.text)
 </script>
 
 <template>
@@ -10,7 +12,7 @@ defineProps<{ refinement: ActionProposalRefinement }>()
       <p class="text-xs font-medium uppercase tracking-wide text-muted">Last update</p>
     </div>
     <div class="flex flex-col gap-2 px-3.5 py-3">
-      <p class="text-xs italic leading-relaxed text-text-muted">"{{ refinement.text }}"</p>
+      <p class="text-xs italic leading-relaxed text-text-muted">"{{ displayText }}"</p>
       <p class="text-xs text-muted">{{ refinement.summary }}</p>
       <ul v-if="refinement.changes.length" class="flex flex-col gap-1 pt-0.5">
         <li
