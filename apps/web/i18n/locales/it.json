@@ -18,6 +18,7 @@
     "changes": "Modifiche proposte",
     "missing": "Campi mancanti",
     "confirm_execute": "Conferma & Esegui",
+    "confirming": "Conferma in corso…",
     "complete_to_confirm": "Completa per confermare",
     "status": {
       "draft": "Bozza",

@@ -12,12 +12,8 @@ export function useActionProposal() {
     error.value = null
     try {
       const response = await api.post<ActionProposal>('/actions/interpret', { text })
-      if (response.success) {
-        proposal.value = response.data
-      }
-      else {
-        error.value = response.message
-      }
+      if (response.success) proposal.value = response.data
+      else error.value = response.message
     }
     catch (err: unknown) {
       error.value = err instanceof Error ? err.message : 'Unknown error'
@@ -27,29 +23,46 @@ export function useActionProposal() {
     }
   }
 
-  function setProposal(p: ActionProposal | null) {
-    proposal.value = p
+  async function confirm(id: string): Promise<void> {
+    const response = await api.post<ActionProposal>(`/actions/${id}/confirm`, {})
+    if (response.success) proposal.value = response.data
+    else throw new Error(response.message)
   }
 
-  function setLoading(value: boolean) {
-    loading.value = value
+  async function execute(id: string): Promise<void> {
+    const response = await api.post<ActionProposal>(`/actions/${id}/execute`, {})
+    if (response.success) proposal.value = response.data
+    else throw new Error(response.message)
   }
 
-  function setError(message: string | null) {
-    error.value = message
-  }
-
-  function clear() {
-    proposal.value = null
+  async function confirmAndExecute(): Promise<void> {
+    if (!proposal.value || proposal.value.status !== 'ready') return
+    const id = proposal.value.id
+    loading.value = true
     error.value = null
-    loading.value = false
+    try {
+      await confirm(id)
+      await execute(id)
+    }
+    catch (err: unknown) {
+      error.value = err instanceof Error ? err.message : 'Unknown error'
+    }
+    finally {
+      loading.value = false
+    }
   }
+
+  function setProposal(p: ActionProposal | null) { proposal.value = p }
+  function setLoading(value: boolean) { loading.value = value }
+  function setError(message: string | null) { error.value = message }
+  function clear() { proposal.value = null; error.value = null; loading.value = false }
 
   return {
     proposal: readonly(proposal),
     loading: readonly(loading),
     error: readonly(error),
     interpret,
+    confirmAndExecute,
     setProposal,
     setLoading,
     setError,

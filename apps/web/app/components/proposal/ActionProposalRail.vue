@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import type { ActionProposal } from '~/types/actions'
 
-const props = defineProps<{ proposal: ActionProposal }>()
+const props = defineProps<{ proposal: ActionProposal; loading?: boolean }>()
+const emit = defineEmits<{ 'confirm-execute': [] }>()
 
 const isReady    = computed(() => props.proposal.status === 'ready')
 const isDraft    = computed(() => props.proposal.status === 'draft')
 const isExecuted = computed(() => props.proposal.status === 'executed')
+const isFailed   = computed(() => props.proposal.status === 'failed')
+
+const canConfirm = computed(() => isReady.value && !props.loading)
 </script>
 
 <template>
@@ -34,6 +38,15 @@ const isExecuted = computed(() => props.proposal.status === 'executed')
       <!-- Proposed changes -->
       <ProposalProposedChangesList :changes="proposal.changes" />
 
+      <!-- Failure reason -->
+      <div
+        v-if="isFailed && proposal.failure_reason"
+        class="mx-4 mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-xs text-red-400"
+      >
+        <p class="mb-1 font-medium">Execution failed</p>
+        <p>{{ proposal.failure_reason }}</p>
+      </div>
+
       <!-- Execution result -->
       <ProposalExecutionResultPanel
         v-if="isExecuted && proposal.execution_result"
@@ -46,12 +59,13 @@ const isExecuted = computed(() => props.proposal.status === 'executed')
       <button
         type="button"
         class="flex-1 rounded-lg py-2 text-sm font-medium transition-colors"
-        :disabled="!isReady"
-        :class="isReady
+        :disabled="!canConfirm"
+        :class="canConfirm
           ? 'bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)]'
           : 'cursor-not-allowed bg-[var(--color-surface-raised)] text-[var(--color-muted)]'"
+        @click="emit('confirm-execute')"
       >
-        {{ isDraft ? $t('proposal.complete_to_confirm') : $t('proposal.confirm_execute') }}
+        {{ loading ? $t('proposal.confirming') : isDraft ? $t('proposal.complete_to_confirm') : $t('proposal.confirm_execute') }}
       </button>
     </div>
   </div>

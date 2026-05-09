@@ -15,8 +15,7 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      // override with NUXT_PUBLIC_API_BASE env var at runtime
-      apiBase: 'http://localhost:8000/api',
+        apiBase: import.meta.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8000/api',
     },
   },
 

@@ -18,6 +18,7 @@
     "changes": "Proposed changes",
     "missing": "Missing fields",
     "confirm_execute": "Confirm & Execute",
+    "confirming": "Confirming…",
     "complete_to_confirm": "Complete to confirm",
     "status": {
       "draft": "Draft",

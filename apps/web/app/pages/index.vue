@@ -19,7 +19,7 @@ const { isAuthenticated } = useAuth()
 
 // ── live state ───────────────────────────────────────────────
 const commandText = ref('')
-const { proposal, loading, error, interpret } = useActionProposal()
+const { proposal, loading, error, interpret, confirmAndExecute } = useActionProposal()
 
 // real proposal wins; fall back to selected mock while no API response exists
 // cast needed: readonly(proposal).value is Readonly<ActionProposal>, mocks are ActionProposal
@@ -86,7 +86,11 @@ async function handleSubmit() {
         </p>
       </div>
       <div class="flex-1 overflow-hidden">
-        <ProposalActionProposalRail :proposal="displayProposal" />
+        <ProposalActionProposalRail
+          :proposal="displayProposal"
+          :loading="loading"
+          @confirm-execute="confirmAndExecute"
+        />
       </div>
     </div>
   </div>
