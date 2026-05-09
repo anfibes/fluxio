@@ -35,6 +35,7 @@ class ActionProposalResource extends JsonResource
             'failed_at' => $proposal->failed_at?->toIso8601String(),
             'failure_reason' => $proposal->failure_reason,
             'execution_result' => $proposal->execution_result,
+            'last_refinement' => $proposal->last_refinement,
         ];
     }
 }

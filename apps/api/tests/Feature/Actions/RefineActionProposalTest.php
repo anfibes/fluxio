@@ -149,6 +149,117 @@ class RefineActionProposalTest extends TestCase
         $response->assertStatus(200);
     }
 
+    // --- last_refinement metadata ---
+
+    public function test_source_text_is_unchanged_after_refinement(): void
+    {
+        $user = $this->actingAsUser();
+        $proposal = $this->scheduleCallProposal($user);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", [
+            'text' => 'Tomorrow morning',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.source_text', 'Schedule a call with Rossini');
+    }
+
+    public function test_last_refinement_text_equals_refinement_command(): void
+    {
+        $user = $this->actingAsUser();
+        $proposal = $this->scheduleCallProposal($user);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", [
+            'text' => 'Tomorrow morning',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.last_refinement.text', 'Tomorrow morning');
+    }
+
+    public function test_last_refinement_summary_is_date_and_time_added(): void
+    {
+        $user = $this->actingAsUser();
+        $proposal = $this->scheduleCallProposal($user);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", [
+            'text' => 'Tomorrow morning',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.last_refinement.summary', 'Date and time added.');
+    }
+
+    public function test_last_refinement_changes_contain_date_and_time(): void
+    {
+        $user = $this->actingAsUser();
+        $proposal = $this->scheduleCallProposal($user);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", [
+            'text' => 'Tomorrow morning',
+        ]);
+
+        $response->assertStatus(200);
+
+        $changes = collect($response->json('data.last_refinement.changes'))->keyBy('field');
+
+        $this->assertArrayHasKey('date', $changes->all());
+        $this->assertNull($changes['date']['from']);
+        $this->assertEquals(now()->addDay()->toDateString(), $changes['date']['to']);
+
+        $this->assertArrayHasKey('time', $changes->all());
+        $this->assertNull($changes['time']['from']);
+        $this->assertEquals('09:00', $changes['time']['to']);
+    }
+
+    public function test_last_refinement_changes_include_status_when_draft_becomes_ready(): void
+    {
+        $user = $this->actingAsUser();
+        $proposal = $this->scheduleCallProposal($user, 'draft');
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", [
+            'text' => 'Tomorrow morning',
+        ]);
+
+        $response->assertStatus(200);
+
+        $changes = collect($response->json('data.last_refinement.changes'))->keyBy('field');
+
+        $this->assertArrayHasKey('status', $changes->all());
+        $this->assertEquals('draft', $changes['status']['from']);
+        $this->assertEquals('ready', $changes['status']['to']);
+    }
+
+    public function test_last_refinement_changes_do_not_include_status_when_already_ready(): void
+    {
+        $user = $this->actingAsUser();
+        $proposal = $this->scheduleCallProposal($user, 'ready');
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", [
+            'text' => 'Tomorrow morning',
+        ]);
+
+        $response->assertStatus(200);
+
+        $changeFields = collect($response->json('data.last_refinement.changes'))->pluck('field');
+        $this->assertNotContains('status', $changeFields->all());
+    }
+
+    public function test_unrecognized_refinement_last_refinement_has_no_changes(): void
+    {
+        $user = $this->actingAsUser();
+        $proposal = $this->scheduleCallProposal($user);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", [
+            'text' => 'Some unrelated text',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.last_refinement.text', 'Some unrelated text')
+            ->assertJsonPath('data.last_refinement.summary', 'No changes applied.')
+            ->assertJsonPath('data.last_refinement.changes', []);
+    }
+
     // --- unrecognized refinement ---
 
     public function test_unrecognized_refinement_adds_warning_and_preserves_status(): void
