@@ -24,6 +24,19 @@ export interface MissingField {
   message?: string
 }
 
+export interface ActionProposalRefinementChange {
+  field: string
+  label: string
+  from: unknown
+  to: unknown
+}
+
+export interface ActionProposalRefinement {
+  text: string
+  summary: string
+  changes: ActionProposalRefinementChange[]
+}
+
 export interface ActionProposal {
   id: string
   intent: string
@@ -41,4 +54,5 @@ export interface ActionProposal {
   failed_at: string | null
   failure_reason: string | null
   execution_result: Record<string, unknown> | null
+  last_refinement: ActionProposalRefinement | null
 }

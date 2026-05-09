@@ -32,6 +32,7 @@ export const mockProposalReady: ActionProposal = {
   failed_at: null,
   failure_reason: null,
   execution_result: null,
+  last_refinement: null,
 }
 
 export const mockProposalDraft: ActionProposal = {
@@ -67,6 +68,7 @@ export const mockProposalDraft: ActionProposal = {
   failed_at: null,
   failure_reason: null,
   execution_result: null,
+  last_refinement: null,
 }
 
 export const mockProposalExecuted: ActionProposal = {
@@ -105,4 +107,5 @@ export const mockProposalExecuted: ActionProposal = {
     title: 'Product demo with TechStart',
     status: 'created',
   },
+  last_refinement: null,
 }

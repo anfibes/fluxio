@@ -72,6 +72,12 @@ const exampleCommands = [
           <!-- Proposed changes -->
           <ProposalProposedChangesList :changes="proposal.changes" />
 
+          <!-- Last refinement feedback -->
+          <ProposalLastRefinementPanel
+            v-if="proposal.last_refinement"
+            :refinement="proposal.last_refinement"
+          />
+
           <!-- Failure reason -->
           <div
             v-if="isFailed && proposal.failure_reason"
