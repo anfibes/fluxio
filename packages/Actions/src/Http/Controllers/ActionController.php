@@ -5,12 +5,14 @@ namespace Fluxio\Actions\Http\Controllers;
 use Fluxio\Actions\Http\Requests\ConfirmActionProposalRequest;
 use Fluxio\Actions\Http\Requests\ExecuteActionProposalRequest;
 use Fluxio\Actions\Http\Requests\InterpretActionRequest;
+use Fluxio\Actions\Http\Requests\RefineActionProposalRequest;
 use Fluxio\Actions\Http\Resources\ActionProposalResource;
 use Fluxio\Actions\Models\ActionProposal;
 use Fluxio\Actions\Services\ActionExecutionService;
 use Fluxio\Actions\Services\ActionInterpreterService;
 use Fluxio\Actions\Services\ActionProposalConfirmationService;
 use Fluxio\Actions\Services\ActionProposalPersistenceService;
+use Fluxio\Actions\Services\ActionProposalRefinementService;
 use Fluxio\Core\Http\Controllers\BaseApiController;
 use Fluxio\Core\Http\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -22,6 +24,7 @@ class ActionController extends BaseApiController
         private readonly ActionProposalPersistenceService $persistenceService,
         private readonly ActionProposalConfirmationService $confirmationService,
         private readonly ActionExecutionService $executionService,
+        private readonly ActionProposalRefinementService $refinementService,
     ) {}
 
     public function interpret(InterpretActionRequest $request): JsonResponse
@@ -61,6 +64,20 @@ class ActionController extends BaseApiController
         return ApiResponse::success(
             (new ActionProposalResource($executed))->resolve(),
             'actions::actions.executed'
+        );
+    }
+
+    public function refine(RefineActionProposalRequest $request, ActionProposal $proposal): JsonResponse
+    {
+        if ($proposal->user_id !== $request->user()->id) {
+            abort(404);
+        }
+
+        $refined = $this->refinementService->refine($proposal, $request->validated('text'));
+
+        return ApiResponse::success(
+            (new ActionProposalResource($refined))->resolve(),
+            'actions::actions.refined'
         );
     }
 }
