@@ -4,6 +4,7 @@ namespace Fluxio\Actions\Services;
 
 use Fluxio\Actions\Contracts\ActionExecutorInterface;
 use Fluxio\Actions\Executors\CreateTaskActionExecutor;
+use Fluxio\Actions\Executors\ScheduleCallActionExecutor;
 use Fluxio\Actions\Models\ActionProposal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -12,6 +13,7 @@ class ActionExecutionService
 {
     public function __construct(
         private readonly CreateTaskActionExecutor $createTaskExecutor,
+        private readonly ScheduleCallActionExecutor $scheduleCallExecutor,
     ) {}
 
     public function execute(ActionProposal $proposal): ActionProposal
@@ -54,6 +56,7 @@ class ActionExecutionService
     {
         return match ($intent) {
             'create_task' => $this->createTaskExecutor,
+            'schedule_call' => $this->scheduleCallExecutor,
             default => throw new \RuntimeException("No executor registered for intent [{$intent}]."),
         };
     }
