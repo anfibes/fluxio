@@ -16,7 +16,7 @@ const { isAuthenticated } = useAuth()
 
 // ── live state ───────────────────────────────────────────────
 const commandText = ref('')
-const { proposal, loading, error, interpret, confirmAndExecute, setError } = useActionProposal()
+const { proposal, loading, error, submitCommand, confirmAndExecute, setError } = useActionProposal()
 const { history, push: pushHistory } = useCommandHistory()
 
 // ── composer keyboard shortcut ───────────────────────────────
@@ -41,7 +41,7 @@ const displayProposal = computed<ActionProposal | null>(
 // ── command submit ───────────────────────────────────────────
 async function handleSubmit() {
   pushHistory(commandText.value)
-  await interpret(commandText.value)
+  await submitCommand(commandText.value)
 }
 
 function handleClear() {
@@ -134,7 +134,7 @@ function fillFromHistory(cmd: string) {
     </div>
 
     <!-- Right rail -->
-    <div class="flex w-[440px] shrink-0 flex-col overflow-hidden border-l border-border bg-surface">
+    <div class="flex w-110 shrink-0 flex-col overflow-hidden border-l border-border bg-surface">
       <div class="border-b border-border px-4 py-3">
         <p class="text-xs font-medium uppercase tracking-wide text-muted">
           {{ $t('proposal.title') }}

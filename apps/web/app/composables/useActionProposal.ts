@@ -29,6 +29,17 @@ export function useActionProposal() {
     }
   }
 
+  async function submitCommand(text: string): Promise<void> {
+    const status = proposal.value?.status
+    if (!status || status === 'executed' || status === 'failed') {
+      await interpret(text)
+    }
+    else {
+      // draft | ready | confirmed → future: refine/patch; for now re-interpret
+      await interpret(text)
+    }
+  }
+
   async function confirmAndExecute(): Promise<void> {
     if (!proposal.value || proposal.value.status !== 'ready') return
     const id = proposal.value.id
@@ -56,6 +67,7 @@ export function useActionProposal() {
     loading: readonly(loading),
     error: readonly(error),
     interpret,
+    submitCommand,
     confirmAndExecute,
     setProposal,
     setLoading,
