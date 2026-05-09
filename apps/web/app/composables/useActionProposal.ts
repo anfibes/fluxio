@@ -29,14 +29,29 @@ export function useActionProposal() {
     }
   }
 
+  async function refine(id: string, text: string): Promise<void> {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await api.post<ActionProposal>(`/actions/${id}/refine`, { text })
+      if (response.success) proposal.value = response.data
+      else error.value = response.message
+    }
+    catch (err: unknown) {
+      error.value = err instanceof Error ? err.message : 'Unknown error'
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
   async function submitCommand(text: string): Promise<void> {
-    const status = proposal.value?.status
-    if (!status || status === 'executed' || status === 'failed') {
+    const current = proposal.value
+    if (!current || current.status === 'confirmed' || current.status === 'executed' || current.status === 'failed') {
       await interpret(text)
     }
     else {
-      // draft | ready | confirmed → future: refine/patch; for now re-interpret
-      await interpret(text)
+      await refine(current.id, text)
     }
   }
 
@@ -67,6 +82,7 @@ export function useActionProposal() {
     loading: readonly(loading),
     error: readonly(error),
     interpret,
+    refine,
     submitCommand,
     confirmAndExecute,
     setProposal,
