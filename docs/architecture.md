@@ -14,6 +14,7 @@ The project explores how business systems can evolve from:
 toward:
 - natural-language intent
 - structured action proposals
+- proposal refinement
 - validation-first execution
 - controlled business automation
 
@@ -21,6 +22,7 @@ Fluxio is intentionally:
 - architecture-first
 - proposal-centric
 - command-first
+- operational
 
 The project demonstrates:
 - modular backend architecture
@@ -28,7 +30,9 @@ The project demonstrates:
 - domain separation
 - event-driven communication
 - proposal-driven workflows
+- proposal continuity
 - safe natural-language execution
+- proposal mutation transparency
 - modern AI-first frontend interaction patterns
 
 Fluxio is NOT intended to become a traditional CRUD-heavy CRM.
@@ -46,6 +50,7 @@ Natural language input
 → Intent resolution
 → Entity extraction
 → Action Proposal
+→ Proposal refinement
 → Validation
 → User confirmation
 → Execution
@@ -76,16 +81,34 @@ Fluxio is:
 - operational
 - validation-first
 - execution-controlled
+- deterministic-first
 
 The proposal is more important than the conversation.
 
-Conversation exists ONLY to refine structured business proposals.
+Conversation exists ONLY to:
+- refine proposals
+- resolve ambiguity
+- improve confidence
+- gather missing information
+
+Conversation does NOT exist to:
+- simulate assistant personalities
+- maintain infinite chat timelines
+- generate conversational clutter
+
+Fluxio intentionally avoids:
+- chatbot interaction patterns
+- assistant prose
+- timeline-based UX
+- autonomous execution
 
 ---
 
-# Conversational Proposal Refinement
+# Proposal Continuity
 
-Fluxio supports iterative proposal refinement.
+Fluxio supports stateful proposal continuity.
+
+The proposal evolves over time instead of being recreated for every command.
 
 Example:
 
@@ -97,7 +120,7 @@ Schedule a call with Rossini
 
 System:
 - detects partial intent
-- creates a draft proposal
+- creates draft proposal
 - identifies missing information
 
 User:
@@ -110,9 +133,51 @@ Expected behavior:
 - refine the EXISTING proposal
 - improve confidence
 - reduce missing fields
-- move toward execution readiness
+- move proposal toward `ready`
+- preserve proposal identity
 
-The system should preserve proposal continuity instead of generating disconnected proposals.
+This proposal continuity behavior is one of the core differentiators of Fluxio.
+
+---
+
+# Proposal Mutation Transparency
+
+Fluxio intentionally surfaces proposal mutations.
+
+The UI should communicate:
+- proposal changes
+- refinement effects
+- lifecycle transitions
+- execution state
+- confidence evolution
+
+Example:
+
+```text
+Last update
+"Tomorrow morning"
+
+Date → 2026-05-10
+Time → 09:00
+Status → ready
+```
+
+This is intentionally:
+- compact
+- operational
+- deterministic
+- explainable
+
+NOT:
+- conversational
+- assistant-like
+- chat-oriented
+
+The goal is:
+- operational trust
+- explainability
+- proposal visibility
+- mutation transparency
 
 ---
 
@@ -176,6 +241,7 @@ Responsibilities:
 - handle authentication
 - coordinate business workflows
 - expose proposal lifecycle endpoints
+- expose proposal refinement endpoints
 - provide standardized API responses
 - orchestrate module interaction
 
@@ -197,6 +263,8 @@ Responsibilities:
 - command-first UI
 - proposal rendering
 - proposal refinement UX
+- proposal continuity UX
+- proposal mutation visibility
 - proposal confirmation UX
 - execution state rendering
 - confidence visualization
@@ -221,6 +289,7 @@ Login
 → Command input
 → Interpret
 → Action Proposal
+→ Proposal refinement
 → Confirm
 → Execute
 → Execution Result
@@ -230,6 +299,7 @@ The UI is centered around:
 - command input
 - proposal review
 - refinement
+- proposal continuity
 - confirmation
 - execution visibility
 
@@ -280,6 +350,14 @@ Current orchestration composables:
 - `useApi()`
 - `useActionProposal()`
 
+Current `useActionProposal()` responsibilities:
+- interpret proposals
+- refine proposals
+- confirm proposals
+- execute proposals
+- maintain proposal continuity
+- centralize proposal lifecycle orchestration
+
 The frontend intentionally avoids:
 - large global stores
 - unnecessary abstractions
@@ -307,6 +385,7 @@ proposal/
   EditableProposalField
   MissingInformationPanel
   ProposedChangesList
+  LastRefinementPanel
   ExecutionResultPanel
 
 context/
@@ -314,6 +393,12 @@ context/
 ```
 
 The proposal rail is the central UI object.
+
+It acts as:
+- proposal inspector
+- lifecycle state viewer
+- mutation summary panel
+- operational truth surface
 
 ---
 
@@ -432,8 +517,8 @@ Statuses:
 
 Future:
 - proposal integration
-- cross-module events
 - contextual refinement support
+- ambiguity-aware entity workflows
 
 ---
 
@@ -480,17 +565,21 @@ Responsibilities:
 - detect intent
 - extract entities
 - calculate confidence
-- detect ambiguity
 - detect missing information
 - create ActionProposal objects
 - persist proposals
+- refine existing proposals
+- preserve proposal continuity
+- track proposal mutations
 - validate lifecycle transitions
 - execute confirmed actions
 
 Implemented:
 - rule-based intent resolver
 - proposal persistence
+- proposal refinement
 - proposal lifecycle guards
+- refinement metadata tracking
 - confirmation flow
 - execution flow
 - idempotent execution
@@ -503,6 +592,8 @@ Current intents:
 - `unknown`
 
 Execution happens ONLY after explicit confirmation.
+
+Ambiguity-aware workflows are the next planned milestone.
 
 ---
 
@@ -532,6 +623,14 @@ Meaning:
 
 - `failed`
   execution failure
+
+Lifecycle rules:
+- refinement does NOT create new proposals
+- proposal IDs remain stable
+- `draft` proposals may be refined
+- `ready` proposals may still be refined
+- execution must remain explicit
+- proposal continuity must remain visible
 
 ---
 
@@ -580,9 +679,32 @@ Example:
     "executed_at": null,
     "failed_at": null,
     "failure_reason": null,
-    "execution_result": null
+    "execution_result": null,
+    "last_refinement": {
+        "text": "Tomorrow morning",
+        "effective_text": "Tomorrow morning",
+        "summary": "Date and time added.",
+        "changes": [
+            {
+                "field": "date",
+                "from": null,
+                "to": "2026-05-10"
+            },
+            {
+                "field": "time",
+                "from": null,
+                "to": "09:00"
+            }
+        ]
+    }
 }
 ```
+
+The proposal contract must remain:
+- stable
+- deterministic
+- frontend-friendly
+- explainable
 
 ---
 
@@ -602,6 +724,13 @@ The UI should:
 - expose uncertainty explicitly
 - encourage review
 - avoid hallucinated confidence
+
+Confidence UX is considered:
+- architectural
+- operational
+- product-critical
+
+NOT cosmetic.
 
 ---
 
@@ -646,6 +775,14 @@ Paginated:
 ```
 
 The frontend relies heavily on stable response contracts.
+
+Proposal payloads are especially sensitive because they drive:
+- proposal rendering
+- refinement rendering
+- execution state
+- mutation visibility
+- confidence UX
+- proposal continuity
 
 ---
 
@@ -798,6 +935,8 @@ However:
 Testing priority:
 - business-critical behavior
 - proposal integrity
+- proposal continuity
+- refinement consistency
 - lifecycle consistency
 - API contracts
 
@@ -807,14 +946,19 @@ Backend priorities:
 - Actions parser
 - confidence calculation
 - proposal lifecycle
+- proposal refinement
+- mutation tracking
+- effective refinement extraction
 - idempotent execution
 - auth flows
 
 Frontend priorities:
 - command UX
 - proposal rendering
+- refinement rendering
 - confidence rendering
 - missing information UX
+- proposal mutation visibility
 - confirmation UX
 - execution state rendering
 - API error handling
@@ -826,29 +970,50 @@ Frontend priorities:
 Implemented end-to-end flow:
 
 ```text
-Create a follow-up task for Rossini tomorrow at 10am
+Schedule a call with Rossini
 ```
 
 Current behavior:
 1. User enters command
 2. System interprets intent
-3. Proposal is generated
+3. Draft proposal is generated
 4. Proposal is rendered in the rail
-5. User confirms
-6. Task is executed
-7. Execution result is rendered
-
-Ambiguous command example:
+5. Missing date/time is detected
+6. User refines:
 
 ```text
-Schedule a call with Rossini
+Tomorrow morning
 ```
 
-Expected behavior:
-- draft proposal
-- missing information detection
-- disabled confirmation
-- refinement required
+7. SAME proposal is updated
+8. Proposal transitions toward `ready`
+9. User confirms
+10. Proposal executes
+11. Execution result is rendered
+
+This vertical slice now validates:
+- proposal continuity
+- operational refinement
+- deterministic execution
+- AI-first operational UX
+
+---
+
+# Current Strategic Direction
+
+The current focus is:
+- proposal continuity
+- ambiguity-aware workflows
+- operational refinement UX
+- mutation transparency
+- contextual proposal handling
+- confidence UX
+- controlled execution
+
+NOT:
+- CRUD expansion
+- dashboard complexity
+- generic AI chat experiences
 
 ---
 
@@ -866,4 +1031,24 @@ The strongest architectural idea is:
 
 ```text
 Validated natural-language action proposals for business systems.
+```
+
+---
+
+# Long-Term Vision
+
+Fluxio aims to demonstrate:
+- proposal-driven enterprise UX
+- AI-assisted operational workflows
+- ambiguity-aware business interaction
+- controlled natural-language execution
+- deterministic operational AI systems
+
+The strongest possible outcome is NOT:
+- becoming a massive CRM
+
+The strongest possible outcome is:
+
+```text
+Proving that proposal-centric operational UX is a viable future paradigm for enterprise software.
 ```

@@ -11,12 +11,16 @@ Its purpose is to explore a new interaction model for business software:
 - proposal-driven
 - AI-assisted
 - validation-centric
+- continuity-aware
+- operational
 
 The frontend exists to support:
 - natural-language operational workflows
 - proposal refinement
+- proposal continuity
 - explicit execution control
 - confidence-aware business interaction
+- proposal mutation transparency
 
 The UI is intentionally designed to feel closer to:
 - a business copilot
@@ -43,6 +47,7 @@ Fluxio intentionally moves toward:
 ```text
 Command
 → Proposal
+→ Refinement
 → Validation
 → Confirmation
 → Execution
@@ -50,7 +55,21 @@ Command
 
 The proposal is the central UI object.
 
-The conversation exists only to support proposal refinement.
+Conversation exists ONLY to:
+- refine proposals
+- resolve ambiguity
+- gather missing information
+- improve confidence
+
+Conversation does NOT exist to:
+- simulate AI personalities
+- maintain infinite timelines
+- generate conversational clutter
+
+Fluxio is NOT:
+- a generic assistant
+- a chat wrapper
+- an autonomous AI agent
 
 ---
 
@@ -64,6 +83,7 @@ The frontend should always feel:
 - trustworthy
 - structured
 - confidence-aware
+- deterministic
 
 The interface should avoid:
 - visual noise
@@ -71,13 +91,14 @@ The interface should avoid:
 - consumer-chat aesthetics
 - dashboard overload
 - excessive color usage
-- "magic AI" feeling
+- “magic AI” feeling
 
 Fluxio should communicate:
 - control
 - transparency
 - explainability
 - operational clarity
+- proposal continuity
 
 ---
 
@@ -87,6 +108,7 @@ Fluxio is intentionally:
 - AI-first
 - proposal-centric
 - execution-oriented
+- operational
 
 The system should feel like:
 - an operator console
@@ -102,6 +124,7 @@ The user must always understand:
 - what the system detected
 - what the system inferred
 - what is still missing
+- what changed after refinement
 - what will happen after execution
 
 ---
@@ -113,16 +136,60 @@ Current frontend flow:
 ```text
 Login
 → Command input
-→ Live interpretation
-→ Action Proposal
-→ Missing information detection
+→ Proposal creation
+→ Proposal continuity
 → Proposal refinement
+→ Validation
 → Confirmation
 → Execution
 → Execution result
 ```
 
 The frontend must make this lifecycle explicit at every step.
+
+---
+
+# Proposal Continuity UX
+
+Proposal continuity is one of the core UX principles of Fluxio.
+
+The same proposal evolves over time.
+
+Example:
+
+User:
+
+```text
+Schedule a call with Rossini
+```
+
+System:
+- creates draft proposal
+- detects missing fields
+- blocks execution
+
+User:
+
+```text
+Tomorrow morning
+```
+
+System:
+- updates SAME proposal
+- fills missing fields
+- improves confidence
+- transitions proposal toward `ready`
+
+The frontend must clearly communicate:
+- proposal continuity
+- proposal mutation
+- proposal identity stability
+- operational progression
+
+The UX should never feel like:
+- disconnected chat messages
+- multiple isolated assistant replies
+- fragmented operations
 
 ---
 
@@ -146,7 +213,8 @@ Current layout structure:
 │ command input       │ proposal state                     │
 │ quick actions       │ editable fields                    │
 │ context lists       │ missing information                │
-│ operational items   │ execution changes                  │
+│ operational items   │ refinement metadata                │
+│                     │ execution changes                  │
 │                     │ confirm & execute                  │
 └─────────────────────┴────────────────────────────────────┘
 ```
@@ -192,10 +260,33 @@ The user should immediately understand:
 The composer should support:
 - multiline input
 - keyboard-first interaction
-- command refinement
-- conversational continuation
+- proposal refinement
+- proposal continuation
 - future autocomplete
 - future context suggestions
+
+An important UX insight:
+
+Users naturally resend full commands during refinement.
+
+Example:
+
+Original proposal:
+
+```text
+Schedule a call with Rossini
+```
+
+User refinement:
+
+```text
+Schedule a call with Rossini Tomorrow morning
+```
+
+The frontend should support this behavior naturally without:
+- creating new proposals
+- breaking proposal continuity
+- creating chat-like duplication
 
 ---
 
@@ -227,6 +318,8 @@ It represents:
 - validation
 - execution intent
 - operational consequence
+- proposal continuity
+- refinement evolution
 
 The rail should clearly display:
 - proposal state
@@ -234,6 +327,7 @@ The rail should clearly display:
 - missing information
 - execution changes
 - warnings
+- refinement metadata
 - execution results
 
 The rail should feel:
@@ -241,6 +335,12 @@ The rail should feel:
 - stable
 - explicit
 - operational
+
+The proposal rail acts as:
+- operational truth panel
+- proposal inspector
+- mutation summary surface
+- execution visibility layer
 
 ---
 
@@ -279,6 +379,8 @@ It is part of:
 - operational transparency
 - safe execution workflows
 
+The UI should never pretend certainty when ambiguity exists.
+
 ---
 
 # Missing Information UX
@@ -286,7 +388,7 @@ It is part of:
 One of Fluxio's strongest interaction patterns is:
 - incomplete proposals
 - progressive refinement
-- conversational completion
+- operational completion
 
 Example:
 
@@ -308,7 +410,7 @@ This UX pattern is central to Fluxio.
 
 # Conversational Refinement
 
-Fluxio should support iterative refinement of proposals.
+Fluxio supports iterative proposal refinement.
 
 Example:
 
@@ -325,12 +427,97 @@ Tomorrow morning
 The frontend should:
 - preserve proposal continuity
 - update the existing proposal
+- expose proposal mutations
 - avoid creating disconnected interactions
 
 The experience should feel:
 - progressive
 - contextual
 - operational
+- stateful
+
+NOT:
+- chat-oriented
+- conversationally noisy
+- assistant-like
+
+---
+
+# Proposal Mutation Transparency
+
+Fluxio intentionally surfaces proposal mutations.
+
+The frontend should clearly render:
+- latest refinement
+- changed fields
+- proposal state transitions
+- execution state changes
+
+Example:
+
+```text
+Last update
+"Tomorrow morning"
+
+Date → 2026-05-10
+Time → 09:00
+Status → ready
+```
+
+This UX exists to create:
+- operational trust
+- explainability
+- deterministic visibility
+- proposal transparency
+
+The system should communicate:
+
+```text
+"The proposal changed."
+```
+
+NOT:
+
+```text
+"The assistant replied."
+```
+
+This distinction is extremely important.
+
+---
+
+# Last Refinement UX
+
+Fluxio currently exposes:
+- raw refinement text
+- effective refinement text
+- refinement summary
+- field mutations
+
+The frontend should prefer rendering:
+- effective refinement text
+
+instead of:
+- duplicated full commands
+
+Example:
+
+Avoid:
+
+```text
+Schedule a call with Rossini Tomorrow morning
+```
+
+Prefer:
+
+```text
+Tomorrow morning
+```
+
+This creates:
+- cleaner operational UX
+- less conversational clutter
+- stronger proposal continuity perception
 
 ---
 
@@ -351,6 +538,11 @@ Before execution, the UI should communicate:
 - which module is affected
 - which entity will change
 
+Execution is always:
+- deliberate
+- reviewable
+- operational
+
 ---
 
 # Execution Result UX
@@ -364,6 +556,13 @@ After execution, the interface should show:
 Failures should remain visible and understandable.
 
 The system should not hide operational failures.
+
+Execution results should feel:
+- factual
+- operational
+- structured
+
+NOT conversational.
 
 ---
 
@@ -401,8 +600,9 @@ Animations should remain:
 
 Allowed:
 - proposal transitions
-- fade states
+- refinement transitions
 - execution state transitions
+- fade states
 - lightweight hover feedback
 
 Avoid:
@@ -421,6 +621,7 @@ Frontend architecture should remain:
 - modular
 - predictable
 - lightweight
+- proposal-centric
 
 Prefer:
 - composables for orchestration
@@ -452,6 +653,14 @@ Current orchestration composables:
 - `useApi()`
 - `useActionProposal()`
 
+Current `useActionProposal()` responsibilities:
+- interpret proposals
+- refine proposals
+- confirm proposals
+- execute proposals
+- preserve proposal continuity
+- orchestrate lifecycle state
+
 ---
 
 # Tailwind Philosophy
@@ -481,20 +690,54 @@ instead of repeated raw CSS variables.
 
 # AI-First Principle
 
-The frontend is NOT an "AI wrapper."
+The frontend is NOT an “AI wrapper.”
 
 The frontend exists to:
 - operationalize AI assistance
 - structure execution
 - expose proposal lifecycle
+- expose proposal continuity
+- expose proposal mutations
 - maintain human control
 
 AI must remain:
 - assistive
 - explainable
 - controllable
+- deterministic-first
 
 The frontend should reinforce this philosophy visually.
+
+---
+
+# Ambiguity UX Direction
+
+The next major UX milestone is:
+- ambiguity-aware operational workflows
+
+Example:
+
+```text
+Call Rossi
+```
+
+When multiple Rossi entities exist:
+- ambiguity must become visible
+- execution must remain blocked
+- the proposal must remain active
+- clarification must refine the SAME proposal
+
+Fluxio must NEVER:
+- choose arbitrarily
+- fake confidence
+- silently infer dangerous actions
+
+The ambiguity workflow should feel:
+- operational
+- structured
+- confidence-aware
+
+NOT conversational.
 
 ---
 
@@ -502,11 +745,11 @@ The frontend should reinforce this philosophy visually.
 
 Planned directions:
 
-- conversational proposal continuation
-- contextual refinement memory
+- ambiguity resolution UX
+- candidate entity workflows
+- contextual refinement semantics
 - keyboard-first workflows
 - command history
-- operational timeline
 - contextual entity suggestions
 - inline proposal editing
 - proposal comparison
@@ -515,7 +758,7 @@ Planned directions:
 - AI provider abstraction support
 
 Long-term:
-- multi-proposal workflows
+- multi-step operational proposals
 - chained proposal execution
 - operational AI workspaces
 
@@ -528,12 +771,14 @@ Fluxio should NOT evolve into:
 - a generic AI chat clone
 - an autonomous AI agent
 - a form-heavy ERP
-- a "chat with your database" gimmick
+- a “chat with your database” gimmick
 
 The core value is:
 - proposal-driven business interaction
 - explicit operational control
 - explainable AI-assisted workflows
+- proposal continuity
+- deterministic refinement
 
 ---
 
@@ -542,20 +787,40 @@ The core value is:
 Currently implemented frontend flow:
 
 1. User logs in
-2. User writes command
+2. User writes command:
+
+```text
+Schedule a call with Rossini
+```
+
 3. Frontend calls `/api/actions/interpret`
 4. Proposal rail renders:
    - fields
    - missing information
    - changes
    - confidence
-5. User confirms
-6. Frontend calls:
+5. Proposal remains in `draft`
+6. User refines:
+
+```text
+Tomorrow morning
+```
+
+7. Frontend calls `/api/actions/{proposal}/refine`
+8. SAME proposal is updated
+9. Proposal transitions toward `ready`
+10. User confirms
+11. Frontend calls:
    - `/confirm`
    - `/execute`
-7. Execution result is rendered
+12. Execution result is rendered
 
-This vertical slice already demonstrates the central Fluxio philosophy.
+This vertical slice now demonstrates:
+- proposal continuity
+- operational refinement
+- AI-first operational UX
+- proposal mutation transparency
+- deterministic execution workflows
 
 ---
 
@@ -567,6 +832,7 @@ Fluxio aims to explore a future where business software becomes:
 - proposal-centric
 - validation-first
 - confidence-aware
+- ambiguity-aware
 
 without sacrificing:
 - control
@@ -575,3 +841,12 @@ without sacrificing:
 - operational safety
 
 The frontend is the visible manifestation of that vision.
+
+The long-term goal is NOT:
+- replacing operators with AI
+
+The long-term goal is:
+
+```text
+Building operational software where AI assists structured human decision-making through validated Action Proposals.
+```

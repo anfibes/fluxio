@@ -35,12 +35,16 @@ The API response layer exists to provide:
 - consistent exception rendering
 - reusable module behavior
 - proposal-driven workflow support
+- deterministic proposal lifecycle handling
+- proposal continuity support
+- operational explainability
 
 The response structure must remain:
 - explicit
 - stable
 - composable
 - frontend-friendly
+- proposal-centric
 
 ---
 
@@ -51,6 +55,11 @@ The response structure must remain:
 Every response must follow a predictable shape.
 
 Frontend applications should never need endpoint-specific parsing logic.
+
+All proposal lifecycle operations must preserve:
+- stable contracts
+- stable proposal identity
+- deterministic response structure
 
 ---
 
@@ -87,6 +96,7 @@ This contract is important for:
 - frontend composables
 - TypeScript narrowing
 - predictable error handling
+- proposal lifecycle orchestration
 
 ---
 
@@ -99,9 +109,12 @@ Many endpoints return `ActionProposal` payloads instead of immediately executing
 The response layer must support:
 - proposal interpretation
 - proposal refinement
+- proposal continuity
 - proposal confirmation
 - proposal execution
 - execution results
+- proposal mutation tracking
+- ambiguity-aware future workflows
 
 without requiring custom response formats.
 
@@ -199,9 +212,9 @@ Structure:
 ```
 
 Behavior:
-- Triggered automatically by `ApiExceptionRenderer`
-- Only applies to JSON requests
-- Uses Laravel validation error bag structure
+- triggered automatically by `ApiExceptionRenderer`
+- only applies to JSON requests
+- uses Laravel validation error bag structure
 
 Translation key:
 
@@ -395,12 +408,17 @@ Fluxio is proposal-driven.
 
 Many endpoints return `ActionProposal` payloads.
 
-Example endpoints:
+Current proposal endpoints:
 - `POST /api/actions/interpret`
+- `POST /api/actions/{proposal}/refine`
 - `POST /api/actions/{proposal}/confirm`
 - `POST /api/actions/{proposal}/execute`
 
 These endpoints still use the same standardized response structure.
+
+Proposal identity must remain stable during refinement.
+
+Refinement updates the SAME proposal.
 
 ---
 
@@ -438,7 +456,31 @@ These endpoints still use the same standardized response structure.
                 "module": "tasks"
             }
         ],
-        "needs_confirmation": true
+        "needs_confirmation": true,
+        "confirmed_at": null,
+        "executed_at": null,
+        "failed_at": null,
+        "failure_reason": null,
+        "execution_result": null,
+        "last_refinement": {
+            "text": "Tomorrow morning",
+            "effective_text": "Tomorrow morning",
+            "summary": "Date and time added.",
+            "changes": [
+                {
+                    "field": "date",
+                    "label": "Date",
+                    "from": null,
+                    "to": "2026-05-10"
+                },
+                {
+                    "field": "time",
+                    "label": "Time",
+                    "from": null,
+                    "to": "09:00"
+                }
+            ]
+        }
     }
 }
 ```
@@ -460,10 +502,19 @@ Typical lifecycle:
 ```text
 interpret
 → draft/ready
+→ refine
 → confirm
 → execute
 → executed/failed
 ```
+
+Important lifecycle rules:
+- refinement does NOT create new proposals
+- proposal IDs remain stable
+- proposal continuity is preserved
+- `draft` proposals may be refined
+- `ready` proposals may still be refined
+- execution must remain explicit
 
 ---
 
@@ -480,8 +531,9 @@ Schedule a call with Rossini
 ```
 
 System:
-- draft proposal
-- missing fields
+- creates draft proposal
+- detects missing fields
+- blocks execution
 
 User:
 
@@ -494,8 +546,73 @@ Expected behavior:
 - improve confidence
 - reduce missing fields
 - preserve proposal continuity
+- transition proposal toward `ready`
 
-The API contract must remain stable during refinement.
+---
+
+# Full-Command Refinement
+
+Fluxio also supports full-command refinement inputs.
+
+Example:
+
+Original proposal:
+
+```text
+Schedule a call with Rossini
+```
+
+Refinement input:
+
+```text
+Schedule a call with Rossini Tomorrow morning
+```
+
+Expected behavior:
+- still treated as refinement
+- original `source_text` remains unchanged
+- effective refinement extracted internally
+- proposal updated correctly
+
+This allows:
+- natural user editing behavior
+- proposal continuity preservation
+- deterministic refinement workflows
+
+---
+
+# Proposal Mutation Transparency
+
+Fluxio intentionally surfaces proposal mutations.
+
+Proposal responses may include:
+
+```json
+{
+    "last_refinement": {
+        "text": "...",
+        "effective_text": "...",
+        "summary": "...",
+        "changes": []
+    }
+}
+```
+
+Purpose:
+- explainability
+- mutation visibility
+- operational clarity
+- deterministic proposal tracking
+
+Fluxio intentionally avoids:
+- assistant prose
+- chat timelines
+- conversational message streams
+
+The API contract supports:
+- structured operational UX
+- proposal mutation rendering
+- frontend explainability panels
 
 ---
 
@@ -511,6 +628,7 @@ Executing the same proposal multiple times must NOT:
 Repeated execution calls should:
 - return the existing executed proposal state
 - preserve execution metadata
+- preserve proposal integrity
 
 This is especially important for:
 - retries
@@ -537,6 +655,14 @@ and coordinated carefully between:
 - backend
 - frontend
 - TypeScript contracts
+
+Proposal payloads are especially sensitive because they drive:
+- proposal rendering
+- refinement rendering
+- execution state
+- confidence UX
+- mutation visibility
+- proposal continuity
 
 ---
 
@@ -608,7 +734,35 @@ Priority areas:
 - validation formatting
 - pagination structure
 - proposal response integrity
+- proposal continuity
+- proposal refinement
+- refinement mutation tracking
+- effective refinement extraction
 - proposal execution consistency
 - idempotent execution behavior
+- stable frontend contracts
 
 The API response layer is foundational infrastructure and must remain highly stable.
+
+---
+
+# Architectural Importance
+
+The response layer is not only infrastructure.
+
+It is also:
+- the proposal transport contract
+- the proposal lifecycle transport layer
+- the frontend orchestration contract
+- the operational explainability contract
+
+Fluxio depends heavily on:
+- stable proposal payloads
+- deterministic refinement responses
+- predictable execution state transitions
+
+This response layer is one of the core foundations enabling:
+- proposal-centric UX
+- AI-first operational workflows
+- future ambiguity-aware systems
+- controlled enterprise AI interaction
