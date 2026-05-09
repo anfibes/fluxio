@@ -1,5 +1,6 @@
 {
   "nav": {
+    "actions": "Azioni",
     "dashboard": "Dashboard",
     "leads": "Lead",
     "tasks": "Attività",
@@ -17,6 +18,9 @@
     "fields": "Campi",
     "changes": "Modifiche proposte",
     "missing": "Campi mancanti",
+    "empty_title": "Pronto quando vuoi",
+    "empty_description": "Scrivi un comando nel compositore e clicca Proponi per generare un piano d'azione.",
+    "executed_successfully": "Eseguito con successo",
     "confirm_execute": "Conferma & Esegui",
     "confirming": "Conferma in corso…",
     "complete_to_confirm": "Completa per confermare",
@@ -27,6 +31,12 @@
       "executed": "Eseguita",
       "failed": "Fallita"
     }
+  },
+  "command": {
+    "placeholder": "Descrivi cosa vuoi fare…",
+    "hint": "↵ per proporre · ⇧↵ per a capo",
+    "propose": "Proponi",
+    "interpreting": "Interpretazione in corso…"
   },
   "auth": {
     "email": "Email",

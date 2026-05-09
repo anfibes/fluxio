@@ -12,36 +12,130 @@ const emit = defineEmits<{
 const canSubmit = computed(() => props.modelValue.trim().length > 0 && !props.loading)
 
 function handleKeydown(e: KeyboardEvent) {
-  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && canSubmit.value) {
-    emit('submit')
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    if (canSubmit.value) emit('submit')
   }
 }
 </script>
 
 <template>
-  <div class="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+  <div class="composer-wrap">
     <textarea
       :value="modelValue"
-      rows="3"
-      placeholder="Describe what you want to do…"
+      rows="4"
+      :placeholder="$t('command.placeholder')"
       :disabled="loading"
-      class="w-full resize-none bg-transparent text-sm leading-relaxed text-[var(--color-text)] outline-none placeholder:text-[var(--color-muted)] disabled:opacity-60"
+      class="composer-input"
       @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
       @keydown="handleKeydown"
     />
-    <div class="flex items-center justify-between border-t border-[var(--color-border-subtle)] pt-3">
-      <span class="text-xs text-[var(--color-muted)]">⌘ ↵ to propose</span>
+    <div class="composer-footer">
+      <span class="composer-hint">{{ $t('command.hint') }}</span>
       <button
         type="button"
         :disabled="!canSubmit"
-        class="rounded-lg px-4 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-        :class="canSubmit
-          ? 'bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)]'
-          : 'bg-[var(--color-surface-raised)] text-[var(--color-muted)]'"
+        class="composer-btn"
+        :class="canSubmit ? 'composer-btn--active' : 'composer-btn--idle'"
         @click="emit('submit')"
       >
-        {{ loading ? 'Interpreting…' : 'Propose' }}
+        <span v-if="loading" class="loading-dot" />
+        {{ loading ? $t('command.interpreting') : $t('command.propose') }}
       </button>
     </div>
   </div>
 </template>
+
+<style scoped>
+.composer-wrap {
+  display: flex;
+  flex-direction: column;
+  border-radius: 0.875rem;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.composer-wrap:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgb(99 102 241 / 0.12);
+}
+
+.composer-input {
+  width: 100%;
+  resize: none;
+  background: transparent;
+  padding: 1rem 1.125rem 0.625rem;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--color-text);
+  outline: none;
+  font-family: inherit;
+}
+
+.composer-input::placeholder {
+  color: var(--color-muted);
+}
+
+.composer-input:disabled {
+  opacity: 0.6;
+}
+
+.composer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 1rem 0.75rem;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.composer-hint {
+  font-size: 0.6875rem;
+  color: var(--color-muted);
+  user-select: none;
+}
+
+.composer-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 0.5rem;
+  padding: 0.375rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.composer-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.composer-btn--active {
+  background-color: var(--color-accent);
+  color: white;
+}
+
+.composer-btn--active:not(:disabled):hover {
+  background-color: var(--color-accent-hover);
+}
+
+.composer-btn--idle {
+  background-color: var(--color-surface-raised);
+  color: var(--color-muted);
+}
+
+.loading-dot {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 50%;
+  background-color: currentColor;
+  opacity: 0.6;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 0.2; }
+}
+</style>

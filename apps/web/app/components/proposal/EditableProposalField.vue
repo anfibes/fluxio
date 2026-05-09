@@ -3,31 +3,34 @@ import type { EditableField, EditableFieldSource } from '~/types/actions'
 
 defineProps<{ field: EditableField }>()
 
-const sourceColors: Record<EditableFieldSource, string> = {
-  detected: 'text-emerald-400',
-  inferred:  'text-blue-400',
-  guessed:   'text-amber-400',
-  computed:  'text-purple-400',
-  edited:    'text-[var(--color-text-muted)]',
-  missing:   'text-red-400',
+const sourceBadge: Record<EditableFieldSource, { text: string; cls: string }> = {
+  detected: { text: 'detected', cls: 'bg-emerald-500/10 text-emerald-400' },
+  inferred:  { text: 'inferred', cls: 'bg-blue-500/10 text-blue-400' },
+  guessed:   { text: 'guessed',  cls: 'bg-amber-500/10 text-amber-400' },
+  computed:  { text: 'computed', cls: 'bg-purple-500/10 text-purple-400' },
+  edited:    { text: 'edited',   cls: 'bg-[var(--color-surface-raised)] text-[var(--color-text-muted)]' },
+  missing:   { text: 'missing',  cls: 'bg-red-500/10 text-red-400' },
 }
 </script>
 
 <template>
-  <div class="flex items-center justify-between border-b border-[var(--color-border-subtle)] py-2.5 last:border-0">
+  <div class="flex items-start justify-between gap-3 border-b border-[var(--color-border-subtle)] py-2.5 last:border-0">
     <div class="flex min-w-0 flex-col gap-0.5">
       <span class="text-xs text-[var(--color-muted)]">{{ field.label }}</span>
       <span
-        class="text-sm"
+        class="text-sm leading-snug"
         :class="field.source === 'missing'
           ? 'italic text-[var(--color-muted)]'
           : 'text-[var(--color-text)]'"
       >
-        {{ field.value ?? '—' }}
+        {{ field.value !== null && field.value !== undefined ? field.value : '—' }}
       </span>
     </div>
-    <span class="ml-4 shrink-0 font-mono text-xs" :class="sourceColors[field.source]">
-      {{ field.source }}
+    <span
+      class="mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-xs"
+      :class="sourceBadge[field.source].cls"
+    >
+      {{ sourceBadge[field.source].text }}
     </span>
   </div>
 </template>

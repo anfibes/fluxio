@@ -1,5 +1,6 @@
 {
   "nav": {
+    "actions": "Actions",
     "dashboard": "Dashboard",
     "leads": "Leads",
     "tasks": "Tasks",
@@ -17,6 +18,9 @@
     "fields": "Fields",
     "changes": "Proposed changes",
     "missing": "Missing fields",
+    "empty_title": "Ready when you are",
+    "empty_description": "Type a command in the composer and click Propose to generate an action plan.",
+    "executed_successfully": "Executed successfully",
     "confirm_execute": "Confirm & Execute",
     "confirming": "Confirming…",
     "complete_to_confirm": "Complete to confirm",
@@ -27,6 +31,12 @@
       "executed": "Executed",
       "failed": "Failed"
     }
+  },
+  "command": {
+    "placeholder": "Describe what you want to do…",
+    "hint": "↵ to propose · ⇧↵ for newline",
+    "propose": "Propose",
+    "interpreting": "Interpreting…"
   },
   "auth": {
     "email": "Email",

@@ -3,16 +3,13 @@ import { mockProposalDraft, mockProposalExecuted, mockProposalReady } from '~/mo
 import type { ActionProposal } from '~/types/actions'
 
 // ── dev mock switcher ────────────────────────────────────────
-const states = ['ready', 'draft', 'executed'] as const
-type DemoState = typeof states[number]
+const mockState = ref<'ready' | 'draft' | 'executed' | null>(null)
 
-const mockState = ref<DemoState>('ready')
-
-const mockProposalMap: Record<DemoState, ActionProposal> = {
+const mockProposalMap = {
   ready: mockProposalReady,
   draft: mockProposalDraft,
   executed: mockProposalExecuted,
-}
+} satisfies Record<string, ActionProposal>
 
 // ── auth ─────────────────────────────────────────────────────
 const { isAuthenticated } = useAuth()
@@ -21,10 +18,10 @@ const { isAuthenticated } = useAuth()
 const commandText = ref('')
 const { proposal, loading, error, interpret, confirmAndExecute } = useActionProposal()
 
-// real proposal wins; fall back to selected mock while no API response exists
-// cast needed: readonly(proposal).value is Readonly<ActionProposal>, mocks are ActionProposal
-const displayProposal = computed<ActionProposal>(
-  () => (proposal.value ?? mockProposalMap[mockState.value]) as ActionProposal,
+// real proposal wins; fall back to selected mock; null when no mock chosen
+// cast needed: mock objects are deeply readonly, not assignable to mutable ActionProposal
+const displayProposal = computed<ActionProposal | null>(
+  () => (proposal.value ?? (mockState.value ? mockProposalMap[mockState.value] : null)) as ActionProposal | null,
 )
 
 async function handleSubmit() {
@@ -41,41 +38,54 @@ async function handleSubmit() {
   <!-- ── Main UI ───────────────────────────────────────────── -->
   <div v-else class="flex h-full">
     <!-- Left column -->
-    <div class="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
-      <!-- Dev mock switcher -->
-      <div class="flex items-center gap-2">
-        <span class="text-xs text-[var(--color-muted)]">Mock:</span>
-        <button
-          v-for="s in states"
-          :key="s"
-          type="button"
-          class="rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors"
-          :class="mockState === s
-            ? 'bg-[var(--color-accent)] text-white'
-            : 'border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:text-[var(--color-text-muted)]'"
-          @click="mockState = s"
-        >
-          {{ s }}
-        </button>
-      </div>
-
-      <!-- API error banner -->
-      <div
-        v-if="error"
-        class="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-xs text-red-400"
-      >
-        <span class="mt-0.5 shrink-0">⚠</span>
-        <span>{{ error }}</span>
-      </div>
-
+    <div class="flex flex-1 flex-col gap-5 overflow-y-auto px-6 py-6">
       <CommandComposer
         v-model="commandText"
         :loading="loading"
         @submit="handleSubmit"
       />
+
+      <!-- Parsing feedback (appears after interpretation) -->
       <CommandLiveParsingFeedback :proposal="displayProposal" />
+
+      <!-- API error banner -->
+      <div
+        v-if="error"
+        class="flex items-start gap-2.5 rounded-xl border border-red-500/25 bg-red-500/8 px-3.5 py-3 text-xs text-red-400"
+      >
+        <span class="mt-0.5 shrink-0 text-base leading-none">⚠</span>
+        <span class="leading-relaxed">{{ error }}</span>
+      </div>
+
       <CommandQuickStarters />
       <ContextTabs />
+
+      <!-- Dev: mock switcher -->
+      <div class="flex items-center gap-2 border-t border-[var(--color-border-subtle)] pt-4">
+        <span class="text-xs text-[var(--color-muted)]">Dev:</span>
+        <button
+          type="button"
+          class="rounded px-2 py-1 text-xs font-medium transition-colors"
+          :class="mockState === null
+            ? 'bg-[var(--color-accent)] text-white'
+            : 'border border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text-muted)]'"
+          @click="mockState = null"
+        >
+          none
+        </button>
+        <button
+          v-for="s in (['ready', 'draft', 'executed'] as const)"
+          :key="s"
+          type="button"
+          class="rounded px-2 py-1 text-xs font-medium capitalize transition-colors"
+          :class="mockState === s
+            ? 'bg-[var(--color-accent)] text-white'
+            : 'border border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text-muted)]'"
+          @click="mockState = s"
+        >
+          {{ s }}
+        </button>
+      </div>
     </div>
 
     <!-- Right rail -->

@@ -11,6 +11,12 @@ const confidencePct = computed(() =>
   props.proposal ? Math.round(props.proposal.confidence * 100) : 0,
 )
 
+const confidenceColor = computed(() => {
+  if (confidencePct.value >= 80) return 'text-emerald-400'
+  if (confidencePct.value >= 60) return 'text-amber-400'
+  return 'text-red-400'
+})
+
 const entityEntries = computed(() =>
   props.proposal ? Object.entries(props.proposal.entities) : [],
 )
@@ -20,30 +26,32 @@ const entityEntries = computed(() =>
   <Transition name="slide-down">
     <div
       v-if="proposal"
-      class="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-sm"
+      class="flex flex-col gap-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3.5 py-3 text-sm"
     >
-      <div class="flex items-center gap-3">
-        <span class="rounded bg-[var(--color-accent)]/20 px-2 py-0.5 font-mono text-xs capitalize text-[var(--color-accent)]">
+      <div class="flex items-center gap-2.5">
+        <span class="rounded-md bg-[var(--color-accent)]/15 px-2 py-0.5 font-mono text-xs capitalize text-[var(--color-accent)]">
           {{ intentLabel }}
         </span>
-        <span class="text-xs text-[var(--color-muted)]">
-          Confidence:
-          <span class="font-medium text-[var(--color-text-muted)]">{{ confidencePct }}%</span>
-        </span>
+        <div class="ml-auto flex items-center gap-1.5">
+          <span class="text-xs text-[var(--color-muted)]">confidence</span>
+          <span class="tabular-nums text-xs font-semibold" :class="confidenceColor">{{ confidencePct }}%</span>
+        </div>
       </div>
 
       <div v-if="entityEntries.length" class="flex flex-wrap gap-1.5">
         <span
           v-for="[key, value] in entityEntries"
           :key="key"
-          class="rounded bg-[var(--color-surface-raised)] px-2 py-0.5 text-xs text-[var(--color-text-muted)]"
+          class="flex items-center gap-1 rounded-md bg-[var(--color-surface-raised)] px-2 py-0.5 text-xs"
         >
-          <span class="text-[var(--color-muted)]">{{ key }}:</span> {{ value }}
+          <span class="text-[var(--color-muted)]">{{ key }}</span>
+          <span class="text-[var(--color-text-muted)]">{{ value }}</span>
         </span>
       </div>
 
-      <p v-if="proposal.warnings.length" class="text-xs text-amber-400">
-        ⚠ {{ proposal.warnings[0] }}
+      <p v-if="proposal.warnings.length" class="flex items-center gap-1.5 text-xs text-amber-400">
+        <span>⚠</span>
+        <span>{{ proposal.warnings[0] }}</span>
       </p>
     </div>
   </Transition>
@@ -57,6 +65,6 @@ const entityEntries = computed(() =>
 .slide-down-enter-from,
 .slide-down-leave-to {
   opacity: 0;
-  transform: translateY(-4px);
+  transform: translateY(-6px);
 }
 </style>
