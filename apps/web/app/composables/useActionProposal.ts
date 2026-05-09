@@ -7,6 +7,12 @@ export function useActionProposal() {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
+  async function runProposalAction(id: string, action: 'confirm' | 'execute'): Promise<void> {
+    const response = await api.post<ActionProposal>(`/actions/${id}/${action}`, {})
+    if (response.success) proposal.value = response.data
+    else throw new Error(response.message)
+  }
+
   async function interpret(text: string): Promise<void> {
     loading.value = true
     error.value = null
@@ -23,26 +29,14 @@ export function useActionProposal() {
     }
   }
 
-  async function confirm(id: string): Promise<void> {
-    const response = await api.post<ActionProposal>(`/actions/${id}/confirm`, {})
-    if (response.success) proposal.value = response.data
-    else throw new Error(response.message)
-  }
-
-  async function execute(id: string): Promise<void> {
-    const response = await api.post<ActionProposal>(`/actions/${id}/execute`, {})
-    if (response.success) proposal.value = response.data
-    else throw new Error(response.message)
-  }
-
   async function confirmAndExecute(): Promise<void> {
     if (!proposal.value || proposal.value.status !== 'ready') return
     const id = proposal.value.id
     loading.value = true
     error.value = null
     try {
-      await confirm(id)
-      await execute(id)
+      await runProposalAction(id, 'confirm')
+      await runProposalAction(id, 'execute')
     }
     catch (err: unknown) {
       error.value = err instanceof Error ? err.message : 'Unknown error'

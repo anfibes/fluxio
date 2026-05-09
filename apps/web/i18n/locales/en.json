@@ -21,6 +21,10 @@
     "empty_title": "Ready when you are",
     "empty_description": "Type a command in the composer and click Propose to generate an action plan.",
     "executed_successfully": "Executed successfully",
+    "execution_failed": "Execution failed",
+    "low_confidence_caution": "Review the extracted fields carefully before confirming.",
+    "low_confidence_warning": "Low confidence — verify all fields before confirming.",
+    "empty_try": "Try a command like:",
     "confirm_execute": "Confirm & Execute",
     "confirming": "Confirming…",
     "complete_to_confirm": "Complete to confirm",
@@ -34,9 +38,10 @@
   },
   "command": {
     "placeholder": "Describe what you want to do…",
-    "hint": "↵ to propose · ⇧↵ for newline",
+    "hint": "↵ to propose · ⇧↵ for newline · Esc to clear",
     "propose": "Propose",
-    "interpreting": "Interpreting…"
+    "interpreting": "Interpreting…",
+    "recent": "Recent"
   },
   "auth": {
     "email": "Email",

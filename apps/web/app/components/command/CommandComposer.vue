@@ -7,11 +7,23 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: string]
   submit: []
+  clear: []
 }>()
 
+const textareaEl = ref<HTMLTextAreaElement | null>(null)
 const canSubmit = computed(() => props.modelValue.trim().length > 0 && !props.loading)
 
+function focus() {
+  textareaEl.value?.focus()
+}
+
+defineExpose({ focus })
+
 function handleKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    emit('clear')
+    return
+  }
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
     if (canSubmit.value) emit('submit')
@@ -20,10 +32,12 @@ function handleKeydown(e: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="composer-wrap">
+  <div class="composer-wrap" :class="{ 'composer-wrap--loading': loading }">
     <textarea
+      ref="textareaEl"
       :value="modelValue"
       rows="4"
+      autofocus
       :placeholder="$t('command.placeholder')"
       :disabled="loading"
       class="composer-input"
@@ -53,12 +67,17 @@ function handleKeydown(e: KeyboardEvent) {
   border-radius: 0.875rem;
   border: 1px solid var(--color-border);
   background-color: var(--color-surface);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
 }
 
 .composer-wrap:focus-within {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px rgb(99 102 241 / 0.12);
+}
+
+.composer-wrap--loading {
+  opacity: 0.75;
+  pointer-events: none;
 }
 
 .composer-input {
@@ -75,10 +94,6 @@ function handleKeydown(e: KeyboardEvent) {
 
 .composer-input::placeholder {
   color: var(--color-muted);
-}
-
-.composer-input:disabled {
-  opacity: 0.6;
 }
 
 .composer-footer {

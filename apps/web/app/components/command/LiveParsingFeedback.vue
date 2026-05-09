@@ -26,14 +26,14 @@ const entityEntries = computed(() =>
   <Transition name="slide-down">
     <div
       v-if="proposal"
-      class="flex flex-col gap-2.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3.5 py-3 text-sm"
+      class="flex flex-col gap-2.5 rounded-xl border border-border bg-surface px-3.5 py-3 text-sm"
     >
       <div class="flex items-center gap-2.5">
-        <span class="rounded-md bg-[var(--color-accent)]/15 px-2 py-0.5 font-mono text-xs capitalize text-[var(--color-accent)]">
+        <span class="rounded-md bg-accent/15 px-2 py-0.5 font-mono text-xs capitalize text-accent">
           {{ intentLabel }}
         </span>
         <div class="ml-auto flex items-center gap-1.5">
-          <span class="text-xs text-[var(--color-muted)]">confidence</span>
+          <span class="text-xs text-muted">confidence</span>
           <span class="tabular-nums text-xs font-semibold" :class="confidenceColor">{{ confidencePct }}%</span>
         </div>
       </div>
@@ -42,10 +42,10 @@ const entityEntries = computed(() =>
         <span
           v-for="[key, value] in entityEntries"
           :key="key"
-          class="flex items-center gap-1 rounded-md bg-[var(--color-surface-raised)] px-2 py-0.5 text-xs"
+          class="flex items-center gap-1 rounded-md bg-surface-raised px-2 py-0.5 text-xs"
         >
-          <span class="text-[var(--color-muted)]">{{ key }}</span>
-          <span class="text-[var(--color-text-muted)]">{{ value }}</span>
+          <span class="text-muted">{{ key }}</span>
+          <span class="text-text-muted">{{ value }}</span>
         </span>
       </div>
 

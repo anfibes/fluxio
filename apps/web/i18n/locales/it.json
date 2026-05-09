@@ -21,6 +21,10 @@
     "empty_title": "Pronto quando vuoi",
     "empty_description": "Scrivi un comando nel compositore e clicca Proponi per generare un piano d'azione.",
     "executed_successfully": "Eseguito con successo",
+    "execution_failed": "Esecuzione fallita",
+    "low_confidence_caution": "Rivedi attentamente i campi estratti prima di confermare.",
+    "low_confidence_warning": "Confidenza bassa — verifica tutti i campi prima di confermare.",
+    "empty_try": "Prova un comando come:",
     "confirm_execute": "Conferma & Esegui",
     "confirming": "Conferma in corso…",
     "complete_to_confirm": "Completa per confermare",
@@ -34,9 +38,10 @@
   },
   "command": {
     "placeholder": "Descrivi cosa vuoi fare…",
-    "hint": "↵ per proporre · ⇧↵ per a capo",
+    "hint": "↵ per proporre · ⇧↵ per a capo · Esc per cancellare",
     "propose": "Proponi",
-    "interpreting": "Interpretazione in corso…"
+    "interpreting": "Interpretazione in corso…",
+    "recent": "Recenti"
   },
   "auth": {
     "email": "Email",
