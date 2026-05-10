@@ -64,6 +64,13 @@
     "logging_in": "Accesso in corso…",
     "sign_in_to_continue": "Accedi per continuare"
   },
+  "settings": {
+    "theme": {
+      "system": "Sistema",
+      "light": "Chiaro",
+      "dark": "Scuro"
+    }
+  },
   "errors": {
     "generic": "Si è verificato un errore. Riprova.",
     "unauthorized": "Non sei autorizzato a eseguire questa azione.",

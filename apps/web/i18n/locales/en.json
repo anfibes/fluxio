@@ -64,6 +64,13 @@
     "logging_in": "Signing in…",
     "sign_in_to_continue": "Sign in to continue"
   },
+  "settings": {
+    "theme": {
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark"
+    }
+  },
   "errors": {
     "generic": "Something went wrong. Please try again.",
     "unauthorized": "You are not authorized to perform this action.",

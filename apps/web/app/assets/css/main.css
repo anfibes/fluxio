@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* Background layers */
+  /* Background layers — dark defaults */
   --color-bg:             #0f1117;
   --color-surface:        #1a1d26;
   --color-surface-raised: #22263a;
@@ -24,7 +24,32 @@
   --font-family-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', monospace;
 }
 
+/* Default — dark until data-theme is set by plugin */
 :root {
+  color-scheme: dark;
+}
+
+/* Light theme token overrides */
+html[data-theme="light"] {
+  color-scheme: light;
+
+  --color-bg:             #f4f2ef;
+  --color-surface:        #faf9f7;
+  --color-surface-raised: #ffffff;
+
+  --color-accent:         #6366f1;
+  --color-accent-hover:   #4f46e5;
+
+  --color-text:           #111827;
+  --color-text-muted:     #374151;
+  --color-muted:          #6b7280;
+
+  --color-border:         #e3dfd8;
+  --color-border-subtle:  #ede9e3;
+}
+
+/* Explicit dark overrides (not strictly needed, but clarifies intent) */
+html[data-theme="dark"] {
   color-scheme: dark;
 }
 

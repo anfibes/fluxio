@@ -1,5 +1,14 @@
 <script setup lang="ts">
+import type { ThemePreference } from '~/composables/useTheme'
+
 const { user, isAuthenticated, logout } = useAuth()
+const { themePreference, setThemePreference } = useTheme()
+
+const themeOptions: { value: ThemePreference; labelKey: string }[] = [
+  { value: 'system', labelKey: 'settings.theme.system' },
+  { value: 'light',  labelKey: 'settings.theme.light' },
+  { value: 'dark',   labelKey: 'settings.theme.dark' },
+]
 </script>
 
 <template>
@@ -8,6 +17,22 @@ const { user, isAuthenticated, logout } = useAuth()
       <slot name="title" />
     </div>
     <div class="topbar-right">
+      <!-- Theme control -->
+      <div class="flex items-center gap-px rounded-md border border-[var(--color-border)] p-0.5">
+        <button
+          v-for="option in themeOptions"
+          :key="option.value"
+          type="button"
+          class="rounded px-2 py-1 text-xs transition-colors"
+          :class="themePreference === option.value
+            ? 'bg-[var(--color-surface-raised)] text-[var(--color-text-muted)]'
+            : 'text-[var(--color-muted)] hover:text-[var(--color-text-muted)]'"
+          @click="setThemePreference(option.value)"
+        >
+          {{ $t(option.labelKey) }}
+        </button>
+      </div>
+
       <template v-if="isAuthenticated">
         <span v-if="user" class="text-xs text-[var(--color-text-muted)]">{{ user.email }}</span>
         <button
