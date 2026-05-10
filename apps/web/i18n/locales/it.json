@@ -35,6 +35,11 @@
       "executed": "Eseguita",
       "failed": "Fallita"
     },
+    "sections": {
+      "blocking": "Da risolvere",
+      "informational": "Contesto aggiuntivo",
+      "outcome": "Risultato"
+    },
     "ambiguity": {
       "title": "Risolvi ambiguità",
       "query": "Corrispondenza a \"{query}\"",

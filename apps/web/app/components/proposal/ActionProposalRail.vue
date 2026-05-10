@@ -11,6 +11,40 @@ const isFailed   = computed(() => props.proposal?.status === 'failed')
 
 const canConfirm = computed(() => isReady.value && !props.loading)
 
+// ── Operational hierarchy helpers ───────────────────────────
+
+const blockingAmbiguities = computed(() =>
+  props.proposal?.ambiguities?.filter(a => a.blocking && a.selected_candidate_id === null) ?? [],
+)
+
+const requiredMissingFields = computed(() =>
+  props.proposal?.missing?.filter(f => f.required) ?? [],
+)
+
+const optionalMissingFields = computed(() =>
+  props.proposal?.missing?.filter(f => !f.required) ?? [],
+)
+
+const hasBlockingItems = computed(() =>
+  blockingAmbiguities.value.length > 0 || requiredMissingFields.value.length > 0,
+)
+
+const hasWarnings = computed(() =>
+  (props.proposal?.warnings?.length ?? 0) > 0,
+)
+
+const hasInformationalItems = computed(() =>
+  hasWarnings.value || optionalMissingFields.value.length > 0,
+)
+
+const hasExecutionOutcome = computed(() => isExecuted.value || isFailed.value)
+
+const hasOutcome = computed(() =>
+  !!props.proposal?.last_refinement || hasExecutionOutcome.value,
+)
+
+// ── Dev example commands ─────────────────────────────────────
+
 const exampleCommands = [
   'Create a follow-up task for Rossini tomorrow at 10am',
   'Add a new lead from the marketing conference',
@@ -46,12 +80,31 @@ const exampleCommands = [
 
       <!-- ── Proposal content ──────────────────────────────── -->
       <div v-else key="content" class="flex h-full flex-col">
+
         <!-- Status header -->
         <ProposalStatusBanner :proposal="proposal" />
 
         <!-- Scrollable body -->
         <div class="flex-1 overflow-y-auto">
-          <!-- Editable fields -->
+
+          <!-- ── A. BLOCKING ──────────────────────────────── -->
+          <template v-if="hasBlockingItems">
+            <p class="px-4 pb-1.5 pt-4 text-xs font-medium uppercase tracking-wide text-muted/60">
+              {{ $t('proposal.sections.blocking') }}
+            </p>
+            <ProposalAmbiguityPanel
+              v-if="blockingAmbiguities.length"
+              :ambiguities="blockingAmbiguities"
+              :loading="loading"
+              @resolve="emit('resolve-ambiguity', $event)"
+            />
+            <ProposalMissingInformationPanel
+              v-if="requiredMissingFields.length"
+              :fields="requiredMissingFields"
+            />
+          </template>
+
+          <!-- ── B. ACTIONABLE ────────────────────────────── -->
           <div class="px-4 pb-2 pt-4">
             <p class="mb-3 text-xs font-medium uppercase tracking-wide text-muted">
               {{ $t('proposal.fields') }}
@@ -62,44 +115,58 @@ const exampleCommands = [
               :field="field"
             />
           </div>
-
-          <!-- Ambiguity resolution -->
-          <ProposalAmbiguityPanel
-            v-if="proposal.ambiguities?.length"
-            :proposal="proposal"
-            :loading="loading"
-            @resolve="emit('resolve-ambiguity', $event)"
-          />
-
-          <!-- Missing fields warning -->
-          <ProposalMissingInformationPanel
-            v-if="proposal.missing.length"
-            :fields="proposal.missing"
-          />
-
-          <!-- Proposed changes -->
           <ProposalProposedChangesList :changes="proposal.changes" />
 
-          <!-- Last refinement feedback -->
-          <ProposalLastRefinementPanel
-            v-if="proposal.last_refinement"
-            :refinement="proposal.last_refinement"
-          />
+          <!-- ── C. INFORMATIONAL ─────────────────────────── -->
+          <template v-if="hasInformationalItems">
+            <p class="px-4 pb-1.5 pt-1 text-xs font-medium uppercase tracking-wide text-muted/60">
+              {{ $t('proposal.sections.informational') }}
+            </p>
+            <!-- Warnings -->
+            <div
+              v-if="hasWarnings"
+              class="mx-4 mb-4 rounded-lg border border-border bg-surface-raised px-3.5 py-3"
+            >
+              <ul class="flex flex-col gap-1">
+                <li
+                  v-for="(warning, i) in proposal.warnings"
+                  :key="i"
+                  class="flex items-start gap-2 text-xs text-muted"
+                >
+                  <span class="mt-0.5 shrink-0 text-amber-500/70">·</span>
+                  <span class="leading-relaxed">{{ warning }}</span>
+                </li>
+              </ul>
+            </div>
+            <!-- Optional missing fields -->
+            <ProposalMissingInformationPanel
+              v-if="optionalMissingFields.length"
+              :fields="optionalMissingFields"
+            />
+          </template>
 
-          <!-- Failure reason -->
-          <div
-            v-if="isFailed && proposal.failure_reason"
-            class="mx-4 mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-xs text-red-400"
-          >
-            <p class="mb-1 font-semibold">{{ $t('proposal.execution_failed') }}</p>
-            <p class="leading-relaxed opacity-80">{{ proposal.failure_reason }}</p>
-          </div>
+          <!-- ── D. OUTCOME ───────────────────────────────── -->
+          <template v-if="hasOutcome">
+            <p class="px-4 pb-1.5 pt-1 text-xs font-medium uppercase tracking-wide text-muted/60">
+              {{ $t('proposal.sections.outcome') }}
+            </p>
+            <ProposalLastRefinementPanel
+              v-if="proposal.last_refinement"
+              :refinement="proposal.last_refinement"
+            />
+            <div
+              v-if="isFailed && proposal.failure_reason"
+              class="mx-4 mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-xs text-red-400"
+            >
+              <p class="mb-1 font-semibold">{{ $t('proposal.execution_failed') }}</p>
+              <p class="leading-relaxed opacity-80">{{ proposal.failure_reason }}</p>
+            </div>
+            <ProposalExecutionResultPanel
+              v-if="isExecuted && proposal.execution_result"
+              :result="proposal.execution_result"
+            />
+          </template>
 
-          <!-- Execution result -->
-          <ProposalExecutionResultPanel
-            v-if="isExecuted && proposal.execution_result"
-            :result="proposal.execution_result"
-          />
         </div>
 
         <!-- Footer — hidden when already executed or failed -->
@@ -117,8 +184,8 @@ const exampleCommands = [
             {{ loading ? $t('proposal.confirming') : isDraft ? $t('proposal.complete_to_confirm') : $t('proposal.confirm_execute') }}
           </button>
         </div>
-      </div>
 
+      </div>
     </Transition>
   </div>
 </template>

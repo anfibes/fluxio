@@ -35,6 +35,11 @@
       "executed": "Executed",
       "failed": "Failed"
     },
+    "sections": {
+      "blocking": "Needs resolution",
+      "informational": "Additional context",
+      "outcome": "Outcome"
+    },
     "ambiguity": {
       "title": "Resolve ambiguity",
       "query": "Matching \"{query}\"",

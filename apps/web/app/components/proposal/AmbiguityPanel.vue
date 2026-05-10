@@ -1,14 +1,10 @@
 <script setup lang="ts">
-import type { ActionProposal } from '~/types/actions'
+import type { ProposalAmbiguity } from '~/types/actions'
 
-const props = defineProps<{ proposal: ActionProposal; loading?: boolean }>()
+const props = defineProps<{ ambiguities: ProposalAmbiguity[]; loading?: boolean }>()
 const emit = defineEmits<{ resolve: [text: string] }>()
 
 const { t } = useI18n()
-
-const unresolvedAmbiguities = computed(() =>
-  props.proposal.ambiguities.filter(a => a.blocking && a.selected_candidate_id === null),
-)
 
 function reasonLabel(reason: string): string {
   if (reason === 'multiple_matches') return t('proposal.ambiguity.multiple_matches')
@@ -22,7 +18,7 @@ function confidencePct(confidence: number): number {
 
 <template>
   <div
-    v-if="unresolvedAmbiguities.length"
+    v-if="ambiguities.length"
     class="mx-4 mb-4 overflow-hidden rounded-lg border border-blue-500/30 bg-blue-500/10"
   >
     <!-- Header -->
@@ -32,7 +28,7 @@ function confidencePct(confidence: number): number {
 
     <!-- Ambiguity entries -->
     <div
-      v-for="ambiguity in unresolvedAmbiguities"
+      v-for="ambiguity in ambiguities"
       :key="ambiguity.key"
       class="px-3.5 py-3"
     >
@@ -63,15 +59,10 @@ function confidencePct(confidence: number): number {
           :disabled="loading"
           @click="emit('resolve', candidate.label)"
         >
-          <!-- Label -->
           <span class="flex-1 font-medium text-text-muted">{{ candidate.label }}</span>
-
-          <!-- Type pill -->
           <span class="shrink-0 rounded-full bg-surface px-1.5 py-px text-xs text-muted ring-1 ring-border">
             {{ candidate.type }}
           </span>
-
-          <!-- Confidence -->
           <span
             v-if="candidate.confidence != null"
             class="shrink-0 tabular-nums text-xs text-muted"
