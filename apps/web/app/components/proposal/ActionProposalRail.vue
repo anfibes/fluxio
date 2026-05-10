@@ -2,7 +2,7 @@
 import type { ActionProposal } from '~/types/actions'
 
 const props = defineProps<{ proposal: ActionProposal | null; loading?: boolean }>()
-const emit = defineEmits<{ 'confirm-execute': []; 'resolve-ambiguity': [text: string] }>()
+const emit = defineEmits<{ 'confirm-execute': []; 'resolve-ambiguity': [text: string]; 'reset': [] }>()
 
 const isReady    = computed(() => props.proposal?.status === 'ready')
 const isDraft    = computed(() => props.proposal?.status === 'draft')
@@ -83,6 +83,17 @@ const exampleCommands = [
 
         <!-- Status header -->
         <ProposalStatusBanner :proposal="proposal" />
+
+        <!-- Reset strip — secondary action, ends current operational context -->
+        <div class="flex justify-end border-b border-border-subtle px-4 py-1.5">
+          <button
+            type="button"
+            class="text-xs text-muted transition-colors hover:text-text-muted"
+            @click="emit('reset')"
+          >
+            {{ $t('proposal.reset') }}
+          </button>
+        </div>
 
         <!-- Scrollable body -->
         <div class="flex-1 overflow-y-auto">

@@ -16,7 +16,7 @@ const { isAuthenticated } = useAuth()
 
 // ── live state ───────────────────────────────────────────────
 const commandText = ref('')
-const { proposal, loading, error, submitCommand, confirmAndExecute, resolveAmbiguity, setError } = useActionProposal()
+const { proposal, loading, error, submitCommand, confirmAndExecute, resolveAmbiguity, setError, clear } = useActionProposal()
 const { history, push: pushHistory } = useCommandHistory()
 
 // ── composer keyboard shortcut ───────────────────────────────
@@ -38,10 +38,30 @@ const displayProposal = computed<ActionProposal | null>(
   () => (proposal.value ?? (mockState.value ? mockProposalMap[mockState.value] : null)) as ActionProposal | null,
 )
 
+// ── contextual placeholder ───────────────────────────────────
+const { t } = useI18n()
+
+const composerPlaceholder = computed<string | undefined>(() => {
+  const p = displayProposal.value
+  if (!p) return undefined
+  const blockingAmbiguities = p.ambiguities?.filter(a => a.blocking && a.selected_candidate_id === null) ?? []
+  if (blockingAmbiguities.length) return t('command.placeholder_resolve_ambiguity')
+  const requiredMissing = p.missing?.filter(f => f.required) ?? []
+  if (requiredMissing.length) return t('command.placeholder_add_missing')
+  if (p.status === 'draft' || p.status === 'ready') return t('command.placeholder_refine')
+  return undefined
+})
+
 // ── command submit ───────────────────────────────────────────
 async function handleSubmit() {
-  pushHistory(commandText.value)
-  await submitCommand(commandText.value)
+  const text = commandText.value
+  pushHistory(text)
+  await submitCommand(text)
+  if (!error.value) {
+    commandText.value = ''
+    await nextTick()
+    composerRef.value?.focus()
+  }
 }
 
 function handleClear() {
@@ -56,7 +76,19 @@ function fillFromHistory(cmd: string) {
 
 async function handleResolveAmbiguity(text: string) {
   if (!proposal.value) return
+  pushHistory(text)
   await resolveAmbiguity(proposal.value.id, text)
+  if (!error.value) {
+    commandText.value = ''
+    await nextTick()
+    composerRef.value?.focus()
+  }
+}
+
+function handleReset() {
+  clear()
+  commandText.value = ''
+  nextTick(() => composerRef.value?.focus())
 }
 </script>
 
@@ -75,6 +107,7 @@ async function handleResolveAmbiguity(text: string) {
         ref="composerRef"
         v-model="commandText"
         :loading="loading"
+        :placeholder="composerPlaceholder"
         @submit="handleSubmit"
         @clear="handleClear"
       />
@@ -141,7 +174,7 @@ async function handleResolveAmbiguity(text: string) {
 
     <!-- Proposal rail: full-width below workspace on mobile, fixed-width sidebar on desktop. -->
     <!-- min-h-[28rem] ensures h-full inside the rail resolves correctly on mobile. -->
-    <div class="flex min-h-[28rem] flex-col border-t border-border bg-surface lg:min-h-0 lg:w-110 lg:shrink-0 lg:border-l lg:border-t-0 lg:overflow-hidden">
+    <div class="flex min-h-112 flex-col border-t border-border bg-surface lg:min-h-0 lg:w-110 lg:shrink-0 lg:border-l lg:border-t-0 lg:overflow-hidden">
       <div class="border-b border-border px-4 py-3">
         <p class="text-xs font-medium uppercase tracking-wide text-muted">
           {{ $t('proposal.title') }}
@@ -153,6 +186,7 @@ async function handleResolveAmbiguity(text: string) {
           :loading="loading"
           @confirm-execute="confirmAndExecute"
           @resolve-ambiguity="handleResolveAmbiguity"
+          @reset="handleReset"
         />
       </div>
     </div>

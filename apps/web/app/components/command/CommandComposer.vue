@@ -2,6 +2,7 @@
 const props = defineProps<{
   modelValue: string
   loading?: boolean
+  placeholder?: string
 }>()
 
 const emit = defineEmits<{
@@ -38,7 +39,7 @@ function handleKeydown(e: KeyboardEvent) {
       :value="modelValue"
       rows="4"
       autofocus
-      :placeholder="$t('command.placeholder')"
+      :placeholder="placeholder ?? $t('command.placeholder')"
       :disabled="loading"
       class="composer-input"
       @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"

@@ -32,16 +32,16 @@ const items = computed<ContextItem[]>(() => {
 </script>
 
 <template>
-  <div class="flex flex-col overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
-    <div class="flex border-b border-[var(--color-border)]">
+  <div class="flex flex-col overflow-hidden rounded-xl border border-border bg-surface">
+    <div class="flex border-b border-border">
       <button
         v-for="tab in tabs"
         :key="tab"
         type="button"
         class="flex-1 py-2.5 text-xs font-medium transition-colors"
         :class="active === tab
-          ? 'border-b-2 border-[var(--color-accent)] text-[var(--color-accent)] -mb-px'
-          : 'text-[var(--color-muted)] hover:text-[var(--color-text-muted)]'"
+          ? 'border-b-2 border-accent text-accent -mb-px'
+          : 'text-muted hover:text-text-muted'"
         @click="active = tab"
       >
         {{ tab }}

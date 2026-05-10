@@ -28,6 +28,7 @@
     "confirm_execute": "Conferma & Esegui",
     "confirming": "Conferma in corso…",
     "complete_to_confirm": "Completa per confermare",
+    "reset": "Reimposta",
     "status": {
       "draft": "Bozza",
       "ready": "Pronta",
@@ -51,6 +52,9 @@
   },
   "command": {
     "placeholder": "Descrivi cosa vuoi fare…",
+    "placeholder_resolve_ambiguity": "Risolvi l'ambiguità corrente…",
+    "placeholder_add_missing": "Aggiungi le informazioni mancanti…",
+    "placeholder_refine": "Affina la proposta corrente…",
     "hint": "↵ per proporre · ⇧↵ per a capo · Esc per cancellare",
     "propose": "Proponi",
     "interpreting": "Interpretazione in corso…",
