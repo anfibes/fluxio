@@ -2,6 +2,7 @@
 
 namespace Fluxio\Actions\Services;
 
+use Carbon\Carbon;
 use Fluxio\Actions\Models\ActionProposal;
 use Illuminate\Validation\ValidationException;
 
@@ -19,31 +20,344 @@ class ActionProposalRefinementService
 
         $effectiveText = $this->effectiveText($text, $proposal->source_text);
 
-        if ($proposal->intent === 'schedule_call' && $this->mentionsTomorrowMorning($effectiveText)) {
-            return $this->applyTomorrowMorning($proposal, $text, $effectiveText);
-        }
+        // Classify deterministic field mutations (date, time, priority, …)
+        $fieldMutations = $this->classifyFieldMutations($effectiveText);
 
+        // Try ambiguity resolution when a blocking ambiguity exists
+        $ambiguityResolution = null;
         if ($this->hasUnresolvedBlockingAmbiguity($proposal)) {
-            return $this->tryResolveAmbiguity($proposal, $text, $effectiveText);
+            $ambiguityResolution = $this->tryClassifyAmbiguityResolution($proposal, $effectiveText);
+
+            if ($ambiguityResolution === null && empty($fieldMutations)) {
+                // Can't resolve and nothing else to apply
+                $warnings   = $proposal->warnings ?? [];
+                $warnings[] = __('actions::actions.ambiguity_still_unresolved');
+                $proposal->warnings        = $warnings;
+                $proposal->last_refinement = [
+                    'text'           => $text,
+                    'effective_text' => $effectiveText,
+                    'summary'        => 'No changes applied.',
+                    'changes'        => [],
+                ];
+                $proposal->save();
+
+                return $proposal;
+            }
         }
 
-        $warnings = $proposal->warnings ?? [];
-        $warnings[] = __('actions::actions.refinement_not_recognized');
-        $proposal->warnings = $warnings;
+        // Nothing recognized at all
+        if (empty($fieldMutations) && $ambiguityResolution === null) {
+            $warnings   = $proposal->warnings ?? [];
+            $warnings[] = __('actions::actions.refinement_not_recognized');
+            $proposal->warnings        = $warnings;
+            $proposal->last_refinement = [
+                'text'           => $text,
+                'effective_text' => $effectiveText,
+                'summary'        => 'No changes applied.',
+                'changes'        => [],
+            ];
+            $proposal->save();
+
+            return $proposal;
+        }
+
+        return $this->applyAll($proposal, $fieldMutations, $ambiguityResolution, $text, $effectiveText);
+    }
+
+    // ── Mutation classification ──────────────────────────────────────────────
+
+    private function classifyFieldMutations(string $effectiveText): array
+    {
+        $mutations = [];
+
+        $date = $this->extractDate($effectiveText);
+        if ($date !== null) {
+            $mutations[] = ['field' => 'date', 'label' => 'Date', 'value' => $date, 'source' => 'detected'];
+        }
+
+        $time = $this->extractTime($effectiveText);
+        if ($time !== null) {
+            $mutations[] = ['field' => 'time', 'label' => 'Time', 'value' => $time, 'source' => 'detected'];
+        }
+
+        $priority = $this->extractPriority($effectiveText);
+        if ($priority !== null) {
+            $mutations[] = ['field' => 'priority', 'label' => 'Priority', 'value' => $priority, 'source' => 'detected'];
+        }
+
+        return $mutations;
+    }
+
+    private function extractDate(string $text): ?string
+    {
+        $lower = mb_strtolower(trim($text));
+
+        if (str_contains($lower, 'tomorrow')) {
+            return now()->addDay()->toDateString();
+        }
+
+        $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        foreach ($days as $day) {
+            if ((bool) preg_match('/\b' . $day . '\b/i', $lower)) {
+                return Carbon::parse('next ' . $day)->toDateString();
+            }
+        }
+
+        return null;
+    }
+
+    private function extractTime(string $text): ?string
+    {
+        // Explicit: "at 10:30", "at 10.30", "at 9", "at 9am", "at 9pm", "at 9:30am"
+        if ((bool) preg_match('/\bat\s+(\d{1,2})(?:[.:](\d{2}))?\s*(am|pm)?\b/i', $text, $m)) {
+            $hour = (int) $m[1];
+            $min  = isset($m[2]) && $m[2] !== '' ? (int) $m[2] : 0;
+            $ampm = mb_strtolower($m[3] ?? '');
+
+            if ($ampm === 'pm' && $hour < 12) {
+                $hour += 12;
+            }
+            if ($ampm === 'am' && $hour === 12) {
+                $hour = 0;
+            }
+
+            return sprintf('%02d:%02d', $hour, $min);
+        }
+
+        // Implicit: "morning" → 09:00
+        if ((bool) preg_match('/\bmorning\b/i', $text)) {
+            return '09:00';
+        }
+
+        return null;
+    }
+
+    private function extractPriority(string $text): ?string
+    {
+        $lower = mb_strtolower($text);
+
+        if (str_contains($lower, 'high priority') || str_contains($lower, 'urgent')) {
+            return 'high';
+        }
+
+        if (str_contains($lower, 'low priority')) {
+            return 'low';
+        }
+
+        return null;
+    }
+
+    // ── Ambiguity resolution classification ─────────────────────────────────
+
+    private function tryClassifyAmbiguityResolution(ActionProposal $proposal, string $effectiveText): ?array
+    {
+        foreach ($proposal->ambiguities ?? [] as $ambiguity) {
+            if (! ($ambiguity['blocking'] ?? false) || $ambiguity['selected_candidate_id'] !== null) {
+                continue;
+            }
+
+            $candidate = $this->resolveCandidate($ambiguity, $effectiveText);
+
+            if ($candidate !== null) {
+                return [
+                    'ambiguity_key'   => $ambiguity['key'],
+                    'ambiguity_label' => $ambiguity['label'],
+                    'candidate'       => $candidate,
+                ];
+            }
+
+            // Only one unresolved blocking ambiguity is processed per refinement
+            return null;
+        }
+
+        return null;
+    }
+
+    // ── Unified mutation application ─────────────────────────────────────────
+
+    private function applyAll(
+        ActionProposal $proposal,
+        array $fieldMutations,
+        ?array $ambiguityResolution,
+        string $text,
+        string $effectiveText,
+    ): ActionProposal {
+        $editableFields = $proposal->editable_fields ?? [];
+        $missing        = $proposal->missing ?? [];
+        $ambiguities    = $proposal->ambiguities ?? [];
+        $entities       = $proposal->entities ?? [];
+        $previousStatus = $proposal->status;
+        $confidence     = $proposal->confidence;
+        $changes        = [];
+
+        $currentFieldValues = collect($editableFields)
+            ->keyBy('key')
+            ->map(fn (array $f) => $f['value'])
+            ->all();
+
+        // Apply field mutations (date, time, priority, …)
+        $mutatedFieldKeys = [];
+
+        foreach ($fieldMutations as $mutation) {
+            $field     = $mutation['field'];
+            $label     = $mutation['label'];
+            $newValue  = $mutation['value'];
+            $prevValue = $currentFieldValues[$field] ?? null;
+
+            if (collect($editableFields)->contains('key', $field)) {
+                $editableFields = array_map(function (array $f) use ($field, $newValue, $mutation): array {
+                    if ($f['key'] === $field) {
+                        $f['value']  = $newValue;
+                        $f['source'] = $mutation['source'];
+                    }
+
+                    return $f;
+                }, $editableFields);
+            } else {
+                $editableFields[] = [
+                    'key'      => $field,
+                    'label'    => $label,
+                    'value'    => $newValue,
+                    'source'   => $mutation['source'],
+                    'required' => in_array($field, ['date', 'time'], true),
+                ];
+            }
+
+            if ($prevValue !== $newValue) {
+                $changes[] = ['field' => $field, 'label' => $label, 'from' => $prevValue, 'to' => $newValue];
+            }
+
+            $mutatedFieldKeys[] = $field;
+
+            if (in_array($field, ['date', 'time'], true)) {
+                $confidence = max($confidence, 0.85);
+            }
+        }
+
+        // Remove resolved field keys from missing
+        if (! empty($mutatedFieldKeys)) {
+            $missing = array_values(
+                array_filter($missing, fn (array $f) => ! in_array($f['key'], $mutatedFieldKeys, true))
+            );
+        }
+
+        // Apply ambiguity resolution
+        if ($ambiguityResolution !== null) {
+            $fieldKey   = $ambiguityResolution['ambiguity_key'];
+            $fieldLabel = $ambiguityResolution['ambiguity_label'];
+            $candidate  = $ambiguityResolution['candidate'];
+            $prevValue  = $currentFieldValues[$fieldKey] ?? null;
+
+            $ambiguities = array_map(function (array $a) use ($fieldKey, $candidate): array {
+                if ($a['key'] === $fieldKey && $a['selected_candidate_id'] === null) {
+                    $a['selected_candidate_id'] = $candidate['id'];
+                }
+
+                return $a;
+            }, $ambiguities);
+
+            $entities[$fieldKey] = $candidate['label'];
+
+            if (collect($editableFields)->contains('key', $fieldKey)) {
+                $editableFields = array_map(function (array $f) use ($fieldKey, $candidate): array {
+                    if ($f['key'] === $fieldKey) {
+                        $f['value']  = $candidate['label'];
+                        $f['source'] = 'detected';
+                    }
+
+                    return $f;
+                }, $editableFields);
+            } else {
+                $editableFields[] = [
+                    'key'      => $fieldKey,
+                    'label'    => $fieldLabel,
+                    'value'    => $candidate['label'],
+                    'source'   => 'detected',
+                    'required' => true,
+                ];
+            }
+
+            if ($prevValue !== $candidate['label']) {
+                $changes[] = [
+                    'field' => $fieldKey,
+                    'label' => $fieldLabel,
+                    'from'  => $prevValue,
+                    'to'    => $candidate['label'],
+                ];
+            }
+        }
+
+        // Recompute status
+        $status = $this->hasBlockingConditions($proposal, $missing, $ambiguities)
+            ? $previousStatus
+            : 'ready';
+
+        if ($status !== $previousStatus) {
+            $changes[] = ['field' => 'status', 'label' => 'Status', 'from' => $previousStatus, 'to' => $status];
+        }
+
+        $proposal->editable_fields = $editableFields;
+        $proposal->missing         = $missing;
+        $proposal->ambiguities     = $ambiguities;
+        $proposal->entities        = $entities;
+        $proposal->status          = $status;
+        $proposal->confidence      = $confidence;
         $proposal->last_refinement = [
-            'text' => $text,
+            'text'           => $text,
             'effective_text' => $effectiveText,
-            'summary' => 'No changes applied.',
-            'changes' => [],
+            'summary'        => $this->buildSummary($changes),
+            'changes'        => $changes,
         ];
         $proposal->save();
 
         return $proposal;
     }
 
+    private function buildSummary(array $changes): string
+    {
+        if (empty($changes)) {
+            return 'No changes applied.';
+        }
+
+        $byField    = collect($changes)->keyBy('field');
+        $dataFields = array_values(array_diff($byField->keys()->all(), ['status']));
+
+        if (in_array('lead', $dataFields, true) && count($dataFields) === 1) {
+            return 'Lead resolved.';
+        }
+
+        $hasDate = in_array('date', $dataFields, true);
+        $hasTime = in_array('time', $dataFields, true);
+
+        if ($hasDate && $hasTime) {
+            $dateFrom = $byField->get('date')['from'];
+            $timeFrom = $byField->get('time')['from'];
+
+            return ($dateFrom === null && $timeFrom === null)
+                ? 'Date and time added.'
+                : 'Date and time updated.';
+        }
+
+        if ($hasDate) {
+            return $byField->get('date')['from'] === null ? 'Date added.' : 'Date updated.';
+        }
+
+        if ($hasTime) {
+            return $byField->get('time')['from'] === null ? 'Time added.' : 'Time updated.';
+        }
+
+        if (in_array('priority', $dataFields, true)) {
+            return 'Priority set.';
+        }
+
+        return 'Proposal updated.';
+    }
+
+    // ── Shared helpers ───────────────────────────────────────────────────────
+
     private function effectiveText(string $text, string $sourceText): string
     {
-        $text = trim($text);
+        $text       = trim($text);
         $sourceText = trim($sourceText);
 
         if ($sourceText !== '' && str_starts_with($text, $sourceText)) {
@@ -51,11 +365,6 @@ class ActionProposalRefinementService
         }
 
         return $text;
-    }
-
-    private function mentionsTomorrowMorning(string $text): bool
-    {
-        return (bool) preg_match('/tomorrow\s+morning/i', $text);
     }
 
     private function hasUnresolvedBlockingAmbiguity(ActionProposal $proposal): bool
@@ -73,96 +382,10 @@ class ActionProposalRefinementService
         return $requiredMissingRemain || $blockingAmbiguityRemains;
     }
 
-    private function tryResolveAmbiguity(ActionProposal $proposal, string $text, string $effectiveText): ActionProposal
-    {
-        $ambiguities = $proposal->ambiguities ?? [];
-        $resolvedField = null;
-
-        foreach ($ambiguities as &$ambiguity) {
-            if (! ($ambiguity['blocking'] ?? false) || $ambiguity['selected_candidate_id'] !== null) {
-                continue;
-            }
-
-            $candidate = $this->resolveCandidate($ambiguity, $effectiveText);
-
-            if ($candidate === null) {
-                $warnings = $proposal->warnings ?? [];
-                $warnings[] = __('actions::actions.ambiguity_still_unresolved');
-                $proposal->warnings = $warnings;
-                $proposal->last_refinement = [
-                    'text' => $text,
-                    'effective_text' => $effectiveText,
-                    'summary' => 'No changes applied.',
-                    'changes' => [],
-                ];
-                $proposal->save();
-
-                return $proposal;
-            }
-
-            $ambiguity['selected_candidate_id'] = $candidate['id'];
-            $resolvedField = ['key' => $ambiguity['key'], 'label' => $ambiguity['label'], 'candidate' => $candidate];
-        }
-        unset($ambiguity);
-
-        if ($resolvedField === null) {
-            return $proposal;
-        }
-
-        $candidate = $resolvedField['candidate'];
-        $fieldKey = $resolvedField['key'];
-        $fieldLabel = $resolvedField['label'];
-
-        $entities = $proposal->entities ?? [];
-        $previousLead = $entities[$fieldKey] ?? null;
-        $entities[$fieldKey] = $candidate['label'];
-
-        $editableFields = $proposal->editable_fields ?? [];
-        $hasLeadField = collect($editableFields)->contains('key', $fieldKey);
-        if (! $hasLeadField) {
-            $editableFields[] = ['key' => $fieldKey, 'label' => $fieldLabel, 'value' => $candidate['label'], 'source' => 'detected', 'required' => true];
-        } else {
-            $editableFields = array_map(function (array $field) use ($fieldKey, $candidate): array {
-                if ($field['key'] === $fieldKey) {
-                    $field['value'] = $candidate['label'];
-                    $field['source'] = 'detected';
-                }
-
-                return $field;
-            }, $editableFields);
-        }
-
-        $missing = $proposal->missing ?? [];
-        $previousStatus = $proposal->status;
-        $status = $this->hasBlockingConditions($proposal, $missing, $ambiguities) ? $previousStatus : 'ready';
-
-        $changes = [
-            ['field' => $fieldKey, 'label' => $fieldLabel, 'from' => $previousLead, 'to' => $candidate['label']],
-        ];
-
-        if ($status !== $previousStatus) {
-            $changes[] = ['field' => 'status', 'label' => 'Status', 'from' => $previousStatus, 'to' => $status];
-        }
-
-        $proposal->ambiguities = $ambiguities;
-        $proposal->entities = $entities;
-        $proposal->editable_fields = $editableFields;
-        $proposal->status = $status;
-        $proposal->last_refinement = [
-            'text' => $text,
-            'effective_text' => $effectiveText,
-            'summary' => ucfirst($fieldLabel).' resolved.',
-            'changes' => $changes,
-        ];
-        $proposal->save();
-
-        return $proposal;
-    }
-
     private function resolveCandidate(array $ambiguity, string $text): ?array
     {
         $candidates = $ambiguity['candidates'] ?? [];
-        $lower = mb_strtolower(trim($text));
+        $lower      = mb_strtolower(trim($text));
 
         $ordinal = $this->parseOrdinal($lower);
         if ($ordinal !== null && isset($candidates[$ordinal])) {
@@ -213,62 +436,5 @@ class ActionProposalRefinementService
             str_contains($text, 'third')  || str_contains($text, '3rd') => 2,
             default => null,
         };
-    }
-
-    private function applyTomorrowMorning(ActionProposal $proposal, string $text, string $effectiveText): ActionProposal
-    {
-        $tomorrow = now()->addDay()->toDateString();
-
-        $previousStatus = $proposal->status;
-        $fields = collect($proposal->editable_fields ?? [])->keyBy('key');
-        $previousDate = $fields->get('date')['value'] ?? null;
-        $previousTime = $fields->get('time')['value'] ?? null;
-
-        $editableFields = array_map(function (array $field) use ($tomorrow): array {
-            if ($field['key'] === 'date') {
-                $field['value'] = $tomorrow;
-                $field['source'] = 'detected';
-            } elseif ($field['key'] === 'time') {
-                $field['value'] = '09:00';
-                $field['source'] = 'detected';
-            }
-
-            return $field;
-        }, $proposal->editable_fields ?? []);
-
-        $missing = array_values(
-            array_filter(
-                $proposal->missing ?? [],
-                fn (array $f) => ! in_array($f['key'], ['date', 'time'], true),
-            )
-        );
-
-        $status = $this->hasBlockingConditions($proposal, $missing, $proposal->ambiguities ?? [])
-            ? $proposal->status
-            : 'ready';
-        $confidence = max($proposal->confidence, 0.85);
-
-        $changes = [
-            ['field' => 'date', 'label' => 'Date', 'from' => $previousDate, 'to' => $tomorrow],
-            ['field' => 'time', 'label' => 'Time', 'from' => $previousTime, 'to' => '09:00'],
-        ];
-
-        if ($status !== $previousStatus) {
-            $changes[] = ['field' => 'status', 'label' => 'Status', 'from' => $previousStatus, 'to' => $status];
-        }
-
-        $proposal->editable_fields = $editableFields;
-        $proposal->missing = $missing;
-        $proposal->status = $status;
-        $proposal->confidence = $confidence;
-        $proposal->last_refinement = [
-            'text' => $text,
-            'effective_text' => $effectiveText,
-            'summary' => 'Date and time added.',
-            'changes' => $changes,
-        ];
-        $proposal->save();
-
-        return $proposal;
     }
 }
