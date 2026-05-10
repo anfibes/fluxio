@@ -8,11 +8,18 @@ The `ActionProposal` is the core architectural concept of Fluxio.
 
 Fluxio does NOT execute business actions directly from natural language.
 
-Instead, every user command is transformed into a structured, reviewable and confirmable proposal before execution.
+Instead, every user command becomes:
+- structured
+- reviewable
+- refinable
+- confirmable
+- explainable
+
+before execution.
 
 Core flow:
 
-```text
+```text id="qzxtm8"
 Natural language
 → Intent resolution
 → Entity extraction
@@ -23,14 +30,17 @@ Natural language
 → Execution
 ```
 
-The proposal lifecycle is designed to ensure:
+The proposal lifecycle exists to ensure:
 - deterministic execution
 - explicit user control
 - operational transparency
-- safe AI-assisted workflows
-- explainable business automation
+- explainable AI assistance
 - proposal continuity
-- proposal mutation visibility
+- ambiguity-aware workflows
+
+Conversation exists only to refine proposals.
+
+The proposal itself is the authoritative operational object.
 
 ---
 
@@ -38,64 +48,53 @@ The proposal lifecycle is designed to ensure:
 
 Traditional systems usually follow:
 
-```text
+```text id="5kn3eu"
 User → Form → Submit → Execute
 ```
 
-AI chat systems often follow:
+Many AI systems follow:
 
-```text
+```text id="3jlwmu"
 User → AI → Execute
 ```
 
-Fluxio introduces a different approach:
+Fluxio introduces a different model:
 
-```text
+```text id="jlwmr3"
 User
-→ AI interpretation
+→ Interpretation
 → Structured proposal
 → Proposal refinement
 → Confirmation
 → Execute
 ```
 
-This allows:
+This enables:
 - natural-language interaction
-- validation before execution
-- explicit user approval
-- auditability
+- controlled execution
+- explicit validation
 - confidence-aware UX
-- controlled refinement
-- deterministic proposal evolution
+- ambiguity visibility
+- operational explainability
 
 The proposal is more important than the conversation itself.
 
 ---
 
-# Core Principle
+# Core Lifecycle Invariants
 
-Natural language must NEVER directly mutate business data.
+The proposal lifecycle follows strict invariants.
 
-AI interpretation is:
-- advisory
-- assistive
-- structured
+Rules:
+- execution always requires confirmation
+- refinement preserves proposal identity
+- refinement never creates new proposals
+- proposal IDs remain stable
+- ambiguities block execution
+- proposal state transitions remain explicit
+- AI output remains advisory and structured
 
-Execution always requires:
-- validation
-- lifecycle checks
-- explicit confirmation
-
-Conversation exists ONLY to:
-- refine proposals
-- improve confidence
-- gather missing information
-- resolve ambiguity
-
-Fluxio is NOT:
-- a chatbot
-- a conversational timeline
-- an autonomous AI agent
+Natural language never directly mutates business data.
 
 ---
 
@@ -105,83 +104,65 @@ Every interpretation produces an `ActionProposal`.
 
 Example:
 
-```json
+```json id="5h9jln"
 {
     "id": "proposal_uuid",
     "intent": "create_task",
-    "status": "ready",
-    "confidence": 0.91,
-    "source_text": "Create a follow-up task for Rossini tomorrow at 10am",
-    "entities": {
-        "lead": "Rossini"
-    },
+    "status": "draft",
+    "confidence": 0.74,
+    "source_text": "Call Rossi",
+    "entities": {},
     "missing": [],
     "warnings": [],
-    "editable_fields": [
+    "ambiguities": [
         {
-            "key": "title",
-            "label": "Title",
-            "value": "Follow-up task",
-            "source": "detected",
-            "required": true
+            "key": "lead",
+            "label": "Lead",
+            "reason": "multiple_matches",
+            "blocking": true,
+            "selected_candidate_id": null,
+            "candidates": [
+                {
+                    "id": 1,
+                    "type": "person",
+                    "label": "Mario Rossi"
+                },
+                {
+                    "id": 7,
+                    "type": "company",
+                    "label": "Rossi SRL"
+                }
+            ]
         }
     ],
-    "changes": [
-        {
-            "type": "create",
-            "label": "Create task",
-            "module": "tasks",
-            "payload": {
-                "title": "Follow-up task"
-            }
-        }
-    ],
-    "needs_confirmation": true,
-    "confirmed_at": null,
-    "executed_at": null,
-    "failed_at": null,
-    "failure_reason": null,
-    "execution_result": null,
-    "last_refinement": {
-        "text": "Tomorrow morning",
-        "effective_text": "Tomorrow morning",
-        "summary": "Date and time added.",
-        "changes": [
-            {
-                "field": "date",
-                "label": "Date",
-                "from": null,
-                "to": "2026-05-10"
-            },
-            {
-                "field": "time",
-                "label": "Time",
-                "from": null,
-                "to": "09:00"
-            }
-        ]
-    }
+    "editable_fields": [],
+    "changes": [],
+    "needs_confirmation": true
 }
 ```
 
+The proposal acts as:
+- execution contract
+- refinement target
+- operational state container
+- frontend rendering source
+
 ---
 
-# Proposal Lifecycle States
+# Proposal States
 
-Fluxio currently supports the following proposal states:
+Current proposal lifecycle:
 
-```text
+```text id="zmf91y"
 draft
 → ready
 → confirmed
 → executed / failed
 ```
 
-Proposal refinement does NOT create new proposals.
-
 The SAME proposal evolves over time.
 
-Proposal identity must remain stable during refinement.
+Refinement never creates disconnected proposals.
 
 ---
 
@@ -189,31 +170,34 @@ Proposal identity must remain stable during refinement.
 
 A proposal is in `draft` state when:
 - required information is missing
-- confidence is too low
-- ambiguity remains unresolved
+- confidence is insufficient
+- ambiguities remain unresolved
 
 Example:
 
-```text
+```text id="5e6fj9"
 Schedule a call with Rossini
 ```
 
 The system may detect:
-- intent: `schedule_call`
-- entity: `Rossini`
+- intent
+- possible entities
 
 but still miss:
 - date
 - time
 
+or detect:
+- multiple possible entities
+
 Result:
 - proposal remains incomplete
-- execution is disabled
-- UI shows missing information
+- execution remains blocked
+- refinement becomes necessary
 
 Example response:
 
-```json
+```json id="7dq2fx"
 {
     "status": "draft",
     "missing": [
@@ -221,17 +205,12 @@ Example response:
             "key": "date",
             "label": "Date",
             "required": true
-        },
-        {
-            "key": "time",
-            "label": "Time",
-            "required": true
         }
     ]
 }
 ```
 
-Draft proposals may still be refined multiple times.
+Draft proposals may evolve through multiple refinements.
 
 ---
 
@@ -239,24 +218,20 @@ Draft proposals may still be refined multiple times.
 
 A proposal becomes `ready` when:
 - required fields are resolved
+- ambiguities are resolved
 - validation passes
 - execution becomes possible
 
 Example:
 
-```text
+```text id="wsh2qt"
 Create a follow-up task for Rossini tomorrow at 10am
 ```
 
-The system can:
-- detect intent
-- extract entities
-- build executable payload
-- calculate sufficient confidence
-
-Result:
-- proposal is confirmable
-- execution button becomes enabled
+The proposal is now:
+- executable
+- confirmable
+- operationally complete
 
 Ready proposals may still be refined before confirmation.
 
@@ -266,21 +241,20 @@ Ready proposals may still be refined before confirmation.
 
 A proposal enters `confirmed` state after explicit user approval.
 
-Confirmation is separate from execution.
+Confirmation is intentionally separate from execution.
 
-This distinction allows:
-- future async execution
-- delayed workflows
+This supports future workflows such as:
+- async execution
 - approval chains
-- scheduled execution
+- delayed execution
+- scheduling
 - auditability
 
-Example flow:
+Example:
 
-```text
+```text id="u4z1i4"
 Interpret
 → Ready
-→ User confirms
 → Confirmed
 → Execute
 ```
@@ -292,13 +266,13 @@ Interpret
 A proposal becomes `executed` after successful business execution.
 
 At this point:
-- the business action has completed
+- business mutation completed
 - execution metadata is persisted
-- UI shows execution results
+- execution result becomes visible
 
-Example execution result:
+Example:
 
-```json
+```json id="jtt9hv"
 {
     "execution_result": {
         "task_id": 42,
@@ -316,37 +290,42 @@ Executed proposals should remain immutable.
 A proposal becomes `failed` when execution cannot complete.
 
 Examples:
-- validation failure
-- ambiguous entity resolution
-- database constraints
+- validation failures
 - permission errors
+- unresolved ambiguities
 - execution exceptions
+- business constraints
 
 Example:
 
-```json
+```json id="v57znr"
 {
     "status": "failed",
     "failure_reason": "Multiple leads matched 'Rossini'."
 }
 ```
 
-The frontend should surface failures clearly and explicitly.
+Failures must remain:
+- explicit
+- visible
+- explainable
 
 Fluxio intentionally avoids hiding:
 - uncertainty
 - ambiguity
-- execution errors
+- execution problems
 
 ---
 
-# Confidence
+# Proposal Semantics
 
-Each proposal includes a confidence score.
+## Confidence
+
+Each proposal exposes a confidence score.
 
 Example:
 
-```json
+```json id="rgwfrd"
 {
     "confidence": 0.91
 }
@@ -354,31 +333,26 @@ Example:
 
 Confidence represents:
 - parser certainty
-- entity certainty
 - extraction quality
 - contextual completeness
+- entity certainty
 
 Confidence is NOT:
-- a guarantee
 - execution safety
 - business correctness
+- guaranteed intent accuracy
 
-The UI should:
-- expose uncertainty
-- encourage review
-- reduce blind trust
-
-Low confidence is expected behavior.
+The frontend should expose uncertainty explicitly.
 
 ---
 
-# Missing Information
+## Missing Fields
 
-Incomplete proposals expose missing fields explicitly.
+Incomplete proposals expose missing information.
 
 Example:
 
-```json
+```json id="d4t8bk"
 {
     "missing": [
         {
@@ -390,21 +364,20 @@ Example:
 }
 ```
 
-This enables:
-- proposal refinement
+This supports:
 - proposal continuation
 - progressive completion
-- deterministic proposal evolution
+- deterministic refinement
 
 ---
 
-# Editable Fields
+## Editable Fields
 
 Proposals expose editable fields to the frontend.
 
 Example:
 
-```json
+```json id="yavrf7"
 {
     "editable_fields": [
         {
@@ -420,41 +393,39 @@ Example:
 This allows users to:
 - review inferred values
 - refine execution
-- correct AI assumptions
-- mutate proposal data safely
+- safely mutate proposal state
 
 ---
 
-# Field Sources
+## Field Provenance
 
-Each editable field exposes its provenance.
+Editable fields expose provenance metadata.
 
 Allowed sources:
 
 | Source | Meaning |
 |---|---|
-| `detected` | explicitly detected in user input |
+| `detected` | explicitly detected |
 | `inferred` | inferred from context |
-| `guessed` | weak confidence assumption |
-| `computed` | derived from business rules |
+| `guessed` | low-confidence assumption |
+| `computed` | derived from business logic |
 | `edited` | modified by user |
-| `missing` | unresolved required field |
+| `missing` | unresolved value |
 
-Field provenance is important for:
+Field provenance improves:
 - explainability
 - trust
-- AI transparency
-- operational visibility
+- operational transparency
 
 ---
 
-# Proposed Changes
+## Proposed Changes
 
 Proposals expose intended business mutations before execution.
 
 Example:
 
-```json
+```json id="r4k6pa"
 {
     "changes": [
         {
@@ -466,96 +437,118 @@ Example:
 }
 ```
 
-This allows the frontend to show:
-- what will happen
-- which module is involved
-- what business entity will change
-
-Fluxio intentionally surfaces execution intent explicitly.
+This allows the frontend to render:
+- execution intent
+- affected modules
+- operational consequences
 
 ---
 
-# Proposal Continuity
+# Proposal Evolution
 
-One of Fluxio's main architectural goals is proposal continuity.
+## Proposal Continuity
+
+Proposal identity must remain stable during refinement.
 
 Example:
 
 User:
 
-```text
+```text id="3v72yj"
 Schedule a call with Rossini
 ```
 
 System:
 - creates draft proposal
-- detects missing fields
+- detects missing information
 
 User:
 
-```text
+```text id="5zj81x"
 Tomorrow morning
 ```
 
 Expected behavior:
-- refine the EXISTING proposal
+- refine SAME proposal
 - preserve proposal identity
 - improve confidence
 - reduce missing fields
-- transition proposal toward `ready`
+- transition toward `ready`
 
-The system should avoid:
-- disconnected proposals
-- chat-style duplication
-- fragmented operational state
+Fluxio intentionally avoids:
+- fragmented proposal history
+- disconnected operations
+- conversational duplication
 
-Proposal continuity is one of the main differentiators of Fluxio.
+Proposal continuity is one of the main architectural differentiators of Fluxio.
 
 ---
 
-# Full-Command Refinement
+## Incremental Refinement
 
-Fluxio also supports full-command refinement behavior.
+Users naturally refine proposals step-by-step.
+
+Example:
+
+```text id="ykhnlr"
+Schedule a call with Rossini
+```
+
+Then:
+
+```text id="7svxrr"
+Tomorrow morning
+```
+
+Refinement should:
+- remain proposal-scoped
+- mutate proposal state
+- preserve operational continuity
+
+Conversation exists only to improve the proposal.
+
+---
+
+## Full-Command Refinement
+
+Users may resend complete commands during refinement.
 
 Example:
 
 Original proposal:
 
-```text
+```text id="mmskxb"
 Schedule a call with Rossini
 ```
 
-User refinement:
+Refinement:
 
-```text
-Schedule a call with Rossini Tomorrow morning
+```text id="d74p2j"
+Schedule a call with Rossini tomorrow morning
 ```
 
 Expected behavior:
-- refinement still targets the SAME proposal
+- refinement still targets SAME proposal
 - proposal identity remains stable
-- original `source_text` remains unchanged
-- effective refinement is extracted internally
-- proposal updates correctly
+- proposal evolves correctly
 
 This supports natural user behavior while preserving:
-- proposal continuity
+- continuity
 - deterministic refinement
 - operational clarity
 
 ---
 
-# Proposal Mutation Transparency
+## Proposal Mutation Transparency
 
-Fluxio intentionally surfaces proposal mutations.
+Fluxio intentionally exposes proposal mutations.
 
 Proposal responses may include:
 
-```json
+```json id="gdnv9r"
 {
     "last_refinement": {
         "text": "Tomorrow morning",
-        "effective_text": "Tomorrow morning",
         "summary": "Date and time added.",
         "changes": [
             {
@@ -568,63 +561,83 @@ Proposal responses may include:
 }
 ```
 
-This metadata exists to support:
+This supports:
 - explainability
-- operational transparency
-- proposal mutation visibility
-- deterministic UX
+- operational visibility
+- proposal evolution tracking
 
 The frontend should expose:
 - latest refinement
-- field changes
+- changed fields
 - lifecycle progression
 - operational deltas
 
-Fluxio intentionally avoids:
-- assistant prose
-- conversational timelines
-- chatbot-style interactions
+The UX should communicate:
+
+```text id="h7vnh0"
+"The proposal evolved."
+```
+
+NOT:
+
+```text id="9n2xrc"
+"The assistant replied."
+```
 
 ---
 
-# Conversational Proposal Refinement
+# Ambiguity Lifecycle
 
-Fluxio supports iterative proposal refinement.
+Ambiguity is a first-class operational concept.
+
+Fluxio must NEVER:
+- silently choose entities
+- hallucinate certainty
+- auto-resolve dangerous ambiguity
 
 Example:
 
-User:
-
-```text
-Schedule a call with Rossini
+```text id="m1l4zb"
+Call Rossi
 ```
 
-System:
-- creates draft proposal
-- detects missing fields
-
-User:
-
-```text
-Tomorrow morning
-```
+Possible matches:
+- Mario Rossi
+- Rossi SRL
+- Studio Rossi
 
 Expected behavior:
-- refine the existing proposal
-- preserve proposal continuity
-- improve confidence
-- reduce ambiguity
-- update proposal state
+- proposal remains incomplete
+- ambiguity becomes explicit
+- execution remains blocked
+- refinement updates SAME proposal
 
-The refinement lifecycle is:
-- stateful
-- deterministic
-- operational
+Example ambiguity structure:
 
-NOT:
-- conversationally open-ended
-- assistant-oriented
-- freeform chat memory
+```json id="l5wx3i"
+{
+    "ambiguities": [
+        {
+            "key": "lead",
+            "label": "Lead",
+            "reason": "multiple_matches",
+            "blocking": true,
+            "candidates": [
+                {
+                    "id": 1,
+                    "label": "Mario Rossi"
+                },
+                {
+                    "id": 7,
+                    "label": "Rossi SRL"
+                }
+            ]
+        }
+    ]
+}
+```
+
+Ambiguity resolution is part of the proposal lifecycle itself.
 
 ---
 
@@ -632,19 +645,19 @@ NOT:
 
 Fluxio is designed around controlled execution.
 
-Important rules:
+Execution rules:
 - proposals must validate before execution
+- ambiguities block execution
 - confirmation is mandatory
-- execution must be deterministic
-- AI output must remain structured
-- execution should be idempotent where possible
+- execution should remain deterministic
+- AI output remains structured
 
 Execution must remain:
 - explicit
 - reviewable
 - auditable
 
-AI must NEVER directly mutate business data.
+AI never directly mutates business data.
 
 ---
 
@@ -656,7 +669,7 @@ Fluxio currently uses:
 - structured validation
 - deterministic refinement rules
 
-Future versions may optionally integrate:
+Future versions may integrate:
 - local LLMs
 - Ollama
 - Qwen
@@ -665,36 +678,39 @@ Future versions may optionally integrate:
 However:
 - AI remains assistive
 - proposals remain authoritative
-- confirmation remains mandatory
 - refinement remains structured
+- confirmation remains mandatory
 
-LLMs must NEVER directly execute business actions.
+LLMs may help generate proposals.
+
+They never directly execute business actions.
 
 ---
 
-# Frontend UX Principles
+# Frontend Lifecycle UX
 
 The frontend is proposal-centric.
 
-The UI should feel like:
-- a structured operational copilot
-- a business execution workspace
-- a controlled AI-assisted system
-
-NOT:
-- a generic chatbot
-- a dashboard-heavy ERP
-- a consumer AI interface
-
-The proposal rail is the primary interaction object.
+The proposal rail acts as:
+- lifecycle viewer
+- proposal inspector
+- mutation renderer
+- ambiguity resolver
+- operational truth surface
 
 The frontend should clearly expose:
 - proposal state
 - confidence
-- missing fields
-- proposal mutations
+- ambiguities
+- missing information
 - refinement effects
 - execution results
+
+Current UX direction:
+- operational
+- structured
+- confidence-aware
+- deterministic-first
 
 ---
 
@@ -702,100 +718,106 @@ The frontend should clearly expose:
 
 Current working vertical slice:
 
-1. User logs in
-2. User writes command:
+1. User writes:
 
-```text
+```text id="q1xkg5"
 Schedule a call with Rossini
 ```
 
-3. Frontend calls `/api/actions/interpret`
-4. Backend returns draft `ActionProposal`
-5. Proposal rail renders:
-   - fields
-   - changes
-   - confidence
-   - missing information
+2. Frontend calls:
 
-6. User refines:
+```text id="ypwzfr"
+/api/actions/interpret
+```
 
-```text
+3. Backend returns draft proposal
+
+4. Proposal rail renders:
+- fields
+- confidence
+- ambiguities
+- missing information
+- changes
+
+5. User refines:
+
+```text id="6lcxqj"
 Tomorrow morning
 ```
 
-7. Frontend calls:
+6. Frontend calls:
 
-```text
+```text id="jv8xeh"
 /api/actions/{proposal}/refine
 ```
 
-8. SAME proposal is updated
-9. Proposal transitions toward `ready`
-10. User confirms
-11. Frontend calls:
-   - `/confirm`
-   - `/execute`
-12. Backend executes business action
-13. Execution result is rendered
+7. SAME proposal is updated
 
-This vertical slice now demonstrates:
+8. Proposal transitions toward `ready`
+
+9. User confirms
+
+10. Frontend calls:
+- `/confirm`
+- `/execute`
+
+11. Backend executes operation
+
+12. Execution result is rendered
+
+This vertical slice demonstrates:
 - proposal continuity
-- operational refinement
+- ambiguity-aware refinement
+- mutation transparency
 - deterministic execution
-- proposal mutation transparency
-- AI-first operational UX
+- operational AI UX
 
 ---
 
 # Future Direction
 
-The next major evolution areas are:
-- ambiguity resolution workflows
-- candidate entity UX
+Next evolution areas:
+- richer ambiguity workflows
 - contextual refinement semantics
 - multi-step proposals
-- operational orchestration flows
+- orchestration flows
+- proposal mutation intelligence
+- contextual entity memory
 
-Future examples:
+Future workflows may support:
+- progressive proposal composition
+- orchestration chains
+- operational timelines
+- local AI inference
 
-```text
-Call Rossi
-```
-
-when multiple entities exist:
-- ambiguity must remain visible
-- execution must remain blocked
-- clarification must refine the SAME proposal
-
-Fluxio should NEVER:
-- guess dangerous actions
-- hide ambiguity
-- fake confidence
+while preserving:
+- deterministic execution
+- proposal continuity
+- explicit control
 
 ---
 
 # Long-Term Vision
 
-Fluxio aims to demonstrate that business systems can evolve from:
-- form-driven interaction
-- CRUD-first workflows
-- dashboard-centric UX
+Fluxio explores how business software can evolve from:
+- forms
+- dashboards
+- CRUD workflows
 
 toward:
 - proposal-driven workflows
-- AI-assisted operational interaction
-- confidence-aware execution systems
-- conversational refinement flows
-- ambiguity-aware operational UX
+- ambiguity-aware systems
+- explainable operational AI
+- controlled business execution
 
 The proposal lifecycle is the foundation of that vision.
 
-The ultimate goal is NOT:
-- autonomous AI execution
+The long-term goal is not autonomous AI execution.
 
-The ultimate goal is:
+The goal is:
 
-```text
+```text id="ym83fk"
 Validated, explainable and controllable
-AI-assisted business execution through structured Action Proposals.
+AI-assisted business execution
+through structured Action Proposals.
 ```

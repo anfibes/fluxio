@@ -1,8 +1,8 @@
 # API Response Standard
 
-All HTTP responses from `apps/api` must use the standardized response shapes defined in this document.
+All HTTP responses from `apps/api` must use the standardized response structures defined in this document.
 
-The implementation lives in:
+Implementation:
 
 ```text
 packages/Core/src/Http/Responses/ApiResponse.php
@@ -23,51 +23,59 @@ and use:
 - `sendForbidden()`
 - `sendPaginated()`
 
-instead of manually constructing JSON responses.
+instead of manually constructing JSON payloads.
 
 ---
 
-# Goals
+# Purpose
 
-The API response layer exists to provide:
-- predictable frontend contracts
-- stable TypeScript integration
-- consistent exception rendering
-- reusable module behavior
-- proposal-driven workflow support
-- deterministic proposal lifecycle handling
-- proposal continuity support
+The API response layer provides:
+
+- stable frontend/backend contracts
+- predictable TypeScript integration
+- deterministic proposal transport
+- centralized exception rendering
+- proposal lifecycle consistency
 - operational explainability
+
+Fluxio depends heavily on:
+- stable proposal payloads
+- deterministic refinement responses
+- predictable execution transitions
+- ambiguity-aware proposal workflows
 
 The response structure must remain:
 - explicit
 - stable
 - composable
-- frontend-friendly
 - proposal-centric
+- frontend-friendly
 
 ---
 
 # Core Principles
 
-## 1. Predictable structure
+## 1. Predictable Structure
 
-Every response must follow a predictable shape.
+Every endpoint must return a predictable structure.
 
-Frontend applications should never need endpoint-specific parsing logic.
+Frontend applications should never require:
+- endpoint-specific parsing
+- custom error extraction
+- proposal-specific transport logic
 
-All proposal lifecycle operations must preserve:
-- stable contracts
+Proposal operations must preserve:
 - stable proposal identity
-- deterministic response structure
+- stable payload structure
+- deterministic lifecycle behavior
 
 ---
 
-## 2. Explicit success/failure discrimination
+## 2. Explicit Success / Failure
 
-Responses are discriminated by the `success` boolean field.
+Responses are discriminated through the `success` boolean.
 
-When:
+Success response:
 
 ```json
 {
@@ -75,11 +83,11 @@ When:
 }
 ```
 
-the response:
+Rules:
 - contains `data`
-- does NOT contain `errors`
+- never contains `errors`
 
-When:
+Failure response:
 
 ```json
 {
@@ -87,34 +95,32 @@ When:
 }
 ```
 
-the response:
+Rules:
 - always contains `message`
 - may contain `errors`
 - never contains `data`
 
 This contract is important for:
-- frontend composables
 - TypeScript narrowing
-- predictable error handling
-- proposal lifecycle orchestration
+- frontend composables
+- proposal orchestration
+- predictable UX rendering
 
 ---
 
-## 3. Proposal-driven architecture compatibility
+## 3. Proposal-Centric Compatibility
 
-Fluxio is proposal-centric.
+Fluxio is proposal-driven.
 
-Many endpoints return `ActionProposal` payloads instead of immediately executing business actions.
+Many endpoints return `ActionProposal` payloads instead of directly executing business actions.
 
 The response layer must support:
 - proposal interpretation
 - proposal refinement
-- proposal continuity
-- proposal confirmation
-- proposal execution
-- execution results
+- ambiguity resolution
 - proposal mutation tracking
-- ambiguity-aware future workflows
+- confirmation workflows
+- execution workflows
 
 without requiring custom response formats.
 
@@ -124,7 +130,7 @@ without requiring custom response formats.
 
 HTTP status:
 - `200 OK`
-- or any explicit 2xx status passed to the response helper
+- or any explicit 2xx status
 
 Structure:
 
@@ -144,12 +150,12 @@ Rules:
   - `null`
 - `errors` must NOT exist
 - `message` may be:
-  - plain string
   - translation key
+  - raw string
 
 ---
 
-# Example
+# Success Example
 
 ```php
 return ApiResponse::success(
@@ -175,21 +181,23 @@ Structure:
 }
 ```
 
-Optional field-level errors:
+Optional validation details:
 
 ```json
 {
     "success": false,
     "message": "Error message.",
     "errors": {
-        "field_name": ["Validation detail."]
+        "field_name": [
+            "Validation detail."
+        ]
     }
 }
 ```
 
 Rules:
 - `data` must NOT exist
-- `errors` is omitted when empty
+- `errors` omitted when empty
 
 ---
 
@@ -205,16 +213,21 @@ Structure:
     "success": false,
     "message": "The given data was invalid.",
     "errors": {
-        "email": ["The email field is required."],
-        "title": ["The title field must be at least 3 characters."]
+        "email": [
+            "The email field is required."
+        ],
+        "title": [
+            "The title field must be at least 3 characters."
+        ]
     }
 }
 ```
 
-Behavior:
-- triggered automatically by `ApiExceptionRenderer`
-- only applies to JSON requests
-- uses Laravel validation error bag structure
+Triggered automatically by:
+- `ValidationException`
+
+Only applies to:
+- JSON requests
 
 Translation key:
 
@@ -238,7 +251,7 @@ Structure:
 }
 ```
 
-Triggered automatically for:
+Triggered automatically by:
 - `AuthenticationException`
 
 Translation key:
@@ -263,10 +276,9 @@ Structure:
 }
 ```
 
-Triggered automatically for:
+Triggered automatically by:
 - `AccessDeniedHttpException`
 
-Notes:
 Laravel internally converts:
 - `AuthorizationException`
 
@@ -297,7 +309,7 @@ Structure:
 }
 ```
 
-Triggered automatically for:
+Triggered automatically by:
 - `NotFoundHttpException`
 
 Laravel internally converts:
@@ -376,7 +388,7 @@ Rules:
 - `meta` exists ONLY on paginated responses
 - regular success responses never contain `meta`
 
-Pagination behavior:
+Pagination defaults:
 - default `per_page`: `15`
 - minimum: `1`
 - maximum: `100`
@@ -416,13 +428,9 @@ Current proposal endpoints:
 
 These endpoints still use the same standardized response structure.
 
-Proposal identity must remain stable during refinement.
-
-Refinement updates the SAME proposal.
-
 ---
 
-# Example Action Proposal Response
+# Example Proposal Response
 
 ```json
 {
@@ -440,54 +448,69 @@ Refinement updates the SAME proposal.
         },
         "missing": [],
         "warnings": [],
-        "editable_fields": [
-            {
-                "key": "title",
-                "label": "Title",
-                "value": "Follow-up task for Rossini",
-                "source": "detected",
-                "required": true
-            }
-        ],
-        "changes": [
-            {
-                "type": "create",
-                "label": "Create Task",
-                "module": "tasks"
-            }
-        ],
+        "ambiguities": [],
+        "editable_fields": [],
+        "changes": [],
         "needs_confirmation": true,
         "confirmed_at": null,
         "executed_at": null,
         "failed_at": null,
         "failure_reason": null,
         "execution_result": null,
-        "last_refinement": {
-            "text": "Tomorrow morning",
-            "effective_text": "Tomorrow morning",
-            "summary": "Date and time added.",
-            "changes": [
-                {
-                    "field": "date",
-                    "label": "Date",
-                    "from": null,
-                    "to": "2026-05-10"
-                },
-                {
-                    "field": "time",
-                    "label": "Time",
-                    "from": null,
-                    "to": "09:00"
-                }
-            ]
-        }
+        "last_refinement": null
     }
 }
 ```
 
 ---
 
-# Action Proposal Lifecycle
+# Ambiguity-Aware Proposal Responses
+
+Fluxio supports structured ambiguity handling.
+
+The API contract supports explicit ambiguity rendering through:
+
+```json
+{
+    "ambiguities": [
+        {
+            "key": "lead",
+            "label": "Lead",
+            "reason": "multiple_matches",
+            "blocking": true,
+            "selected_candidate_id": null,
+            "candidates": [
+                {
+                    "id": 1,
+                    "type": "person",
+                    "label": "Mario Rossi"
+                },
+                {
+                    "id": 7,
+                    "type": "company",
+                    "label": "Rossi SRL"
+                }
+            ]
+        }
+    ]
+}
+```
+
+Important rules:
+- ambiguity must never be hidden
+- proposals remain stable during clarification
+- ambiguity may block readiness
+- execution must remain explicit
+- refinement updates the SAME proposal
+
+This allows:
+- operational ambiguity resolution
+- deterministic proposal refinement
+- proposal continuity preservation
+
+---
+
+# Proposal Lifecycle Guarantees
 
 Allowed proposal statuses:
 
@@ -508,7 +531,7 @@ interpret
 → executed/failed
 ```
 
-Important lifecycle rules:
+Rules:
 - refinement does NOT create new proposals
 - proposal IDs remain stable
 - proposal continuity is preserved
@@ -532,7 +555,7 @@ Schedule a call with Rossini
 
 System:
 - creates draft proposal
-- detects missing fields
+- detects missing information
 - blocks execution
 
 User:
@@ -552,9 +575,7 @@ Expected behavior:
 
 # Full-Command Refinement
 
-Fluxio also supports full-command refinement inputs.
-
-Example:
+Fluxio also supports full-command refinement.
 
 Original proposal:
 
@@ -565,7 +586,7 @@ Schedule a call with Rossini
 Refinement input:
 
 ```text
-Schedule a call with Rossini Tomorrow morning
+Schedule a call with Rossini tomorrow morning
 ```
 
 Expected behavior:
@@ -574,45 +595,48 @@ Expected behavior:
 - effective refinement extracted internally
 - proposal updated correctly
 
-This allows:
-- natural user editing behavior
-- proposal continuity preservation
+This supports:
+- natural editing behavior
+- proposal continuity
 - deterministic refinement workflows
 
 ---
 
 # Proposal Mutation Transparency
 
-Fluxio intentionally surfaces proposal mutations.
+Fluxio intentionally exposes proposal mutations.
 
-Proposal responses may include:
+Proposal payloads may include:
 
 ```json
 {
     "last_refinement": {
-        "text": "...",
-        "effective_text": "...",
-        "summary": "...",
-        "changes": []
+        "text": "Tomorrow morning",
+        "effective_text": "Tomorrow morning",
+        "summary": "Date and time added.",
+        "changes": [
+            {
+                "field": "date",
+                "label": "Date",
+                "from": null,
+                "to": "2026-05-10"
+            }
+        ]
     }
 }
 ```
 
 Purpose:
 - explainability
-- mutation visibility
 - operational clarity
+- mutation visibility
 - deterministic proposal tracking
 
-Fluxio intentionally avoids:
-- assistant prose
-- chat timelines
-- conversational message streams
-
-The API contract supports:
-- structured operational UX
-- proposal mutation rendering
-- frontend explainability panels
+The frontend uses this information for:
+- refinement panels
+- mutation rendering
+- proposal explainability
+- operational UX continuity
 
 ---
 
@@ -623,10 +647,10 @@ Proposal execution endpoints must be idempotent.
 Executing the same proposal multiple times must NOT:
 - duplicate tasks
 - duplicate mutations
-- produce inconsistent business state
+- create inconsistent business state
 
 Repeated execution calls should:
-- return the existing executed proposal state
+- return the existing executed proposal
 - preserve execution metadata
 - preserve proposal integrity
 
@@ -645,9 +669,13 @@ Fluxio includes a typed Nuxt frontend using:
 - composables
 - proposal-driven orchestration
 
-Frontend composables rely on stable response contracts.
+Frontend composables depend heavily on:
+- stable response contracts
+- deterministic proposal payloads
+- stable refinement semantics
+- stable execution states
 
-Breaking response structure changes should be treated as:
+Breaking response changes should be treated as:
 - architectural changes
 - cross-layer changes
 
@@ -656,19 +684,11 @@ and coordinated carefully between:
 - frontend
 - TypeScript contracts
 
-Proposal payloads are especially sensitive because they drive:
-- proposal rendering
-- refinement rendering
-- execution state
-- confidence UX
-- mutation visibility
-- proposal continuity
-
 ---
 
-# Translation Keys
+# Translation Resolution
 
-Default messages are defined in:
+Default translations live in:
 
 ```text
 packages/Core/lang/en/api.php
@@ -676,17 +696,13 @@ packages/Core/lang/en/api.php
 
 Current keys:
 
-| Key                            | Default message                    |
-|--------------------------------|------------------------------------|
-| `core::api.validation_failed`  | The given data was invalid.        |
-| `core::api.not_found`          | Resource not found.                |
-| `core::api.unauthorized`       | Unauthenticated.                   |
-| `core::api.forbidden`          | This action is not allowed.        |
-| `core::api.server_error`       | An unexpected error occurred.      |
-
----
-
-# Translation Resolution
+| Key | Default message |
+|---|---|
+| `core::api.validation_failed` | The given data was invalid. |
+| `core::api.not_found` | Resource not found. |
+| `core::api.unauthorized` | Unauthenticated. |
+| `core::api.forbidden` | This action is not allowed. |
+| `core::api.server_error` | An unexpected error occurred. |
 
 Messages may be:
 - translation keys
@@ -696,23 +712,18 @@ The response layer automatically:
 - resolves translation keys when available
 - falls back to raw strings otherwise
 
-This allows:
-- multilingual APIs
-- frontend-friendly consistency
-- module-level localization
-
 ---
 
 # Exception → Status Mapping
 
-| Exception class               | Prepared as                     | Status |
-|--------------------------------|----------------------------------|--------|
-| `ValidationException`          | itself                           | 422    |
-| `AuthenticationException`      | itself                           | 401    |
-| `AuthorizationException`       | `AccessDeniedHttpException`      | 403    |
-| `ModelNotFoundException`       | `NotFoundHttpException`          | 404    |
-| `NotFoundHttpException`        | itself                           | 404    |
-| Any other `Throwable`          | itself                           | 500    |
+| Exception class | Prepared as | Status |
+|---|---|---|
+| `ValidationException` | itself | 422 |
+| `AuthenticationException` | itself | 401 |
+| `AuthorizationException` | `AccessDeniedHttpException` | 403 |
+| `ModelNotFoundException` | `NotFoundHttpException` | 404 |
+| `NotFoundHttpException` | itself | 404 |
+| Any other `Throwable` | itself | 500 |
 
 Rendering applies only to requests with:
 
@@ -720,49 +731,45 @@ Rendering applies only to requests with:
 Accept: application/json
 ```
 
-Non-JSON requests fall back to Laravel's default HTML handling.
+Non-JSON requests fall back to Laravel's default HTML rendering.
 
 ---
 
 # Testing Expectations
 
-Core response behavior should be tested thoroughly.
+The response layer is foundational infrastructure and must remain highly stable.
 
 Priority areas:
 - response shape consistency
 - exception rendering
 - validation formatting
 - pagination structure
-- proposal response integrity
+- proposal integrity
 - proposal continuity
+- ambiguity handling
 - proposal refinement
 - refinement mutation tracking
-- effective refinement extraction
-- proposal execution consistency
+- execution consistency
 - idempotent execution behavior
-- stable frontend contracts
-
-The API response layer is foundational infrastructure and must remain highly stable.
+- frontend contract stability
 
 ---
 
 # Architectural Importance
 
-The response layer is not only infrastructure.
-
-It is also:
+The response layer acts as:
 - the proposal transport contract
-- the proposal lifecycle transport layer
 - the frontend orchestration contract
-- the operational explainability contract
+- the proposal lifecycle transport layer
+- the operational explainability layer
 
-Fluxio depends heavily on:
+Fluxio depends on:
 - stable proposal payloads
-- deterministic refinement responses
-- predictable execution state transitions
+- deterministic refinement semantics
+- predictable execution transitions
+- ambiguity-aware operational workflows
 
 This response layer is one of the core foundations enabling:
 - proposal-centric UX
 - AI-first operational workflows
-- future ambiguity-aware systems
 - controlled enterprise AI interaction

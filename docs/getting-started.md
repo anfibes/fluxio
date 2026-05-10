@@ -6,54 +6,69 @@
 
 Fluxio is an experimental AI-first CRM/ERP prototype focused on:
 
-- natural-language business interaction
 - Action Proposal workflows
 - proposal refinement
+- ambiguity-aware operations
 - proposal continuity
 - explicit confirmation before execution
-- explainable AI-assisted operations
+- deterministic operational AI
 
-The project is structured as a modular monolith with:
+Fluxio is intentionally:
+- proposal-centric
+- operational
+- architecture-first
+- deterministic-first
 
-- Laravel backend (`apps/api`)
-- Nuxt frontend (`apps/web`)
-- shared domain-oriented packages (`packages/*`)
+Natural language never directly executes business actions.
 
-This document explains how to run Fluxio locally for development.
+Every business operation must pass through:
+1. interpretation
+2. proposal refinement
+3. validation
+4. explicit confirmation
+5. execution
 
 ---
 
-# Current Status
+# Current Vertical Slice
 
-Fluxio is currently an active architecture-first prototype.
+Fluxio currently validates the following operational flow:
 
-Implemented vertical slice:
+```text
+Command
+→ Interpret
+→ Draft proposal
+→ Proposal refinement
+→ Ambiguity resolution
+→ Ready proposal
+→ Confirm
+→ Execute
+→ Execution result
+```
 
+Implemented capabilities include:
 - authentication
 - command composer
-- Action Proposal interpretation
-- proposal rendering
+- Action Proposal rendering
 - proposal refinement
+- ambiguity workflows
 - proposal continuity
 - refinement metadata rendering
-- proposal confirmation
-- proposal execution
 - execution result rendering
 - task creation flow
+- responsive operational UI
+- dark/light/system themes
 
-The project is intentionally:
-- proposal-centric
-- AI-first
-- operational
-- still incomplete by design
-
-The goal is NOT feature quantity.
-
-The goal is validating:
+The project intentionally prioritizes:
 - proposal-driven workflows
 - operational AI UX
-- structured business execution
-- deterministic refinement flows
+- explainable execution
+- deterministic refinement behavior
+
+over:
+- feature quantity
+- ERP breadth
+- dashboard complexity
 
 ---
 
@@ -68,13 +83,11 @@ Recommended environment:
 | Node.js | 20+ |
 | npm | 10+ |
 | PostgreSQL | 15+ |
-| Nginx | optional but recommended |
 | Git | latest |
 
-Development OS currently used:
-
+Current development environment:
 - macOS
-- local Nginx environment
+- local Nginx setup
 - VS Code
 
 ---
@@ -84,8 +97,8 @@ Development OS currently used:
 ```text
 fluxio/
 ├── apps/
-│   ├── api/        Laravel backend
-│   └── web/        Nuxt frontend
+│   ├── api/
+│   └── web/
 │
 ├── packages/
 │   ├── Core/
@@ -98,20 +111,15 @@ fluxio/
 │   └── Notifications/
 │
 ├── docs/
-│   ├── architecture.md
-│   ├── api-response-standard.md
-│   ├── frontend-vision.md
-│   ├── proposal-lifecycle.md
-│   ├── backend-current-state.md
-│   ├── development-plan.md
-│   └── getting-started.md
 │
 └── README.md
 ```
 
 ---
 
-# Clone the Repository
+# Quick Start
+
+Clone the repository:
 
 ```bash
 git clone https://github.com/anfibes/fluxio.git
@@ -128,19 +136,19 @@ Navigate to the API app:
 cd apps/api
 ```
 
-Install PHP dependencies:
+Install dependencies:
 
 ```bash
 composer install
 ```
 
-Create the environment file:
+Create environment file:
 
 ```bash
 cp .env.example .env
 ```
 
-Generate the Laravel app key:
+Generate application key:
 
 ```bash
 php artisan key:generate
@@ -148,7 +156,7 @@ php artisan key:generate
 
 ---
 
-# Configure the Database
+# Configure PostgreSQL
 
 Edit `.env`:
 
@@ -161,7 +169,7 @@ DB_USERNAME=postgres
 DB_PASSWORD=password
 ```
 
-Create the PostgreSQL database manually if needed.
+Create the database manually if needed.
 
 ---
 
@@ -173,21 +181,15 @@ php artisan migrate
 
 ---
 
-# Seed Demo Data
+# Optional Seeders
 
-The project may include demo seeders for:
-
-- test users
-- demo tasks
-- demo proposals
-
-Run:
+If demo seeders exist:
 
 ```bash
 php artisan db:seed
 ```
 
-If specific seeders exist:
+Or:
 
 ```bash
 php artisan db:seed --class=DemoSeeder
@@ -195,15 +197,13 @@ php artisan db:seed --class=DemoSeeder
 
 ---
 
-# Start the Laravel Server
-
-Simple local development:
+# Start Laravel
 
 ```bash
 php artisan serve
 ```
 
-Default:
+Default URL:
 
 ```text
 http://localhost:8000
@@ -211,24 +211,24 @@ http://localhost:8000
 
 ---
 
-# Optional: Local Nginx Setup
+# Optional Local HTTPS Setup
 
-Recommended local URL:
+Recommended local API URL:
 
 ```text
 https://fluxio.test
 ```
 
-Example Nginx root:
+Typical local setup:
+- Nginx
+- mkcert
+- trusted local SSL certificates
+
+Example API public root:
 
 ```text
 /Applications/progetti/fluxio/apps/api/public
 ```
-
-Typical local SSL setup:
-- mkcert
-- Valet-like certificates
-- local trusted certificates
 
 ---
 
@@ -248,21 +248,15 @@ npm install
 
 ---
 
-# Frontend Runtime Configuration
+# Frontend Environment
 
-Fluxio frontend uses:
-
-```text
-NUXT_PUBLIC_API_BASE
-```
-
-Recommended local `.env` inside `apps/web`:
+Create `.env` inside `apps/web`:
 
 ```env
 NUXT_PUBLIC_API_BASE=https://fluxio.test/api
 ```
 
-Fallback default exists in:
+Fallback configuration exists in:
 
 ```text
 nuxt.config.ts
@@ -270,7 +264,7 @@ nuxt.config.ts
 
 ---
 
-# Start Nuxt Development Server
+# Start Nuxt
 
 ```bash
 npm run dev
@@ -284,41 +278,22 @@ http://localhost:3000
 
 ---
 
-# Current Local Development Flow
-
-Typical development setup:
+# Typical Local Development Flow
 
 | Service | URL |
 |---|---|
 | Laravel API | `https://fluxio.test/api` |
 | Nuxt frontend | `http://localhost:3000` |
 
-Nuxt communicates with Laravel through API calls.
-
-Current proposal lifecycle:
-
-```text
-Command
-→ Interpret
-→ Draft proposal
-→ Proposal refinement
-→ Ready proposal
-→ Confirm
-→ Execute
-→ Execution result
-```
-
-Refinement updates the SAME proposal instead of creating a new one.
-
-This proposal continuity behavior is one of the core architectural concepts of Fluxio.
+Nuxt communicates with Laravel through API requests.
 
 ---
 
-# Login
+# Demo Login
 
-Current demo login depends on seeded users.
+Demo credentials depend on current seeders.
 
-Typical test credentials:
+Typical local credentials:
 
 ```text
 email: test@example.com
@@ -329,66 +304,11 @@ Check actual seeders if credentials differ.
 
 ---
 
-# Current Frontend Features
-
-Implemented:
-- login flow
-- command composer
-- Action Proposal rendering
-- proposal states
-- editable fields
-- missing information handling
-- proposal refinement
-- proposal continuity
-- refinement metadata rendering
-- confidence rendering
-- proposal confirmation
-- proposal execution
-- execution result rendering
-- i18n support
-- dark enterprise UI foundation
-
-Current frontend UX direction:
-- AI-first
-- proposal-centric
-- operational
-- non-chatbot
-
----
-
-# Current Backend Features
-
-Implemented:
-- modular package structure
-- Actions module
-- Tasks module
-- Identity module
-- standardized API responses
-- centralized exception handling
-- Action Proposal lifecycle
-- proposal refinement lifecycle
-- proposal continuity
-- refinement metadata persistence
-- confirm/execute flow
-- deterministic refinement rules
-- execution result persistence
-
-Current Actions endpoints:
-
-| Method | Endpoint |
-|---|---|
-| POST | `/api/actions/interpret` |
-| POST | `/api/actions/{proposal}/refine` |
-| POST | `/api/actions/{proposal}/confirm` |
-| POST | `/api/actions/{proposal}/execute` |
-
----
-
-# Useful Commands
+# Development Commands
 
 ## Backend
 
-Run tests:
+Run all tests:
 
 ```bash
 php artisan test
@@ -430,11 +350,58 @@ node .output/server/index.mjs
 
 ---
 
+# Current Frontend Highlights
+
+Implemented frontend capabilities:
+- command composer
+- proposal rail
+- ambiguity rendering
+- proposal refinement
+- mutation rendering
+- confidence-aware UX
+- execution rendering
+- responsive operational shell
+- theme system
+- i18n support
+
+Frontend direction:
+- AI-first
+- proposal-centric
+- operational
+- non-chatbot
+
+---
+
+# Current Backend Highlights
+
+Implemented backend capabilities:
+- modular package structure
+- Actions module
+- Tasks module
+- Identity module
+- standardized API responses
+- centralized exception handling
+- proposal lifecycle persistence
+- ambiguity-aware refinement
+- confirm/execute flow
+- deterministic refinement logic
+
+Current Actions endpoints:
+
+| Method | Endpoint |
+|---|---|
+| POST | `/api/actions/interpret` |
+| POST | `/api/actions/{proposal}/refine` |
+| POST | `/api/actions/{proposal}/confirm` |
+| POST | `/api/actions/{proposal}/execute` |
+
+---
+
 # Tailwind Notes
 
-Fluxio currently standardizes semantic Tailwind utilities.
+Fluxio uses semantic Tailwind utilities and design tokens.
 
-Preferred:
+Preferred utilities:
 
 ```text
 bg-surface
@@ -443,13 +410,10 @@ border-border
 bg-accent
 ```
 
-Avoid direct repeated CSS variable usage when reusable semantic utilities exist.
-
-Current frontend direction:
-- semantic tokens
+The frontend intentionally prioritizes:
 - operational consistency
-- minimal utility chaos
-- maintainable design system evolution
+- semantic styling
+- maintainable utility usage
 
 ---
 
@@ -477,116 +441,74 @@ apps/api/lang/
 
 # Architecture Notes
 
-Fluxio intentionally follows:
+Fluxio follows:
 - modular monolith architecture
 - explicit domain boundaries
-- AI-assisted workflows
 - proposal-driven execution
-- deterministic refinement flows
-
-Natural language must NEVER directly execute business actions.
-
-All business mutations must pass through:
-1. interpretation
-2. proposal refinement
-3. validation
-4. explicit confirmation
-5. execution
+- deterministic refinement workflows
+- AI-assisted operational UX
 
 The proposal is the central architectural object.
+
+Important concepts:
+- proposal continuity
+- ambiguity-aware workflows
+- explicit execution control
+- explainable AI behavior
 
 ---
 
 # Documentation
 
-Important documents:
+Main documents:
 
 | File | Purpose |
 |---|---|
 | `README.md` | project overview |
-| `docs/architecture.md` | backend/frontend architecture |
-| `docs/api-response-standard.md` | API contract rules |
-| `docs/frontend-vision.md` | frontend philosophy |
+| `docs/architecture.md` | system architecture |
+| `docs/frontend-vision.md` | frontend interaction philosophy |
 | `docs/proposal-lifecycle.md` | Action Proposal lifecycle |
-| `docs/backend-current-state.md` | implemented backend/frontend status |
-| `docs/development-plan.md` | roadmap and architectural direction |
-
----
-
-# AI Workflow
-
-Recommended workflow:
-
-- ChatGPT → architecture and planning
-- Claude Code → implementation and repository execution
-
-The repository is intentionally structured to support:
-- iterative development
-- AI-assisted implementation
-- architecture-first evolution
-
-Recommended model usage:
-- lightweight models → docs, formatting, small components
-- stronger models → proposal lifecycle, ambiguity workflows, orchestration
+| `docs/backend-current-state.md` | current implementation status |
+| `docs/development-plan.md` | roadmap and milestones |
+| `docs/api-response-standard.md` | API contracts |
 
 ---
 
 # Known Limitations
 
 Current prototype limitations:
-
-- no production deployment pipeline yet
 - no advanced permissions
-- no realtime collaboration
-- no advanced LLM provider abstraction yet
-- no ambiguity resolution UX yet
-- no candidate entity workflows yet
+- no production deployment pipeline
+- no advanced provider abstraction
 - limited domain modules
+- no realtime collaboration
 - no multi-step proposal orchestration yet
 
-This is expected at the current stage.
-
-The current focus is intentionally narrow:
+Current focus remains intentionally narrow:
 - proposal continuity
-- refinement workflows
+- ambiguity workflows
 - operational AI UX
 - deterministic execution
 
 ---
 
-# Recommended Next Steps
-
-Suggested exploration areas:
-
-- ambiguity resolution UX
-- candidate entity workflows
-- contextual refinement semantics
-- proposal mutation transparency
-- streaming interpretation
-- AI provider abstraction
-- operational timeline
-- contextual entity memory
-- multi-step operational proposals
-
----
-
 # Contributing
 
-Fluxio is currently architecture-driven and evolving rapidly.
+Fluxio is architecture-driven and evolving rapidly.
 
 Contributions should prioritize:
 - simplicity
 - maintainability
-- explicitness
+- explicit behavior
 - operational clarity
-- explainable behavior
 - proposal continuity
+- explainable workflows
 
 Avoid:
 - premature abstractions
-- over-engineering
-- hidden magic behavior
+- hidden side effects
 - generic chatbot patterns
+- autonomous AI behavior
 
 ---
 
@@ -607,6 +529,6 @@ AI-assisted business execution
 through:
 - validated Action Proposals
 - proposal refinement
-- proposal continuity
+- ambiguity resolution
 - explicit operational control
 - deterministic execution workflows

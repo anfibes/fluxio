@@ -1,41 +1,44 @@
 # Fluxio
 
-AI-first command-driven CRM/ERP prototype that turns natural language into structured, validated and confirmable business actions.
+AI-first command-driven CRM/ERP prototype that transforms natural language into structured, validated and confirmable business actions.
+
+Fluxio is not a chatbot.
+Fluxio is an operational workspace built around proposals, ambiguity resolution and controlled execution.
 
 ---
 
 # Overview
 
-Fluxio is an open-source CRM/ERP prototype focused on command-first business interactions.
+Fluxio explores a different interaction model for business software.
 
-The goal of the project is NOT to build another traditional CRUD-heavy CRM.
-
-Fluxio explores how business systems can evolve from:
+Traditional CRM/ERP systems are usually built around:
 - forms
 - dashboards
-- manual workflows
+- menus
+- repetitive manual workflows
 
-toward:
+Fluxio instead explores:
 - natural-language intent
-- structured proposals
-- validation-first execution
-- controlled business automation
-
-Fluxio is intentionally architecture-first and interaction-first.
-
-The project is designed as a technical and product-design showcase demonstrating:
-- modular backend architecture
-- domain separation
-- API consistency
 - proposal-driven workflows
-- AI-assisted business interactions
-- command-first UX principles
+- ambiguity-aware UX
+- explicit confirmation
+- controlled automation
+
+The project is intentionally:
+- architecture-first
+- interaction-first
+- deterministic-first
+- AI-assisted but not AI-autonomous
+
+Fluxio exists both as:
+- an experimental AI-first business UX
+- a showcase of modern backend/frontend architecture
 
 ---
 
-# Core Idea
+# Core Interaction Model
 
-Traditional business systems:
+Traditional systems:
 
 ```text
 User → Form → Validation → Save
@@ -44,42 +47,160 @@ User → Form → Validation → Save
 Fluxio:
 
 ```text
-User → Natural Language → Action Proposal → Validation → Confirmation → Execution
+User → Natural Language
+     → Action Proposal
+     → Validation
+     → Refinement
+     → Confirmation
+     → Execution
 ```
 
 Natural language is NEVER executed directly.
 
-Every command is transformed into a structured `ActionProposal` that must be:
-- validated
+Every command becomes a structured `ActionProposal` that must be:
 - reviewable
 - editable
+- validated
 - explicitly confirmed
 
 before execution.
 
+---
+
+# Why Proposal-Driven UX
+
+Fluxio does not try to hide uncertainty.
+
+The system intentionally exposes:
+- ambiguities
+- missing information
+- low-confidence interpretations
+- incomplete commands
+
 The goal is not blind automation.
 
-The goal is controlled and transparent execution.
+The goal is:
+- transparency
+- operational control
+- fast refinement
+- safe execution
 
 ---
 
-# Why Fluxio
+# Ambiguity-Aware UX
 
-Most CRM/ERP systems still revolve around:
-- complex navigation
-- repetitive forms
-- rigid UI flows
-- manual data entry
+Fluxio treats ambiguity as a first-class operational state.
 
-Fluxio explores a different interaction model:
-- reduce operational friction
-- increase execution speed
-- preserve business control
-- bridge natural language and structured systems
+The system never silently chooses entities.
 
-Fluxio is intentionally AI-assisted but NOT AI-autonomous.
+Example:
+
+```text
+Call Rossi
+```
+
+Possible matches:
+- Mario Rossi
+- Rossi SRL
+- Studio Rossi
+
+Instead of hallucinating certainty, Fluxio:
+- exposes ambiguity
+- asks for refinement
+- preserves proposal continuity
+
+This is a core architectural principle of the project.
+
+---
+
+# Current UX Direction
+
+The interface is designed as:
+- operational
+- proposal-centric
+- refinement-driven
+- confirmation-first
+- mobile-oriented
+- future voice-friendly
+
+Fluxio is NOT:
+- a generic AI chat
+- a conversational assistant
+- a dashboard-heavy ERP
 
 The proposal remains the central object.
+
+---
+
+# UX Screenshots
+
+## Initial Proposal Generation
+
+<!-- PLACEHOLDER SCREENSHOT -->
+<!-- Use: Action01.png -->
+<!-- Description: Initial draft proposal with missing fields -->
+
+![Fluxio Initial Proposal](docs/screenshots/action01.png)
+
+---
+
+## Proposal Refinement
+
+<!-- PLACEHOLDER SCREENSHOT -->
+<!-- Use: Action02.png -->
+<!-- Description: Proposal refined after missing information -->
+
+![Fluxio Proposal Refinement](docs/screenshots/action02.png)
+
+---
+
+## Successful Execution
+
+<!-- PLACEHOLDER SCREENSHOT -->
+<!-- Use: Action03.png -->
+<!-- Description: Executed proposal with execution result -->
+
+![Fluxio Execution Result](docs/screenshots/action03.png)
+
+---
+
+## Ambiguity Resolution Flow
+
+<!-- PLACEHOLDER SCREENSHOT -->
+<!-- Use: screen01.png -->
+<!-- Description: Ambiguity resolution panel -->
+
+![Fluxio Ambiguity Resolution](docs/screenshots/screen01.png)
+
+---
+
+## Candidate Refinement
+
+<!-- PLACEHOLDER SCREENSHOT -->
+<!-- Use: screen02.png -->
+<!-- Description: Refinement after candidate selection -->
+
+![Fluxio Candidate Refinement](docs/screenshots/screen02.png)
+
+---
+
+## Missing Information Refinement
+
+<!-- PLACEHOLDER SCREENSHOT -->
+<!-- Use: screen03.png -->
+<!-- Description: Proposal becomes ready after refinement -->
+
+![Fluxio Missing Information](docs/screenshots/screen03.png)
+
+---
+
+## Execution State
+
+<!-- PLACEHOLDER SCREENSHOT -->
+<!-- Use: screen04.png -->
+<!-- Description: Final executed operational flow -->
+
+![Fluxio Executed State](docs/screenshots/screen04.png)
 
 ---
 
@@ -87,7 +208,7 @@ The proposal remains the central object.
 
 ## Modular Monolith
 
-Fluxio is built as a modular monolith with strong internal boundaries and future microservice extraction in mind.
+Fluxio is built as a modular monolith with strong internal boundaries.
 
 ```text
 fluxio/
@@ -112,7 +233,7 @@ Principle:
 Modularize first, microservice later.
 ```
 
-Each module owns its:
+Each module owns:
 - models
 - services
 - migrations
@@ -122,34 +243,31 @@ Each module owns its:
 
 ---
 
-# Architectural Principles
-
-## Domain Separation
-
-Each module owns its responsibilities.
+# Domain Separation
 
 Examples:
 
-- `Actions`
-  - intent interpretation
-  - proposal lifecycle
-  - proposal execution orchestration
+## Actions
+- intent interpretation
+- proposal lifecycle
+- proposal execution orchestration
 
-- `Tasks`
-  - executable work items
-  - follow-up operations
+## Leads
+- CRM entities
+- lead lifecycle
+- future customer intelligence
 
-- `Leads`
-  - CRM entities
-  - lead lifecycle
+## Tasks
+- operational tasks
+- follow-up workflows
 
-- `Calendar`
-  - scheduling
-  - future temporal coordination
+## Calendar
+- scheduling
+- future coordination workflows
 
 ---
 
-## Event-Driven Communication
+# Event-Driven Communication
 
 Modules communicate through:
 - events
@@ -161,54 +279,35 @@ Examples:
 - `LeadCreated`
 - `TaskCompleted`
 
----
-
-## No Direct Cross-Domain Coupling
-
 Direct cross-domain coupling is intentionally avoided.
-
-Incorrect:
-
-```php
-Lead::createTaskDirectly();
-```
-
-Preferred:
-
-```php
-dispatch(new CreateTaskFromLead(...));
-```
 
 ---
 
 # Actions Module
 
-The `Actions` module is the core of Fluxio.
+The `Actions` module is the operational core of Fluxio.
 
-It transforms natural-language commands into structured and confirmable business proposals.
-
----
-
-## Main Flow
+Main flow:
 
 ```text
 Natural language
-→ intent resolution
+→ intent detection
 → entity extraction
 → proposal generation
 → validation
-→ user confirmation
+→ refinement
+→ confirmation
 → execution
 ```
 
 ---
 
-## Example
+# Example Proposal
 
 Input:
 
 ```text
-Create a follow-up task for Rossini tomorrow at 10am
+Schedule a follow-up call with Rossini tomorrow morning
 ```
 
 Generated proposal:
@@ -218,33 +317,17 @@ Generated proposal:
   "success": true,
   "message": "Command interpreted successfully.",
   "data": {
-    "id": "proposal_uuid",
-    "intent": "create_task",
+    "intent": "schedule_call",
     "status": "ready",
-    "confidence": 0.91,
-    "source_text": "Create a follow-up task for Rossini tomorrow at 10am",
+    "confidence": 0.85,
+    "source_text": "Schedule a follow-up call with Rossini tomorrow morning",
     "entities": {
       "lead": "Rossini",
-      "due_at": "2026-05-04T10:00:00Z"
+      "date": "2026-05-11",
+      "time": "09:00"
     },
     "missing": [],
     "warnings": [],
-    "editable_fields": [
-      {
-        "key": "title",
-        "label": "Title",
-        "value": "Follow-up task for Rossini",
-        "source": "detected",
-        "required": true
-      }
-    ],
-    "changes": [
-      {
-        "type": "create",
-        "module": "tasks",
-        "label": "Create Task"
-      }
-    ],
     "needs_confirmation": true
   }
 }
@@ -252,71 +335,43 @@ Generated proposal:
 
 ---
 
-# Proposal Refinement
-
-Fluxio supports iterative proposal refinement.
-
-Example:
-
-User:
-
-```text
-Schedule a call with Rossini
-```
-
-System:
-
-```text
-draft proposal
-missing date/time
-```
-
-User:
-
-```text
-Tomorrow morning
-```
-
-Expected behavior:
-- refine the existing proposal
-- increase confidence
-- reduce missing fields
-- move toward execution readiness
-
-Fluxio is NOT designed as a generic chatbot.
-
-Conversation exists only to refine structured business proposals.
-
----
-
 # Confidence UX
 
 Fluxio never pretends certainty.
 
-Low-confidence proposals are expected and intentionally surfaced in the UI.
+Low-confidence proposals are intentionally surfaced.
 
 Examples:
 - ambiguous entities
 - incomplete commands
 - weak context
-- unknown intent
+- uncertain extraction
 
 The system should:
 - expose uncertainty
-- encourage review
+- encourage refinement
+- preserve control
 - avoid hallucinated confidence
+
+---
+
+# Frontend Philosophy
+
+Fluxio follows:
+- AI-first interaction
+- proposal-centric workflows
+- explicit execution confirmation
+- low operational friction
+- structured refinement
+
+CRM data supports the workflow.
+It does not dominate the interface.
 
 ---
 
 # API Design
 
-Fluxio exposes a standardized JSON API designed for:
-- frontend applications
-- integrations
-- future AI providers
-- automation layers
-
----
+Fluxio exposes a standardized JSON API.
 
 ## Success Response
 
@@ -355,77 +410,6 @@ Fluxio exposes a standardized JSON API designed for:
 
 ---
 
-# Exception Handling
-
-Fluxio standardizes framework-level exception rendering.
-
-Handled cases:
-- ValidationException → 422
-- AuthenticationException → 401
-- AuthorizationException → 403
-- ModelNotFoundException → 404
-- NotFoundHttpException → 404
-- Generic exceptions → 500
-
-Production environments never expose internal exception details.
-
----
-
-# Frontend Direction
-
-Fluxio is NOT dashboard-first.
-
-The frontend is proposal-centric and command-driven.
-
-Current UI structure:
-- left sidebar
-- central command composer
-- live parsing feedback
-- recent commands
-- context panels
-- right-side proposal rail
-- editable proposal fields
-- missing information panels
-- execution results
-
-The interface should feel like:
-- a business copilot
-- an operational workspace
-- a controlled execution system
-
-NOT:
-- a generic AI chat
-- a classic ERP full of forms
-
----
-
-# Current Frontend Flow
-
-```text
-Login
-→ Command input
-→ Interpret
-→ Action Proposal
-→ Confirm
-→ Execute
-→ Execution Result
-```
-
----
-
-# Frontend UX Principles
-
-Fluxio follows:
-- AI-first interaction
-- proposal-centric workflows
-- explicit execution confirmation
-- minimal operational friction
-
-CRM data supports the proposal flow.
-It must not dominate the interface.
-
----
-
 # Technology Stack
 
 ## Backend
@@ -442,8 +426,8 @@ It must not dominate the interface.
 - Vue 3
 - Composition API
 - Tailwind CSS v4
-- i18n
 - TypeScript
+- i18n
 
 ---
 
@@ -452,36 +436,32 @@ It must not dominate the interface.
 Fluxio is multilingual from the beginning.
 
 Rules:
-- backend uses Laravel translation files
+- backend uses Laravel translations
 - frontend uses i18n
-- no hardcoded user-facing strings
+- no hardcoded UI strings
 
 Primary language:
 - English
 
 Additional languages:
 - Italian
-- German progressively
+- German (planned)
 
 ---
 
 # Current Project Status
 
-Fluxio is in active development.
+Fluxio is actively evolving.
 
-The backend MVP and the first command-first frontend vertical slice are implemented.
-
----
-
-# Documentation
-
-Detailed technical documentation is available inside the `docs/` directory.
-
-- [Architecture](docs/architecture.md)
-- [API Response Standard](docs/api-response-standard.md)
-- [Proposal Lifecycle](docs/proposal-lifecycle.md)
-- [Frontend Vision](docs/frontend-vision.md)
-- [Getting Started](docs/getting-started.md)
+The project currently includes:
+- backend MVP foundation
+- proposal lifecycle
+- command interpretation flow
+- refinement UX
+- ambiguity resolution UX
+- execution confirmation flow
+- operational frontend shell
+- responsive/mobile-first direction
 
 ---
 
@@ -489,81 +469,98 @@ Detailed technical documentation is available inside the `docs/` directory.
 
 ## Backend
 
-- Modular project structure
-- Core API response layer
-- Centralized exception handling
+- Modular architecture
+- Standardized API layer
+- Exception handling
 - Sanctum authentication
 - Leads module
 - Tasks module
 - Actions module
 - Proposal persistence
-- Proposal confirmation flow
-- Idempotent proposal execution
-- Task creation from proposals
+- Proposal execution flow
+- Idempotent execution
 
 ---
 
 ## Frontend
 
 - Login/logout flow
-- Auth composable
 - Command composer
 - Proposal rail
 - Proposal states
-- Editable fields rendering
-- Missing information rendering
-- Confirm & execute flow
+- Editable fields
+- Missing information panels
+- Ambiguity resolution UX
+- Refinement flow
 - Execution result rendering
 - Confidence UX
-- Low-confidence warnings
 - Recent command history
+- Responsive operational shell
 - Dark SaaS UI foundation
 
 ---
 
 # Not Yet Implemented
 
-- Advanced conversational refinement
-- Entity disambiguation UX
-- Multi-step proposal flows
-- Full calendar workflows
-- Notification orchestration
-- Advanced analytics
+- Real LLM provider integration
+- Provider abstraction layer
+- Advanced proposal mutation intelligence
+- Full conversational refinement
+- Calendar orchestration
+- Multi-step workflows
+- Notifications orchestration
 - Multi-user collaboration
-- Production-grade AI provider abstraction
+- Voice interaction
+- Mobile operational navigation
+- Production-grade AI orchestration
 
 ---
 
 # LLM Strategy
 
-Fluxio is deterministic-first and testable-first.
+Fluxio is deterministic-first and validation-first.
 
-The MVP uses:
+The current MVP uses:
 - rule-based interpretation
-- explicit validation
 - predictable proposal generation
+- explicit validation
 
-Future LLM support may assist:
+Future LLM integration may assist:
 - intent detection
-- proposal refinement
 - ambiguity resolution
+- proposal refinement
 - entity extraction
 
 However:
-- all output must be validated
+- all output remains validated
 - proposals remain structured
 - confirmation remains mandatory
-- AI never directly executes business actions
+- AI never directly executes actions
 
-Possible future direction:
-- local lightweight models
+Possible future providers:
 - Ollama
 - Qwen
-- provider abstraction
+- local lightweight models
+- provider abstraction layer
 
 ---
 
-# Getting Started
+# Documentation
+
+Detailed documentation is available in `docs/`.
+
+## Core Documentation
+
+- [Architecture](docs/architecture.md)
+- [API Response Standard](docs/api-response-standard.md)
+- [Proposal Lifecycle](docs/proposal-lifecycle.md)
+- [Frontend Vision](docs/frontend-vision.md)
+- [Development Plan](docs/development-plan.md)
+- [Getting Started](docs/getting-started.md)
+
+---
+
+# Quick Start
 
 ## Requirements
 
@@ -571,13 +568,10 @@ Possible future direction:
 - Composer
 - Node.js 20+
 - PostgreSQL
-- Nginx (recommended for local HTTPS setup)
 
 ---
 
-# Installation
-
-## Clone repository
+## Clone Repository
 
 ```bash
 git clone https://github.com/anfibes/fluxio.git
@@ -586,7 +580,7 @@ cd fluxio
 
 ---
 
-# Backend Setup
+## Backend
 
 ```bash
 cd apps/api
@@ -598,60 +592,20 @@ cp .env.example .env
 php artisan key:generate
 
 php artisan migrate
-```
 
-Configure PostgreSQL credentials inside `.env`.
-
-Run backend:
-
-```bash
 php artisan serve
-```
-
-Default backend URL:
-
-```text
-http://localhost:8000
 ```
 
 ---
 
-# Frontend Setup
+## Frontend
 
 ```bash
 cd apps/web
 
 npm install
-```
 
-Create:
-
-```text
-apps/web/.env
-```
-
-Example:
-
-```env
-NUXT_PUBLIC_API_BASE=http://localhost:8000/api
-```
-
-For local Nginx HTTPS environments:
-
-```env
-NUXT_PUBLIC_API_BASE=https://fluxio.test/api
-```
-
-Run frontend:
-
-```bash
 npm run dev
-```
-
-Default frontend URL:
-
-```text
-http://localhost:3000
 ```
 
 ---
@@ -660,16 +614,17 @@ http://localhost:3000
 
 Fluxio prioritizes:
 - architecture clarity
-- explicit proposal lifecycle
+- proposal transparency
 - controlled execution
-- maintainable modular design
+- modular maintainability
+- deterministic behavior
 - AI-assisted workflows without hidden automation
 
-The project intentionally evolves in:
-- small
-- testable
-- verifiable
-steps.
+The project intentionally evolves through:
+- small steps
+- verifiable flows
+- testable iterations
+- operational UX experiments
 
 ---
 
@@ -677,13 +632,18 @@ steps.
 
 Fluxio is currently NOT production-ready.
 
-The project exists to demonstrate:
-- modern backend architecture
-- modular monolith design
+The project exists to explore:
 - AI-first business UX
 - proposal-driven workflows
+- operational ambiguity management
 - controlled natural-language execution
-- future-ready enterprise interaction models
+- future enterprise interaction models
+
+while demonstrating:
+- modern backend architecture
+- modular monolith design
+- scalable frontend structure
+- maintainable domain separation
 
 ---
 
