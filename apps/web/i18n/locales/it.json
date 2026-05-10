@@ -29,6 +29,7 @@
     "confirming": "Conferma in corso…",
     "complete_to_confirm": "Completa per confermare",
     "reset": "Reimposta",
+    "reset_proposal": "Reimposta proposta",
     "status": {
       "draft": "Bozza",
       "ready": "Pronta",

@@ -82,18 +82,22 @@ const exampleCommands = [
       <div v-else key="content" class="flex h-full flex-col">
 
         <!-- Status header -->
-        <ProposalStatusBanner :proposal="proposal" />
-
-        <!-- Reset strip — secondary action, ends current operational context -->
-        <div class="flex justify-end border-b border-border-subtle px-4 py-1.5">
-          <button
-            type="button"
-            class="text-xs text-muted transition-colors hover:text-text-muted"
-            @click="emit('reset')"
-          >
-            {{ $t('proposal.reset') }}
-          </button>
-        </div>
+        <ProposalStatusBanner :proposal="proposal">
+          <template #actions>
+            <button
+              type="button"
+              class="flex h-6 w-6 items-center justify-center rounded text-muted/50 transition-colors hover:bg-surface-raised hover:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              :title="$t('proposal.reset_proposal')"
+              :aria-label="$t('proposal.reset_proposal')"
+              @click="emit('reset')"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5">
+                <polyline points="1 4 1 10 7 10" />
+                <path d="M3.51 15a9 9 0 1 0 .49-4.99" />
+              </svg>
+            </button>
+          </template>
+        </ProposalStatusBanner>
 
         <!-- Scrollable body -->
         <div class="flex-1 overflow-y-auto">

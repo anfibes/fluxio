@@ -29,6 +29,7 @@
     "confirming": "Confirming…",
     "complete_to_confirm": "Complete to confirm",
     "reset": "Reset",
+    "reset_proposal": "Reset proposal",
     "status": {
       "draft": "Draft",
       "ready": "Ready",

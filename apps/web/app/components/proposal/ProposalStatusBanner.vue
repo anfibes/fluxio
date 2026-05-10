@@ -41,13 +41,16 @@ const confidenceWarningKey = computed(() => ({
       <h3 class="text-sm font-semibold capitalize leading-snug text-text">
         {{ intentLabel }}
       </h3>
-      <span
-        class="flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium"
-        :class="cfg.pill"
-      >
-        <span class="h-1.5 w-1.5 rounded-full" :class="cfg.dot" />
-        {{ cfg.label }}
-      </span>
+      <div class="flex shrink-0 items-center gap-2">
+        <span
+          class="flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium"
+          :class="cfg.pill"
+        >
+          <span class="h-1.5 w-1.5 rounded-full" :class="cfg.dot" />
+          {{ cfg.label }}
+        </span>
+        <slot name="actions" />
+      </div>
     </div>
 
     <!-- Source text -->
