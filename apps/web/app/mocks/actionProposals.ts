@@ -33,6 +33,7 @@ export const mockProposalReady: ActionProposal = {
   failure_reason: null,
   execution_result: null,
   last_refinement: null,
+  ambiguities: [],
 }
 
 export const mockProposalDraft: ActionProposal = {
@@ -69,6 +70,7 @@ export const mockProposalDraft: ActionProposal = {
   failure_reason: null,
   execution_result: null,
   last_refinement: null,
+  ambiguities: [],
 }
 
 export const mockProposalExecuted: ActionProposal = {
@@ -108,4 +110,5 @@ export const mockProposalExecuted: ActionProposal = {
     status: 'created',
   },
   last_refinement: null,
+  ambiguities: [],
 }

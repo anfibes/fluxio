@@ -16,7 +16,7 @@ const { isAuthenticated } = useAuth()
 
 // ── live state ───────────────────────────────────────────────
 const commandText = ref('')
-const { proposal, loading, error, submitCommand, confirmAndExecute, setError } = useActionProposal()
+const { proposal, loading, error, submitCommand, confirmAndExecute, resolveAmbiguity, setError } = useActionProposal()
 const { history, push: pushHistory } = useCommandHistory()
 
 // ── composer keyboard shortcut ───────────────────────────────
@@ -52,6 +52,11 @@ function handleClear() {
 function fillFromHistory(cmd: string) {
   commandText.value = cmd
   composerRef.value?.focus()
+}
+
+async function handleResolveAmbiguity(text: string) {
+  if (!proposal.value) return
+  await resolveAmbiguity(proposal.value.id, text)
 }
 </script>
 
@@ -145,6 +150,7 @@ function fillFromHistory(cmd: string) {
           :proposal="displayProposal"
           :loading="loading"
           @confirm-execute="confirmAndExecute"
+          @resolve-ambiguity="handleResolveAmbiguity"
         />
       </div>
     </div>

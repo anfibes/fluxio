@@ -2,7 +2,7 @@
 import type { ActionProposal } from '~/types/actions'
 
 const props = defineProps<{ proposal: ActionProposal | null; loading?: boolean }>()
-const emit = defineEmits<{ 'confirm-execute': [] }>()
+const emit = defineEmits<{ 'confirm-execute': []; 'resolve-ambiguity': [text: string] }>()
 
 const isReady    = computed(() => props.proposal?.status === 'ready')
 const isDraft    = computed(() => props.proposal?.status === 'draft')
@@ -62,6 +62,14 @@ const exampleCommands = [
               :field="field"
             />
           </div>
+
+          <!-- Ambiguity resolution -->
+          <ProposalAmbiguityPanel
+            v-if="proposal.ambiguities?.length"
+            :proposal="proposal"
+            :loading="loading"
+            @resolve="emit('resolve-ambiguity', $event)"
+          />
 
           <!-- Missing fields warning -->
           <ProposalMissingInformationPanel

@@ -34,6 +34,14 @@
       "confirmed": "Confirmed",
       "executed": "Executed",
       "failed": "Failed"
+    },
+    "ambiguity": {
+      "title": "Resolve ambiguity",
+      "query": "Matching \"{query}\"",
+      "multiple_matches": "Multiple matches",
+      "select_candidate": "Select a candidate:",
+      "confidence": "{pct}% match",
+      "blocking": "Blocking"
     }
   },
   "command": {

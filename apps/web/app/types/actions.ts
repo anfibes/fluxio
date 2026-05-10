@@ -1,5 +1,23 @@
 export type ActionProposalStatus = 'draft' | 'ready' | 'confirmed' | 'executed' | 'failed'
 
+export interface AmbiguityCandidate {
+  id: string | number
+  type: string
+  label: string
+  description?: string
+  confidence?: number
+}
+
+export interface ProposalAmbiguity {
+  key: string
+  label: string
+  reason: string
+  blocking: boolean
+  query?: string
+  selected_candidate_id: string | number | null
+  candidates: AmbiguityCandidate[]
+}
+
 export type EditableFieldSource = 'detected' | 'inferred' | 'guessed' | 'computed' | 'edited' | 'missing'
 
 export interface EditableField {
@@ -56,4 +74,5 @@ export interface ActionProposal {
   failure_reason: string | null
   execution_result: Record<string, unknown> | null
   last_refinement: ActionProposalRefinement | null
+  ambiguities: ProposalAmbiguity[]
 }

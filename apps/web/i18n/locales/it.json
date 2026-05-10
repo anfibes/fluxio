@@ -34,6 +34,14 @@
       "confirmed": "Confermata",
       "executed": "Eseguita",
       "failed": "Fallita"
+    },
+    "ambiguity": {
+      "title": "Risolvi ambiguità",
+      "query": "Corrispondenza a \"{query}\"",
+      "multiple_matches": "Più corrispondenze",
+      "select_candidate": "Seleziona un candidato:",
+      "confidence": "{pct}% corrispondenza",
+      "blocking": "Bloccante"
     }
   },
   "command": {

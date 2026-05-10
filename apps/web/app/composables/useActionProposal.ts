@@ -45,6 +45,10 @@ export function useActionProposal() {
     }
   }
 
+  async function resolveAmbiguity(id: string, refinementText: string): Promise<void> {
+    await refine(id, refinementText)
+  }
+
   async function submitCommand(text: string): Promise<void> {
     const current = proposal.value
     if (!current || current.status === 'confirmed' || current.status === 'executed' || current.status === 'failed') {
@@ -83,6 +87,7 @@ export function useActionProposal() {
     error: readonly(error),
     interpret,
     refine,
+    resolveAmbiguity,
     submitCommand,
     confirmAndExecute,
     setProposal,
