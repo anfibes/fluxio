@@ -18,15 +18,15 @@ const themeOptions: { value: ThemePreference; labelKey: string }[] = [
     </div>
     <div class="topbar-right">
       <!-- Theme control -->
-      <div class="flex items-center gap-px rounded-md border border-[var(--color-border)] p-0.5">
+      <div class="flex items-center gap-px rounded-md border border-border p-0.5">
         <button
           v-for="option in themeOptions"
           :key="option.value"
           type="button"
           class="rounded px-2 py-1 text-xs transition-colors"
           :class="themePreference === option.value
-            ? 'bg-[var(--color-surface-raised)] text-[var(--color-text-muted)]'
-            : 'text-[var(--color-muted)] hover:text-[var(--color-text-muted)]'"
+            ? 'bg-surface-raised text-text-muted'
+            : 'text-muted hover:text-text-muted'"
           @click="setThemePreference(option.value)"
         >
           {{ $t(option.labelKey) }}
@@ -35,10 +35,10 @@ const themeOptions: { value: ThemePreference; labelKey: string }[] = [
 
       <template v-if="isAuthenticated">
         <!-- Hide email on small screens to avoid overflow -->
-        <span v-if="user" class="hidden text-xs text-[var(--color-text-muted)] md:inline">{{ user.email }}</span>
+        <span v-if="user" class="hidden text-xs text-text-muted md:inline">{{ user.email }}</span>
         <button
           type="button"
-          class="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-xs text-[var(--color-muted)] transition-colors hover:border-[var(--color-border-subtle)] hover:text-[var(--color-text-muted)]"
+          class="rounded-md border border-border px-3 py-1.5 text-xs text-muted transition-colors hover:border-border-subtle hover:text-text-muted"
           @click="logout"
         >
           {{ $t('auth.logout') }}
