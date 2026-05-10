@@ -21,6 +21,8 @@ class RuleBasedIntentResolver implements IntentResolverInterface
 
         if (str_contains($lower, 'rossini')) {
             $entities['lead'] = 'Rossini';
+        } elseif ((bool) preg_match('/\brossi\b/i', $text)) {
+            $entities['lead_query'] = 'Rossi';
         }
 
         return new ParsedIntent($intent, $entities);

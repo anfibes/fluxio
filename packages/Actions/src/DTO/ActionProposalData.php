@@ -21,6 +21,7 @@ class ActionProposalData
         public readonly array $editable_fields = [],
         public readonly array $changes = [],
         public readonly bool $needs_confirmation = true,
+        public readonly array $ambiguities = [],
     ) {}
 
     public function toArray(): array
@@ -37,6 +38,7 @@ class ActionProposalData
             'editable_fields' => array_map(fn (EditableField $f) => $f->toArray(), $this->editable_fields),
             'changes' => array_map(fn (ProposedChange $c) => $c->toArray(), $this->changes),
             'needs_confirmation' => $this->needs_confirmation,
+            'ambiguities' => $this->ambiguities,
         ];
     }
 }

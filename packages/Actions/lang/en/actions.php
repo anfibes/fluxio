@@ -10,4 +10,5 @@ return [
     'refined' => 'Action proposal refined successfully.',
     'cannot_refine' => 'This action proposal cannot be refined.',
     'refinement_not_recognized' => 'The refinement could not be applied. The proposal was left unchanged.',
+    'ambiguity_still_unresolved' => 'The clarification matches multiple candidates. Please be more specific.',
 ];

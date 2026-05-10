@@ -36,6 +36,7 @@ class ActionProposalResource extends JsonResource
             'failure_reason' => $proposal->failure_reason,
             'execution_result' => $proposal->execution_result,
             'last_refinement' => $proposal->last_refinement,
+            'ambiguities' => $proposal->ambiguities ?? [],
         ];
     }
 }

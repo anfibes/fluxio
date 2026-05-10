@@ -25,6 +25,7 @@ class ActionProposalPersistenceService
             'editable_fields' => array_map(fn (EditableField $f) => $f->toArray(), $proposalData->editable_fields),
             'changes' => array_map(fn (ProposedChange $c) => $c->toArray(), $proposalData->changes),
             'needs_confirmation' => $proposalData->needs_confirmation,
+            'ambiguities' => $proposalData->ambiguities,
         ]);
     }
 }

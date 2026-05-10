@@ -23,10 +23,10 @@ class ActionInterpreterService
             default => 0.3,
         };
 
-        [$status, $missing, $editableFields, $changes] = match ($parsed->intent) {
+        [$status, $missing, $editableFields, $changes, $ambiguities] = match ($parsed->intent) {
             'create_task' => $this->buildCreateTask($parsed->entities),
             'schedule_call' => $this->buildScheduleCall($parsed->entities),
-            default => ['draft', [], [], []],
+            default => ['draft', [], [], [], []],
         };
 
         return new ActionProposalData(
@@ -40,6 +40,7 @@ class ActionInterpreterService
             editable_fields: $editableFields,
             changes: $changes,
             needs_confirmation: true,
+            ambiguities: $ambiguities,
         );
     }
 
@@ -82,8 +83,14 @@ class ActionInterpreterService
             ),
         ];
 
-        return [$status, [], $editableFields, $changes];
+        return [$status, [], $editableFields, $changes, []];
     }
+
+    private const ROSSI_CANDIDATES = [
+        ['id' => 1,  'type' => 'person',  'label' => 'Mario Rossi',   'description' => 'Individual lead',     'confidence' => 0.72],
+        ['id' => 7,  'type' => 'company', 'label' => 'Rossi SRL',     'description' => 'Company lead',         'confidence' => 0.68],
+        ['id' => 12, 'type' => 'company', 'label' => 'Studio Rossi',  'description' => 'Professional studio',  'confidence' => 0.61],
+    ];
 
     private function buildScheduleCall(array $entities): array
     {
@@ -103,6 +110,7 @@ class ActionInterpreterService
         ];
 
         $editableFields = [];
+        $ambiguities = [];
 
         if (isset($entities['lead'])) {
             $editableFields[] = new EditableField(
@@ -112,6 +120,16 @@ class ActionInterpreterService
                 source: 'detected',
                 required: true,
             );
+        } elseif (isset($entities['lead_query'])) {
+            $ambiguities[] = [
+                'key' => 'lead',
+                'label' => 'Lead',
+                'reason' => 'multiple_matches',
+                'blocking' => true,
+                'query' => $entities['lead_query'],
+                'selected_candidate_id' => null,
+                'candidates' => self::ROSSI_CANDIDATES,
+            ];
         }
 
         $editableFields[] = new EditableField(
@@ -139,6 +157,6 @@ class ActionInterpreterService
             ),
         ];
 
-        return ['draft', $missing, $editableFields, $changes];
+        return ['draft', $missing, $editableFields, $changes, $ambiguities];
     }
 }
