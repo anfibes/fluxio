@@ -1,0 +1,189 @@
+<?php
+
+namespace Tests\Feature\Actions;
+
+use Carbon\Carbon;
+use Fluxio\Actions\Interpreters\RuleBasedRefinementInterpreter;
+use Tests\TestCase;
+
+/**
+ * Verifies that RuleBasedRefinementInterpreter produces the correct
+ * NormalizedMutation[] for the refinement inputs that ActionProposalRefinementService
+ * is expected to apply. These tests protect the NL → structured-mutation boundary.
+ */
+class NormalizedRefinementInterpreterTest extends TestCase
+{
+    private RuleBasedRefinementInterpreter $interpreter;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Carbon::setTestNow('2026-05-10 08:00:00');
+        $this->interpreter = new RuleBasedRefinementInterpreter();
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow(null);
+        parent::tearDown();
+    }
+
+    // ── Time mutations ────────────────────────────────────────────────────────
+
+    public function test_at_colon_time_produces_single_time_mutation(): void
+    {
+        $mutations = $this->interpreter->interpret('At 10:30');
+
+        $this->assertCount(1, $mutations);
+        $this->assertEquals('time', $mutations[0]->field);
+        $this->assertEquals('Time', $mutations[0]->label);
+        $this->assertEquals('10:30', $mutations[0]->value);
+        $this->assertEquals('detected', $mutations[0]->source);
+    }
+
+    public function test_at_dot_time_produces_single_time_mutation(): void
+    {
+        $mutations = $this->interpreter->interpret('At 10.30');
+
+        $this->assertCount(1, $mutations);
+        $this->assertEquals('time', $mutations[0]->field);
+        $this->assertEquals('10:30', $mutations[0]->value);
+    }
+
+    public function test_at_hour_only_defaults_to_zero_minutes(): void
+    {
+        $mutations = $this->interpreter->interpret('At 9');
+
+        $this->assertCount(1, $mutations);
+        $this->assertEquals('09:00', $mutations[0]->value);
+    }
+
+    public function test_at_pm_time_converts_to_24h(): void
+    {
+        $mutations = $this->interpreter->interpret('At 3pm');
+
+        $this->assertCount(1, $mutations);
+        $this->assertEquals('15:00', $mutations[0]->value);
+    }
+
+    public function test_at_am_noon_converts_to_midnight(): void
+    {
+        $mutations = $this->interpreter->interpret('At 12am');
+
+        $this->assertCount(1, $mutations);
+        $this->assertEquals('00:00', $mutations[0]->value);
+    }
+
+    public function test_morning_keyword_produces_09_00(): void
+    {
+        $mutations = $this->interpreter->interpret('morning');
+
+        $timeMutations = array_filter($mutations, fn ($m) => $m->field === 'time');
+        $this->assertCount(1, $timeMutations);
+        $this->assertEquals('09:00', array_values($timeMutations)[0]->value);
+    }
+
+    // ── Date mutations ────────────────────────────────────────────────────────
+
+    public function test_tomorrow_produces_single_date_mutation(): void
+    {
+        $mutations = $this->interpreter->interpret('Tomorrow');
+
+        $this->assertCount(1, $mutations);
+        $this->assertEquals('date', $mutations[0]->field);
+        $this->assertEquals('Date', $mutations[0]->label);
+        $this->assertEquals(now()->addDay()->toDateString(), $mutations[0]->value);
+    }
+
+    public function test_friday_keyword_produces_next_friday_date(): void
+    {
+        $mutations = $this->interpreter->interpret('Friday instead');
+
+        $dateMutations = array_filter($mutations, fn ($m) => $m->field === 'date');
+        $this->assertCount(1, $dateMutations);
+        $this->assertEquals(Carbon::parse('next friday')->toDateString(), array_values($dateMutations)[0]->value);
+    }
+
+    // ── Combined mutations ────────────────────────────────────────────────────
+
+    public function test_tomorrow_morning_produces_date_and_time_mutations(): void
+    {
+        $mutations = $this->interpreter->interpret('Tomorrow morning');
+
+        $fields = array_map(fn ($m) => $m->field, $mutations);
+        $this->assertContains('date', $fields);
+        $this->assertContains('time', $fields);
+        $this->assertCount(2, $mutations);
+    }
+
+    public function test_tomorrow_at_nine_produces_date_and_time_mutations(): void
+    {
+        $mutations = $this->interpreter->interpret('Tomorrow at 9');
+
+        $fields = array_map(fn ($m) => $m->field, $mutations);
+        $this->assertContains('date', $fields);
+        $this->assertContains('time', $fields);
+    }
+
+    // ── Priority mutations ────────────────────────────────────────────────────
+
+    public function test_high_priority_produces_priority_mutation(): void
+    {
+        $mutations = $this->interpreter->interpret('High priority');
+
+        $this->assertCount(1, $mutations);
+        $this->assertEquals('priority', $mutations[0]->field);
+        $this->assertEquals('Priority', $mutations[0]->label);
+        $this->assertEquals('high', $mutations[0]->value);
+    }
+
+    public function test_urgent_produces_high_priority_mutation(): void
+    {
+        $mutations = $this->interpreter->interpret('Urgent');
+
+        $this->assertCount(1, $mutations);
+        $this->assertEquals('priority', $mutations[0]->field);
+        $this->assertEquals('high', $mutations[0]->value);
+    }
+
+    public function test_low_priority_produces_low_priority_mutation(): void
+    {
+        $mutations = $this->interpreter->interpret('Low priority');
+
+        $this->assertCount(1, $mutations);
+        $this->assertEquals('priority', $mutations[0]->field);
+        $this->assertEquals('low', $mutations[0]->value);
+    }
+
+    // ── No-op cases ───────────────────────────────────────────────────────────
+
+    public function test_unrecognized_text_produces_no_mutations(): void
+    {
+        $mutations = $this->interpreter->interpret('gibberish command xyz');
+
+        $this->assertEmpty($mutations);
+    }
+
+    public function test_empty_string_produces_no_mutations(): void
+    {
+        $mutations = $this->interpreter->interpret('');
+
+        $this->assertEmpty($mutations);
+    }
+
+    // ── Mutation DTO structure ────────────────────────────────────────────────
+
+    public function test_mutation_source_defaults_to_detected(): void
+    {
+        $mutations = $this->interpreter->interpret('At 10:30');
+
+        $this->assertEquals('detected', $mutations[0]->source);
+    }
+
+    public function test_mutation_confidence_defaults_to_one(): void
+    {
+        $mutations = $this->interpreter->interpret('At 10:30');
+
+        $this->assertEquals(1.0, $mutations[0]->confidence);
+    }
+}

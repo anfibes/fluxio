@@ -2,13 +2,16 @@
 
 namespace Fluxio\Actions\Services;
 
-use Carbon\Carbon;
+use Fluxio\Actions\Contracts\RefinementInterpreterInterface;
+use Fluxio\Actions\DTO\NormalizedMutation;
 use Fluxio\Actions\Models\ActionProposal;
 use Illuminate\Validation\ValidationException;
 
 class ActionProposalRefinementService
 {
     private const REFINABLE_STATUSES = ['draft', 'ready'];
+
+    public function __construct(private readonly RefinementInterpreterInterface $interpreter) {}
 
     public function refine(ActionProposal $proposal, string $text): ActionProposal
     {
@@ -20,8 +23,8 @@ class ActionProposalRefinementService
 
         $effectiveText = $this->effectiveText($text, $proposal->source_text);
 
-        // Classify deterministic field mutations (date, time, priority, …)
-        $fieldMutations = $this->classifyFieldMutations($effectiveText);
+        // Delegate NL → mutation extraction to the interpreter
+        $fieldMutations = $this->interpreter->interpret($effectiveText);
 
         // Try ambiguity resolution when a blocking ambiguity exists
         $ambiguityResolution = null;
@@ -29,7 +32,6 @@ class ActionProposalRefinementService
             $ambiguityResolution = $this->tryClassifyAmbiguityResolution($proposal, $effectiveText);
 
             if ($ambiguityResolution === null && empty($fieldMutations)) {
-                // Can't resolve and nothing else to apply
                 $warnings   = $proposal->warnings ?? [];
                 $warnings[] = __('actions::actions.ambiguity_still_unresolved');
                 $proposal->warnings        = $warnings;
@@ -64,90 +66,9 @@ class ActionProposalRefinementService
         return $this->applyAll($proposal, $fieldMutations, $ambiguityResolution, $text, $effectiveText);
     }
 
-    // ── Mutation classification ──────────────────────────────────────────────
-
-    private function classifyFieldMutations(string $effectiveText): array
-    {
-        $mutations = [];
-
-        $date = $this->extractDate($effectiveText);
-        if ($date !== null) {
-            $mutations[] = ['field' => 'date', 'label' => 'Date', 'value' => $date, 'source' => 'detected'];
-        }
-
-        $time = $this->extractTime($effectiveText);
-        if ($time !== null) {
-            $mutations[] = ['field' => 'time', 'label' => 'Time', 'value' => $time, 'source' => 'detected'];
-        }
-
-        $priority = $this->extractPriority($effectiveText);
-        if ($priority !== null) {
-            $mutations[] = ['field' => 'priority', 'label' => 'Priority', 'value' => $priority, 'source' => 'detected'];
-        }
-
-        return $mutations;
-    }
-
-    private function extractDate(string $text): ?string
-    {
-        $lower = mb_strtolower(trim($text));
-
-        if (str_contains($lower, 'tomorrow')) {
-            return now()->addDay()->toDateString();
-        }
-
-        $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-        foreach ($days as $day) {
-            if ((bool) preg_match('/\b' . $day . '\b/i', $lower)) {
-                return Carbon::parse('next ' . $day)->toDateString();
-            }
-        }
-
-        return null;
-    }
-
-    private function extractTime(string $text): ?string
-    {
-        // Explicit: "at 10:30", "at 10.30", "at 9", "at 9am", "at 9pm", "at 9:30am"
-        if ((bool) preg_match('/\bat\s+(\d{1,2})(?:[.:](\d{2}))?\s*(am|pm)?\b/i', $text, $m)) {
-            $hour = (int) $m[1];
-            $min  = isset($m[2]) && $m[2] !== '' ? (int) $m[2] : 0;
-            $ampm = mb_strtolower($m[3] ?? '');
-
-            if ($ampm === 'pm' && $hour < 12) {
-                $hour += 12;
-            }
-            if ($ampm === 'am' && $hour === 12) {
-                $hour = 0;
-            }
-
-            return sprintf('%02d:%02d', $hour, $min);
-        }
-
-        // Implicit: "morning" → 09:00
-        if ((bool) preg_match('/\bmorning\b/i', $text)) {
-            return '09:00';
-        }
-
-        return null;
-    }
-
-    private function extractPriority(string $text): ?string
-    {
-        $lower = mb_strtolower($text);
-
-        if (str_contains($lower, 'high priority') || str_contains($lower, 'urgent')) {
-            return 'high';
-        }
-
-        if (str_contains($lower, 'low priority')) {
-            return 'low';
-        }
-
-        return null;
-    }
-
-    // ── Ambiguity resolution classification ─────────────────────────────────
+    // ── Ambiguity resolution ─────────────────────────────────────────────────
+    // Candidate matching requires proposal state (the candidates list) so it
+    // stays here rather than in the interpreter.
 
     private function tryClassifyAmbiguityResolution(ActionProposal $proposal, string $effectiveText): ?array
     {
@@ -166,7 +87,7 @@ class ActionProposalRefinementService
                 ];
             }
 
-            // Only one unresolved blocking ambiguity is processed per refinement
+            // Process only the first unresolved blocking ambiguity per call
             return null;
         }
 
@@ -175,6 +96,9 @@ class ActionProposalRefinementService
 
     // ── Unified mutation application ─────────────────────────────────────────
 
+    /**
+     * @param NormalizedMutation[] $fieldMutations
+     */
     private function applyAll(
         ActionProposal $proposal,
         array $fieldMutations,
@@ -199,16 +123,16 @@ class ActionProposalRefinementService
         $mutatedFieldKeys = [];
 
         foreach ($fieldMutations as $mutation) {
-            $field     = $mutation['field'];
-            $label     = $mutation['label'];
-            $newValue  = $mutation['value'];
+            $field    = $mutation->field;
+            $label    = $mutation->label;
+            $newValue = $mutation->value;
             $prevValue = $currentFieldValues[$field] ?? null;
 
             if (collect($editableFields)->contains('key', $field)) {
                 $editableFields = array_map(function (array $f) use ($field, $newValue, $mutation): array {
                     if ($f['key'] === $field) {
                         $f['value']  = $newValue;
-                        $f['source'] = $mutation['source'];
+                        $f['source'] = $mutation->source;
                     }
 
                     return $f;
@@ -218,7 +142,7 @@ class ActionProposalRefinementService
                     'key'      => $field,
                     'label'    => $label,
                     'value'    => $newValue,
-                    'source'   => $mutation['source'],
+                    'source'   => $mutation->source,
                     'required' => in_array($field, ['date', 'time'], true),
                 ];
             }
@@ -375,7 +299,7 @@ class ActionProposalRefinementService
 
     private function hasBlockingConditions(ActionProposal $proposal, array $updatedMissing, array $updatedAmbiguities): bool
     {
-        $requiredMissingRemain = collect($updatedMissing)->contains('required', true);
+        $requiredMissingRemain    = collect($updatedMissing)->contains('required', true);
         $blockingAmbiguityRemains = collect($updatedAmbiguities)
             ->contains(fn (array $a) => ($a['blocking'] ?? false) && $a['selected_candidate_id'] === null);
 
