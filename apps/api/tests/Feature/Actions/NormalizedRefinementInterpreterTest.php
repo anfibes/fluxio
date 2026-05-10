@@ -186,4 +186,69 @@ class NormalizedRefinementInterpreterTest extends TestCase
 
         $this->assertEquals(1.0, $mutations[0]->confidence);
     }
+
+    // ── Mutation operations ───────────────────────────────────────────────────
+
+    public function test_replace_mutations_carry_replace_operation(): void
+    {
+        foreach (['At 10:30', 'Tomorrow', 'High priority', 'Urgent', 'Low priority', 'Friday instead'] as $input) {
+            $mutations = $this->interpreter->interpret($input);
+            foreach ($mutations as $m) {
+                $this->assertEquals('replace', $m->operation, "Expected 'replace' for input: {$input}");
+            }
+        }
+    }
+
+    // ── Clear operation ───────────────────────────────────────────────────────
+
+    public function test_remove_priority_phrase_produces_clear_mutation(): void
+    {
+        $mutations = $this->interpreter->interpret('Remove priority');
+
+        $this->assertCount(1, $mutations);
+        $this->assertEquals('priority', $mutations[0]->field);
+        $this->assertEquals('clear', $mutations[0]->operation);
+        $this->assertNull($mutations[0]->value);
+    }
+
+    public function test_clear_priority_phrase_produces_clear_mutation(): void
+    {
+        $mutations = $this->interpreter->interpret('Clear priority');
+
+        $this->assertCount(1, $mutations);
+        $this->assertEquals('priority', $mutations[0]->field);
+        $this->assertEquals('clear', $mutations[0]->operation);
+    }
+
+    public function test_no_priority_phrase_produces_clear_mutation(): void
+    {
+        $mutations = $this->interpreter->interpret('No priority');
+
+        $this->assertCount(1, $mutations);
+        $this->assertEquals('priority', $mutations[0]->field);
+        $this->assertEquals('clear', $mutations[0]->operation);
+    }
+
+    public function test_clear_mutation_value_is_null(): void
+    {
+        $mutations = $this->interpreter->interpret('Remove priority');
+
+        $this->assertNull($mutations[0]->value);
+    }
+
+    public function test_clear_mutation_source_is_detected(): void
+    {
+        $mutations = $this->interpreter->interpret('Remove priority');
+
+        $this->assertEquals('detected', $mutations[0]->source);
+    }
+
+    public function test_clear_operation_takes_precedence_over_replace_for_same_field(): void
+    {
+        // "no priority" must produce clear, not a replace with value "normal" or similar
+        $mutations = $this->interpreter->interpret('no priority');
+
+        $this->assertCount(1, $mutations);
+        $this->assertEquals('clear', $mutations[0]->operation);
+    }
 }

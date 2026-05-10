@@ -9,11 +9,11 @@ use Fluxio\Actions\DTO\NormalizedMutation;
 class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
 {
     /**
-     * Extract normalized field mutations from a refinement text.
+     * Extract normalized mutations from a refinement text.
      *
      * The interpreter is intentionally locale-fixed to English for now.
-     * Future implementations can add Italian, German, or LLM-assisted variants
-     * behind the same interface without touching the orchestration layer.
+     * Future implementations (Italian, German, LLM-assisted) can implement
+     * RefinementInterpreterInterface without touching the orchestration layer.
      *
      * @return NormalizedMutation[]
      */
@@ -21,23 +21,70 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
     {
         $mutations = [];
 
+        // Clear operations are checked before replace so they win when both
+        // patterns could match the same field (e.g. "no priority" vs "priority").
+        $clearMutation = $this->extractClearMutation($text);
+        if ($clearMutation !== null) {
+            $mutations[] = $clearMutation;
+            return $mutations;
+        }
+
         $date = $this->extractDate($text);
         if ($date !== null) {
-            $mutations[] = new NormalizedMutation(field: 'date', label: 'Date', value: $date);
+            $mutations[] = new NormalizedMutation(
+                field:     'date',
+                label:     'Date',
+                value:     $date,
+                operation: 'replace',
+            );
         }
 
         $time = $this->extractTime($text);
         if ($time !== null) {
-            $mutations[] = new NormalizedMutation(field: 'time', label: 'Time', value: $time);
+            $mutations[] = new NormalizedMutation(
+                field:     'time',
+                label:     'Time',
+                value:     $time,
+                operation: 'replace',
+            );
         }
 
         $priority = $this->extractPriority($text);
         if ($priority !== null) {
-            $mutations[] = new NormalizedMutation(field: 'priority', label: 'Priority', value: $priority);
+            $mutations[] = new NormalizedMutation(
+                field:     'priority',
+                label:     'Priority',
+                value:     $priority,
+                operation: 'replace',
+            );
         }
 
         return $mutations;
     }
+
+    // ── Clear operations ─────────────────────────────────────────────────────
+
+    private function extractClearMutation(string $text): ?NormalizedMutation
+    {
+        $lower = mb_strtolower($text);
+
+        if (
+            str_contains($lower, 'remove priority') ||
+            str_contains($lower, 'clear priority')  ||
+            str_contains($lower, 'no priority')
+        ) {
+            return new NormalizedMutation(
+                field:     'priority',
+                label:     'Priority',
+                value:     null,
+                operation: 'clear',
+            );
+        }
+
+        return null;
+    }
+
+    // ── Replace extraction ───────────────────────────────────────────────────
 
     private function extractDate(string $text): ?string
     {

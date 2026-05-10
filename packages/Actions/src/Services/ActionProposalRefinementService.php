@@ -119,43 +119,66 @@ class ActionProposalRefinementService
             ->map(fn (array $f) => $f['value'])
             ->all();
 
-        // Apply field mutations (date, time, priority, …)
+        // Apply field mutations — dispatch on semantic operation
         $mutatedFieldKeys = [];
 
         foreach ($fieldMutations as $mutation) {
-            $field    = $mutation->field;
-            $label    = $mutation->label;
-            $newValue = $mutation->value;
+            $field     = $mutation->field;
+            $label     = $mutation->label;
             $prevValue = $currentFieldValues[$field] ?? null;
 
-            if (collect($editableFields)->contains('key', $field)) {
-                $editableFields = array_map(function (array $f) use ($field, $newValue, $mutation): array {
-                    if ($f['key'] === $field) {
-                        $f['value']  = $newValue;
-                        $f['source'] = $mutation->source;
-                    }
+            if ($mutation->operation === 'replace') {
+                $newValue = $mutation->value;
 
-                    return $f;
-                }, $editableFields);
-            } else {
-                $editableFields[] = [
-                    'key'      => $field,
-                    'label'    => $label,
-                    'value'    => $newValue,
-                    'source'   => $mutation->source,
-                    'required' => in_array($field, ['date', 'time'], true),
-                ];
-            }
+                if (collect($editableFields)->contains('key', $field)) {
+                    $editableFields = array_map(
+                        function (array $f) use ($field, $newValue, $mutation): array {
+                            if ($f['key'] === $field) {
+                                $f['value']  = $newValue;
+                                $f['source'] = $mutation->source;
+                            }
 
-            if ($prevValue !== $newValue) {
-                $changes[] = ['field' => $field, 'label' => $label, 'from' => $prevValue, 'to' => $newValue];
+                            return $f;
+                        },
+                        $editableFields
+                    );
+                } else {
+                    $editableFields[] = [
+                        'key'      => $field,
+                        'label'    => $label,
+                        'value'    => $newValue,
+                        'source'   => $mutation->source,
+                        'required' => in_array($field, ['date', 'time'], true),
+                    ];
+                }
+
+                if ($prevValue !== $newValue) {
+                    $changes[] = ['field' => $field, 'label' => $label, 'from' => $prevValue, 'to' => $newValue];
+                }
+
+                if (in_array($field, ['date', 'time'], true)) {
+                    $confidence = max($confidence, 0.85);
+                }
+
+            } elseif ($mutation->operation === 'clear') {
+                $editableFields = array_values(
+                    array_filter($editableFields, fn (array $f) => $f['key'] !== $field)
+                );
+
+                if ($prevValue !== null) {
+                    $changes[] = ['field' => $field, 'label' => $label, 'from' => $prevValue, 'to' => null];
+                }
+
+            } elseif ($mutation->operation === 'append') {
+                // 'append' operation is not yet implemented.
+                // This path is structurally reserved for future collection semantics
+                // (e.g. "Also invite Luca"). Do not silently swallow it.
+                throw new \RuntimeException(
+                    "Mutation operation 'append' is not yet supported. Field: {$field}."
+                );
             }
 
             $mutatedFieldKeys[] = $field;
-
-            if (in_array($field, ['date', 'time'], true)) {
-                $confidence = max($confidence, 0.85);
-            }
         }
 
         // Remove resolved field keys from missing
@@ -271,7 +294,7 @@ class ActionProposalRefinementService
         }
 
         if (in_array('priority', $dataFields, true)) {
-            return 'Priority set.';
+            return $byField->get('priority')['to'] === null ? 'Priority cleared.' : 'Priority set.';
         }
 
         return 'Proposal updated.';

@@ -576,7 +576,106 @@ class ProposalMutationIntelligenceTest extends TestCase
         $this->assertEquals('11:00', $timeChange['to']);
     }
 
-    // ── 12. Persistence assertions ───────────────────────────────────────────
+    // ── 12. Clear operation ───────────────────────────────────────────────────
+
+    private function readyScheduleCallProposalWithHighPriority(User $user): ActionProposal
+    {
+        return $this->readyScheduleCallProposal($user, [
+            'editable_fields' => [
+                ['key' => 'lead',     'label' => 'Lead',     'value' => 'Rossini',                      'source' => 'detected', 'required' => true],
+                ['key' => 'date',     'label' => 'Date',     'value' => now()->addDay()->toDateString(), 'source' => 'detected', 'required' => true],
+                ['key' => 'time',     'label' => 'Time',     'value' => '09:00',                         'source' => 'detected', 'required' => true],
+                ['key' => 'priority', 'label' => 'Priority', 'value' => 'high',                          'source' => 'detected', 'required' => false],
+            ],
+        ]);
+    }
+
+    public function test_remove_priority_clears_priority_from_editable_fields(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposalWithHighPriority($user);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Remove priority']);
+
+        $response->assertStatus(200);
+
+        $fieldKeys = collect($response->json('data.editable_fields'))->pluck('key')->all();
+        $this->assertNotContains('priority', $fieldKeys);
+    }
+
+    public function test_clear_priority_preserves_all_other_fields(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposalWithHighPriority($user);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Remove priority']);
+
+        $fields = collect($response->json('data.editable_fields'))->keyBy('key');
+        $this->assertEquals('Rossini', $fields['lead']['value']);
+        $this->assertEquals(now()->addDay()->toDateString(), $fields['date']['value']);
+        $this->assertEquals('09:00', $fields['time']['value']);
+    }
+
+    public function test_clear_priority_summary_says_priority_cleared(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposalWithHighPriority($user);
+
+        $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Remove priority'])
+            ->assertJsonPath('data.last_refinement.summary', 'Priority cleared.');
+    }
+
+    public function test_clear_priority_last_refinement_change_has_null_to(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposalWithHighPriority($user);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Remove priority']);
+
+        $change = collect($response->json('data.last_refinement.changes'))->firstWhere('field', 'priority');
+        $this->assertNotNull($change);
+        $this->assertEquals('high', $change['from']);
+        $this->assertNull($change['to']);
+    }
+
+    public function test_clear_priority_status_remains_ready(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposalWithHighPriority($user);
+
+        $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Remove priority'])
+            ->assertJsonPath('data.status', 'ready');
+    }
+
+    public function test_clear_on_absent_priority_produces_no_change_record(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposal($user); // no priority field
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Remove priority']);
+
+        // No previous value → no change record, summary is "No changes applied."
+        $response->assertStatus(200);
+        $this->assertEmpty($response->json('data.last_refinement.changes'));
+        $response->assertJsonPath('data.last_refinement.summary', 'No changes applied.');
+    }
+
+    public function test_clear_priority_is_persisted_to_database(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposalWithHighPriority($user);
+
+        $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Clear priority'])
+            ->assertStatus(200);
+
+        $proposal->refresh();
+
+        $fieldKeys = collect($proposal->editable_fields)->pluck('key')->all();
+        $this->assertNotContains('priority', $fieldKeys);
+        $this->assertEquals('Priority cleared.', $proposal->last_refinement['summary']);
+    }
+
+    // ── 13. Persistence assertions ───────────────────────────────────────────
 
     public function test_time_mutation_is_fully_persisted_to_database(): void
     {
