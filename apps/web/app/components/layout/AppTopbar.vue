@@ -34,7 +34,8 @@ const themeOptions: { value: ThemePreference; labelKey: string }[] = [
       </div>
 
       <template v-if="isAuthenticated">
-        <span v-if="user" class="text-xs text-[var(--color-text-muted)]">{{ user.email }}</span>
+        <!-- Hide email on small screens to avoid overflow -->
+        <span v-if="user" class="hidden text-xs text-[var(--color-text-muted)] md:inline">{{ user.email }}</span>
         <button
           type="button"
           class="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-xs text-[var(--color-muted)] transition-colors hover:border-[var(--color-border-subtle)] hover:text-[var(--color-text-muted)]"
@@ -64,5 +65,15 @@ const themeOptions: { value: ThemePreference; labelKey: string }[] = [
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+@media (max-width: 767px) {
+  .topbar {
+    padding: 0 0.875rem;
+  }
+
+  .topbar-right {
+    gap: 0.5rem;
+  }
 }
 </style>

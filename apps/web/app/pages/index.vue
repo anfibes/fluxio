@@ -67,9 +67,10 @@ async function handleResolveAmbiguity(text: string) {
   </div>
 
   <!-- ── Main UI ───────────────────────────────────────────── -->
-  <div v-else class="flex h-full">
-    <!-- Left column -->
-    <div class="flex flex-1 flex-col gap-5 overflow-y-auto px-6 py-6">
+  <!-- Mobile: single scrollable column. Desktop: side-by-side with internal scroll. -->
+  <div v-else class="flex flex-col overflow-y-auto lg:h-full lg:flex-row lg:overflow-hidden">
+    <!-- Workspace column -->
+    <div class="flex min-w-0 flex-col gap-5 px-4 py-5 lg:flex-1 lg:overflow-y-auto lg:px-6 lg:py-6">
       <CommandComposer
         ref="composerRef"
         v-model="commandText"
@@ -138,8 +139,9 @@ async function handleResolveAmbiguity(text: string) {
       </details>
     </div>
 
-    <!-- Right rail -->
-    <div class="flex w-110 shrink-0 flex-col overflow-hidden border-l border-border bg-surface">
+    <!-- Proposal rail: full-width below workspace on mobile, fixed-width sidebar on desktop. -->
+    <!-- min-h-[28rem] ensures h-full inside the rail resolves correctly on mobile. -->
+    <div class="flex min-h-[28rem] flex-col border-t border-border bg-surface lg:min-h-0 lg:w-110 lg:shrink-0 lg:border-l lg:border-t-0 lg:overflow-hidden">
       <div class="border-b border-border px-4 py-3">
         <p class="text-xs font-medium uppercase tracking-wide text-muted">
           {{ $t('proposal.title') }}

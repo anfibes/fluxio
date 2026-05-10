@@ -42,6 +42,12 @@
   flex-shrink: 0;
 }
 
+@media (max-width: 1023px) {
+  .sidebar {
+    display: none;
+  }
+}
+
 .sidebar-brand {
   display: flex;
   align-items: center;

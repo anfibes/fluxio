@@ -140,6 +140,17 @@ function handleKeydown(e: KeyboardEvent) {
   color: var(--color-muted);
 }
 
+@media (max-width: 767px) {
+  .composer-hint {
+    display: none;
+  }
+
+  .composer-btn {
+    min-height: 2.25rem;
+    padding: 0.375rem 1.125rem;
+  }
+}
+
 .loading-dot {
   width: 0.4375rem;
   height: 0.4375rem;

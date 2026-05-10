@@ -22,6 +22,7 @@
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-width: 0;
   overflow: hidden;
 }
 
