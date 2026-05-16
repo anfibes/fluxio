@@ -17,9 +17,23 @@ const confidenceColor = computed(() => {
   return 'text-red-400'
 })
 
-const entityEntries = computed(() =>
-  props.proposal ? Object.entries(props.proposal.entities) : [],
-)
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined) return '—'
+  if (Array.isArray(value)) return value.length ? value.join(', ') : '—'
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
+}
+
+const fieldEntries = computed(() => {
+  const fields = props.proposal?.editable_fields ?? []
+  if (fields.length) return fields
+  // Fallback: surface entities if editable_fields is unpopulated
+  return Object.entries(props.proposal?.entities ?? {}).map(([key, value]) => ({
+    key,
+    label: key,
+    value,
+  }))
+})
 </script>
 
 <template>
@@ -38,14 +52,14 @@ const entityEntries = computed(() =>
         </div>
       </div>
 
-      <div v-if="entityEntries.length" class="flex flex-wrap gap-1.5">
+      <div v-if="fieldEntries.length" class="flex flex-wrap gap-1.5">
         <span
-          v-for="[key, value] in entityEntries"
-          :key="key"
+          v-for="field in fieldEntries"
+          :key="field.key"
           class="flex items-center gap-1 rounded-md bg-surface-raised px-2 py-0.5 text-xs"
         >
-          <span class="text-muted">{{ key }}</span>
-          <span class="text-text-muted">{{ value }}</span>
+          <span class="text-muted">{{ field.label }}</span>
+          <span class="text-text-muted">{{ formatValue(field.value) }}</span>
         </span>
       </div>
 
