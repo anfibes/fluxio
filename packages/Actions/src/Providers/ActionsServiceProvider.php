@@ -15,7 +15,9 @@ use Fluxio\Actions\Executors\CreateTaskActionExecutor;
 use Fluxio\Actions\Executors\PrepareContractActionExecutor;
 use Fluxio\Actions\Executors\ScheduleCallActionExecutor;
 use Fluxio\Actions\Executors\ScheduleMeetingActionExecutor;
-use Fluxio\Actions\Interpreters\RuleBasedCommandInterpreter;
+use Fluxio\Actions\Interpretation\Contracts\InterpretationProviderInterface;
+use Fluxio\Actions\Interpretation\InterpretationProviderAdapter;
+use Fluxio\Actions\Interpretation\Providers\DeterministicInterpretationProvider;
 use Fluxio\Actions\Interpreters\RuleBasedRefinementInterpreter;
 use Fluxio\Actions\Registry\IntentRegistry;
 use Fluxio\Actions\Resolvers\RuleBasedIntentResolver;
@@ -114,11 +116,16 @@ class ActionsServiceProvider extends ServiceProvider
             return $registry;
         });
 
-        // Low-level resolver — still bound for direct consumers and for RuleBasedCommandInterpreter
+        // Low-level resolver — used by DeterministicInterpretationProvider and RuleBasedCommandInterpreter
         $this->app->bind(IntentResolverInterface::class, RuleBasedIntentResolver::class);
 
-        // Normalized interpretation boundaries
-        $this->app->bind(CommandInterpreterInterface::class, RuleBasedCommandInterpreter::class);
+        // Interpretation sandbox layer — provider is swappable; deterministic is the default
+        $this->app->bind(InterpretationProviderInterface::class, DeterministicInterpretationProvider::class);
+
+        // Adapter bridges InterpretationProviderInterface → CommandInterpreterInterface
+        // so ActionInterpreterService needs no changes when the provider is swapped
+        $this->app->bind(CommandInterpreterInterface::class, InterpretationProviderAdapter::class);
+
         $this->app->bind(RefinementInterpreterInterface::class, RuleBasedRefinementInterpreter::class);
     }
 

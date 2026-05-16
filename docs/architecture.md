@@ -594,6 +594,51 @@ Execution always requires explicit confirmation.
 
 ---
 
+# Interpretation Sandbox Layer
+
+Fluxio has an explicit provider abstraction for interpretation so the interpretation source is swappable without touching the proposal lifecycle.
+
+```text
+InterpretationProviderInterface
+  → NormalizedCommand
+  → ActionInterpreterService
+  → Entity Resolution
+  → Proposal Builder
+  → ActionProposalData
+```
+
+Structure:
+
+```text
+packages/Actions/src/Interpretation/
+  Contracts/InterpretationProviderInterface.php
+  DTO/InterpretationContext.php
+  Providers/DeterministicInterpretationProvider.php
+  Providers/FakeLlmInterpretationProvider.php
+  InterpretationProviderAdapter.php
+```
+
+`InterpretationProviderInterface`:
+```php
+public function interpret(string $text, InterpretationContext $context): NormalizedCommand;
+```
+
+`InterpretationContext` fields: `locale` (string, default `'en'`), `userId` (?int), `metadata` (array).
+
+`DeterministicInterpretationProvider` — default registered provider. Wraps the rule-based resolver. Deterministic, no external dependencies.
+
+`FakeLlmInterpretationProvider` — sandbox/test provider only. Accepts controlled `addResponse()` pairs. No API calls. Not registered as default. Validates that provider swapping works without touching the proposal lifecycle.
+
+`InterpretationProviderAdapter` — bridges `InterpretationProviderInterface` → `CommandInterpreterInterface` so `ActionInterpreterService` needs no changes when the provider is swapped.
+
+Architectural constraints:
+- Providers produce ONLY `NormalizedCommand`
+- Providers do NOT create proposals, resolve entities, decide status, build missing fields, or access executors
+- `ActionInterpreterService` remains the place where entity resolution, proposal building, and draft/ready decisions happen
+- Real LLM integration is intentionally not implemented
+
+---
+
 # Intent Requirements Model
 
 Each intent in the registry declares its requirements explicitly as `EntityRequirement` objects instead of plain string arrays.
