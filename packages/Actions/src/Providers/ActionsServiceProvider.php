@@ -5,9 +5,11 @@ namespace Fluxio\Actions\Providers;
 use Fluxio\Actions\Contracts\CommandInterpreterInterface;
 use Fluxio\Actions\Contracts\IntentResolverInterface;
 use Fluxio\Actions\Contracts\RefinementInterpreterInterface;
+use Fluxio\Actions\DTO\EntityRequirement;
 use Fluxio\Actions\DTO\IntentDefinition;
 use Fluxio\Actions\EntityResolution\Registry\EntityResolverRegistry;
 use Fluxio\Actions\EntityResolution\Resolvers\LeadEntityResolver;
+use Fluxio\Actions\Enums\IntentComplexity;
 use Fluxio\Actions\Executors\AssignLeadActionExecutor;
 use Fluxio\Actions\Executors\CreateTaskActionExecutor;
 use Fluxio\Actions\Executors\PrepareContractActionExecutor;
@@ -37,58 +39,76 @@ class ActionsServiceProvider extends ServiceProvider
             $registry = new IntentRegistry();
 
             $registry->register(new IntentDefinition(
-                intent:           'create_task',
-                label:            'Create Task',
-                module:           'tasks',
-                operation:        'create',
-                requiredEntities: [],
-                optionalEntities: ['lead', 'priority', 'due_at'],
-                executorClass:    CreateTaskActionExecutor::class,
-                confidence:       0.9,
+                intent:        'create_task',
+                label:         'Create Task',
+                module:        'tasks',
+                operation:     'create',
+                requirements:  [
+                    new EntityRequirement(key: 'lead',     entityType: 'lead_query',       label: 'Lead',     required: false, resolverRequired: true),
+                    new EntityRequirement(key: 'priority', entityType: 'scalar',            label: 'Priority', required: false),
+                    new EntityRequirement(key: 'due_at',   entityType: 'date_expression',   label: 'Due Date', required: false),
+                ],
+                executorClass: CreateTaskActionExecutor::class,
+                confidence:    0.9,
             ));
 
             $registry->register(new IntentDefinition(
-                intent:           'schedule_call',
-                label:            'Schedule Call',
-                module:           'calendar',
-                operation:        'schedule',
-                requiredEntities: ['lead', 'date', 'time'],
-                optionalEntities: ['participants', 'priority'],
-                executorClass:    ScheduleCallActionExecutor::class,
-                confidence:       0.7,
+                intent:        'schedule_call',
+                label:         'Schedule Call',
+                module:        'calendar',
+                operation:     'schedule',
+                requirements:  [
+                    new EntityRequirement(key: 'lead',         entityType: 'lead_query',        label: 'Lead',         required: true,  resolverRequired: true),
+                    new EntityRequirement(key: 'date',         entityType: 'date_expression',   label: 'Date',         required: true),
+                    new EntityRequirement(key: 'time',         entityType: 'time_expression',   label: 'Time',         required: true),
+                    new EntityRequirement(key: 'participants', entityType: 'participant_query',  label: 'Participants', required: false, cardinality: 'many'),
+                    new EntityRequirement(key: 'priority',     entityType: 'scalar',            label: 'Priority',     required: false),
+                ],
+                executorClass: ScheduleCallActionExecutor::class,
+                confidence:    0.7,
             ));
 
             $registry->register(new IntentDefinition(
-                intent:           'schedule_meeting',
-                label:            'Schedule Meeting',
-                module:           'calendar',
-                operation:        'schedule',
-                requiredEntities: ['lead', 'date', 'time'],
-                optionalEntities: ['participants', 'location'],
-                executorClass:    ScheduleMeetingActionExecutor::class,
-                confidence:       0.7,
+                intent:        'schedule_meeting',
+                label:         'Schedule Meeting',
+                module:        'calendar',
+                operation:     'schedule',
+                requirements:  [
+                    new EntityRequirement(key: 'lead',         entityType: 'lead_query',       label: 'Lead',         required: true,  resolverRequired: true),
+                    new EntityRequirement(key: 'date',         entityType: 'date_expression',  label: 'Date',         required: true),
+                    new EntityRequirement(key: 'time',         entityType: 'time_expression',  label: 'Time',         required: true),
+                    new EntityRequirement(key: 'participants', entityType: 'participant_query', label: 'Participants', required: false, cardinality: 'many'),
+                    new EntityRequirement(key: 'location',     entityType: 'scalar',           label: 'Location',     required: false),
+                ],
+                executorClass: ScheduleMeetingActionExecutor::class,
+                confidence:    0.7,
             ));
 
             $registry->register(new IntentDefinition(
-                intent:           'assign_lead',
-                label:            'Assign Lead',
-                module:           'leads',
-                operation:        'assign',
-                requiredEntities: ['lead', 'assignee'],
-                optionalEntities: [],
-                executorClass:    AssignLeadActionExecutor::class,
-                confidence:       0.8,
+                intent:        'assign_lead',
+                label:         'Assign Lead',
+                module:        'leads',
+                operation:     'assign',
+                requirements:  [
+                    new EntityRequirement(key: 'lead',     entityType: 'lead_query',  label: 'Lead',     required: true, resolverRequired: true),
+                    new EntityRequirement(key: 'assignee', entityType: 'user_query',  label: 'Assignee', required: true),
+                ],
+                executorClass: AssignLeadActionExecutor::class,
+                confidence:    0.8,
+                complexity:    IntentComplexity::Domain,
             ));
 
             $registry->register(new IntentDefinition(
-                intent:           'prepare_contract_from_quote',
-                label:            'Prepare Contract',
-                module:           'tasks',
-                operation:        'create',
-                requiredEntities: ['lead'],
-                optionalEntities: ['quote'],
-                executorClass:    PrepareContractActionExecutor::class,
-                confidence:       0.75,
+                intent:        'prepare_contract_from_quote',
+                label:         'Prepare Contract',
+                module:        'tasks',
+                operation:     'create',
+                requirements:  [
+                    new EntityRequirement(key: 'lead',  entityType: 'lead_query', label: 'Lead',  required: true,  resolverRequired: true),
+                    new EntityRequirement(key: 'quote', entityType: 'scalar',     label: 'Quote', required: false),
+                ],
+                executorClass: PrepareContractActionExecutor::class,
+                confidence:    0.75,
             ));
 
             return $registry;

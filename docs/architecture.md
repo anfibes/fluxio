@@ -594,6 +594,40 @@ Execution always requires explicit confirmation.
 
 ---
 
+# Intent Requirements Model
+
+Each intent in the registry declares its requirements explicitly as `EntityRequirement` objects instead of plain string arrays.
+
+`EntityRequirement` fields:
+- `key` — entity key used in proposal payload
+- `entityType` — semantic type (e.g. `lead_query`, `date_expression`, `participant_query`)
+- `label` — human-readable label used in missing/editable field payloads
+- `required` — whether absence blocks readiness
+- `cardinality` — `one` (default) or `many` for collection-type entities
+- `resolverRequired` — whether an EntityResolver must run before the builder
+
+`IntentComplexity` enum classifies intents:
+- `simple` — single-step, single-domain (most current intents)
+- `domain` — spans domain boundaries or requires cross-module resolution (e.g. `assign_lead`)
+- `workflow` — multi-step sequences (reserved, not yet implemented)
+
+`ConfirmationPolicy` enum controls confirmation requirements:
+- `required` — user must confirm before execution (current default for all intents)
+- `strong` — reserved for future high-impact operations
+- `optional` — reserved for future low-risk operations
+
+Helper methods on `IntentDefinition`:
+- `requiredRequirements()` — list of required `EntityRequirement` objects
+- `optionalRequirements()` — list of optional `EntityRequirement` objects
+- `requiredKeys()` — required entity key strings
+- `optionalKeys()` — optional entity key strings
+- `requirementKeys()` — all entity key strings
+- `findRequirement(string $key)` — lookup by key
+
+This model prepares the architecture for generic entity resolution orchestration without changing the current proposal lifecycle or frontend contract.
+
+---
+
 # Action Proposal Lifecycle
 
 Current lifecycle:

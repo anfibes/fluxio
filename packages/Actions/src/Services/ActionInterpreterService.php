@@ -210,47 +210,33 @@ class ActionInterpreterService
         // Keys already handled by pre-built ambiguities must not appear in missing.
         $ambiguousKeys = array_column($prebuiltAmbiguities, 'key');
 
-        foreach ($definition->requiredEntities as $key) {
-            $label = ucwords(str_replace('_', ' ', $key));
-
-            if (isset($entities[$key])) {
+        foreach ($definition->requirements as $req) {
+            if (isset($entities[$req->key])) {
                 $editableFields[] = new EditableField(
-                    key:      $key,
-                    label:    $label,
-                    value:    $entities[$key],
+                    key:      $req->key,
+                    label:    $req->label,
+                    value:    $entities[$req->key],
                     source:   'detected',
-                    required: true,
+                    required: $req->required,
                 );
-            } elseif (in_array($key, $ambiguousKeys, true)) {
+            } elseif ($req->required && in_array($req->key, $ambiguousKeys, true)) {
                 // Handled by a pre-built blocking ambiguity — skip missing and editable field.
-            } else {
+            } elseif ($req->required) {
                 $missing[] = new MissingField(
-                    key:      $key,
-                    label:    $label,
-                    reason:   "The command does not specify a {$label}.",
+                    key:      $req->key,
+                    label:    $req->label,
+                    reason:   "The command does not specify a {$req->label}.",
                     required: true,
                 );
                 $editableFields[] = new EditableField(
-                    key:      $key,
-                    label:    $label,
+                    key:      $req->key,
+                    label:    $req->label,
                     value:    null,
                     source:   'missing',
                     required: true,
                 );
             }
-        }
-
-        foreach ($definition->optionalEntities as $key) {
-            if (isset($entities[$key])) {
-                $label = ucwords(str_replace('_', ' ', $key));
-                $editableFields[] = new EditableField(
-                    key:      $key,
-                    label:    $label,
-                    value:    $entities[$key],
-                    source:   'detected',
-                    required: false,
-                );
-            }
+            // optional and not present — skip
         }
 
         $hasBlockingAmbiguity = collect($ambiguities)->contains(fn ($a) => $a['blocking'] ?? false);
