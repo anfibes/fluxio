@@ -19,7 +19,7 @@ class NormalizedRefinementInterpreterTest extends TestCase
     {
         parent::setUp();
         Carbon::setTestNow('2026-05-10 08:00:00');
-        $this->interpreter = new RuleBasedRefinementInterpreter();
+        $this->interpreter = $this->app->make(RuleBasedRefinementInterpreter::class);
     }
 
     protected function tearDown(): void

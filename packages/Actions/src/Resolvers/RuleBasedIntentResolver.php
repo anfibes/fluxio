@@ -2,12 +2,14 @@
 
 namespace Fluxio\Actions\Resolvers;
 
-use Carbon\Carbon;
 use Fluxio\Actions\Contracts\IntentResolverInterface;
 use Fluxio\Actions\DTO\ParsedIntent;
+use Fluxio\Actions\Support\DateTimeExpressionParser;
 
 class RuleBasedIntentResolver implements IntentResolverInterface
 {
+    public function __construct(private readonly DateTimeExpressionParser $parser) {}
+
     public function resolve(string $text): ParsedIntent
     {
         $lower = mb_strtolower($text);
@@ -36,34 +38,10 @@ class RuleBasedIntentResolver implements IntentResolverInterface
             }
         }
 
-        // Date extraction — mirrors RuleBasedRefinementInterpreter, applied at command time
-        // so that full commands like "Schedule a meeting with Rossini tomorrow at 4pm"
-        // produce a ready proposal without requiring a separate refinement step.
-        if (str_contains($lower, 'tomorrow')) {
-            $entities['date'] = now()->addDay()->toDateString();
-        } else {
-            foreach (['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as $day) {
-                if ((bool) preg_match('/\b' . $day . '\b/i', $lower)) {
-                    $entities['date'] = Carbon::parse('next ' . $day)->toDateString();
-                    break;
-                }
-            }
-        }
-
-        // Time extraction — same pattern as RuleBasedRefinementInterpreter
-        if ((bool) preg_match('/\bat\s+(\d{1,2})(?:[.:](\d{2}))?\s*(am|pm)?\b/i', $text, $m)) {
-            $hour = (int) $m[1];
-            $min  = isset($m[2]) && $m[2] !== '' ? (int) $m[2] : 0;
-            $ampm = mb_strtolower($m[3] ?? '');
-            if ($ampm === 'pm' && $hour < 12) {
-                $hour += 12;
-            }
-            if ($ampm === 'am' && $hour === 12) {
-                $hour = 0;
-            }
-            $entities['time'] = sprintf('%02d:%02d', $hour, $min);
-        } elseif ((bool) preg_match('/\bmorning\b/i', $text)) {
-            $entities['time'] = '09:00';
+        // Date/time extraction — delegated to shared parser so command and
+        // refinement paths remain consistent.
+        foreach ($this->parser->parse($text) as $key => $value) {
+            $entities[$key] = $value;
         }
 
         return new ParsedIntent($intent, $entities);

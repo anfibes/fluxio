@@ -2,12 +2,14 @@
 
 namespace Fluxio\Actions\Interpreters;
 
-use Carbon\Carbon;
 use Fluxio\Actions\Contracts\RefinementInterpreterInterface;
 use Fluxio\Actions\DTO\NormalizedMutation;
+use Fluxio\Actions\Support\DateTimeExpressionParser;
 
 class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
 {
+    public function __construct(private readonly DateTimeExpressionParser $parser) {}
+
     /**
      * Extract normalized mutations from a refinement text.
      *
@@ -44,22 +46,20 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
 
         $mutations = [];
 
-        $date = $this->extractDate($text);
-        if ($date !== null) {
+        $temporal = $this->parser->parse($text);
+        if (isset($temporal['date'])) {
             $mutations[] = new NormalizedMutation(
                 field:     'date',
                 label:     'Date',
-                value:     $date,
+                value:     $temporal['date'],
                 operation: 'replace',
             );
         }
-
-        $time = $this->extractTime($text);
-        if ($time !== null) {
+        if (isset($temporal['time'])) {
             $mutations[] = new NormalizedMutation(
                 field:     'time',
                 label:     'Time',
-                value:     $time,
+                value:     $temporal['time'],
                 operation: 'replace',
             );
         }
@@ -162,50 +162,6 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
     }
 
     // ── Replace extraction ───────────────────────────────────────────────────
-
-    private function extractDate(string $text): ?string
-    {
-        $lower = mb_strtolower(trim($text));
-
-        if (str_contains($lower, 'tomorrow')) {
-            return now()->addDay()->toDateString();
-        }
-
-        $days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-        foreach ($days as $day) {
-            if ((bool) preg_match('/\b' . $day . '\b/i', $lower)) {
-                return Carbon::parse('next ' . $day)->toDateString();
-            }
-        }
-
-        return null;
-    }
-
-    private function extractTime(string $text): ?string
-    {
-        // Explicit: "at 10:30", "at 10.30", "at 9", "at 9am", "at 9pm", "at 9:30am"
-        if ((bool) preg_match('/\bat\s+(\d{1,2})(?:[.:](\d{2}))?\s*(am|pm)?\b/i', $text, $m)) {
-            $hour = (int) $m[1];
-            $min  = isset($m[2]) && $m[2] !== '' ? (int) $m[2] : 0;
-            $ampm = mb_strtolower($m[3] ?? '');
-
-            if ($ampm === 'pm' && $hour < 12) {
-                $hour += 12;
-            }
-            if ($ampm === 'am' && $hour === 12) {
-                $hour = 0;
-            }
-
-            return sprintf('%02d:%02d', $hour, $min);
-        }
-
-        // Implicit: "morning" → 09:00
-        if ((bool) preg_match('/\bmorning\b/i', $text)) {
-            return '09:00';
-        }
-
-        return null;
-    }
 
     private function extractPriority(string $text): ?string
     {
