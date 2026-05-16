@@ -2,6 +2,7 @@
 
 namespace Fluxio\Core\Exceptions;
 
+use Fluxio\Actions\Exceptions\InvalidNormalizedCommandException;
 use Fluxio\Core\Http\Responses\ApiResponse;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -19,6 +20,12 @@ class ApiExceptionRenderer
         // AccessDeniedHttpException and ModelNotFoundException →
         // NotFoundHttpException before render callbacks run, so we match
         // those prepared types here.
+
+        $exceptions->render(function (InvalidNormalizedCommandException $e, Request $request) {
+            if ($request->expectsJson()) {
+                return ApiResponse::error('The interpretation provider returned an invalid response.', 422);
+            }
+        });
 
         $exceptions->render(function (ValidationException $e, Request $request) {
             if ($request->expectsJson()) {

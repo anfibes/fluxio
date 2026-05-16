@@ -123,7 +123,8 @@ class ActionsServiceProvider extends ServiceProvider
         $this->app->bind(InterpretationProviderInterface::class, DeterministicInterpretationProvider::class);
 
         // Adapter bridges InterpretationProviderInterface → CommandInterpreterInterface
-        // so ActionInterpreterService needs no changes when the provider is swapped
+        // so ActionInterpreterService needs no changes when the provider is swapped.
+        // NormalizedCommandValidator is auto-resolved (depends only on IntentRegistry singleton).
         $this->app->bind(CommandInterpreterInterface::class, InterpretationProviderAdapter::class);
 
         $this->app->bind(RefinementInterpreterInterface::class, RuleBasedRefinementInterpreter::class);

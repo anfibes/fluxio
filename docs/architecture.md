@@ -594,6 +594,48 @@ Execution always requires explicit confirmation.
 
 ---
 
+# NormalizedCommand Validation Layer
+
+Every `NormalizedCommand` produced by any provider is validated by `NormalizedCommandValidator` before it enters the proposal pipeline. This is a structural safety layer designed for future LLM provider integration.
+
+```text
+InterpretationProvider
+→ NormalizedCommand
+→ NormalizedCommandValidator
+→ ActionInterpreterService
+→ Entity Resolution
+→ Proposal Builder
+→ ActionProposalData
+```
+
+Structure:
+
+```text
+packages/Actions/src/Validation/
+  NormalizedCommandValidator.php
+  NormalizedCommandValidationResult.php
+packages/Actions/src/Exceptions/
+  InvalidNormalizedCommandException.php
+```
+
+Validation rules:
+1. **Intent** — must not be empty; must be registered in `IntentRegistry` or the `unknown` sentinel
+2. **Confidence** — must be in `[0.0, 1.0]`
+3. **Entity values** — must not be null or empty string
+4. **Entity key compatibility** — keys must match the intent's `EntityRequirement.key`, `EntityRequirement.entityType`, or the transitional `UNIVERSAL_PARSER_KEYS` allowlist (`date`, `time`)
+
+Invalid provider output throws `InvalidNormalizedCommandException` → 422 API response with a safe generic message (internal errors never exposed).
+
+Key distinction:
+- Invalid command structure → validator rejects → exception → 422
+- Missing required entity → structurally valid → proposal becomes draft
+
+Transitional compatibility: `date` and `time` are universal parser keys emitted by `DateTimeExpressionParser` for any intent. They are allowed regardless of the intent's specific requirement keys. This will be revisited when all intents declare explicit date/time field declarations.
+
+Future LLM providers must produce structurally valid `NormalizedCommand` objects to pass this layer.
+
+---
+
 # Interpretation Sandbox Layer
 
 Fluxio has an explicit provider abstraction for interpretation so the interpretation source is swappable without touching the proposal lifecycle.
