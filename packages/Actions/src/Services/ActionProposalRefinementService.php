@@ -127,7 +127,28 @@ class ActionProposalRefinementService
             $label     = $mutation->label;
             $prevValue = $currentFieldValues[$field] ?? null;
 
-            if ($mutation->operation === 'replace') {
+            if ($mutation->operation === 'replace' && $mutation->target !== null) {
+                // Collection replace: swap a specific item within an array field.
+                $current       = is_array($prevValue) ? $prevValue : [];
+                $newCollection = array_map(
+                    fn ($item) => $item === $mutation->target ? $mutation->value : $item,
+                    $current
+                );
+
+                if ($newCollection !== $current) {
+                    $editableFields = $this->upsertCollectionField($editableFields, $field, $label, $newCollection, $mutation->source);
+                    $changes[]      = [
+                        'field'     => $field,
+                        'label'     => $label,
+                        'operation' => 'replace',
+                        'target'    => $mutation->target,
+                        'from'      => $current,
+                        'to'        => $newCollection,
+                    ];
+                }
+
+            } elseif ($mutation->operation === 'replace') {
+                // Scalar replace: set or overwrite a scalar field value.
                 $newValue = $mutation->value;
 
                 if (collect($editableFields)->contains('key', $field)) {
@@ -170,12 +191,36 @@ class ActionProposalRefinementService
                 }
 
             } elseif ($mutation->operation === 'append') {
-                // 'append' operation is not yet implemented.
-                // This path is structurally reserved for future collection semantics
-                // (e.g. "Also invite Luca"). Do not silently swallow it.
-                throw new \RuntimeException(
-                    "Mutation operation 'append' is not yet supported. Field: {$field}."
-                );
+                // Append a value to a collection field (no duplicates).
+                $current = is_array($prevValue) ? $prevValue : ($prevValue !== null ? [$prevValue] : []);
+
+                if (! in_array($mutation->value, $current, true)) {
+                    $newCollection  = [...$current, $mutation->value];
+                    $editableFields = $this->upsertCollectionField($editableFields, $field, $label, $newCollection, $mutation->source);
+                    $changes[]      = [
+                        'field'     => $field,
+                        'label'     => $label,
+                        'operation' => 'append',
+                        'from'      => $current,
+                        'to'        => $newCollection,
+                    ];
+                }
+
+            } elseif ($mutation->operation === 'remove') {
+                // Remove a specific item from a collection field.
+                $current       = is_array($prevValue) ? $prevValue : [];
+                $newCollection = array_values(array_filter($current, fn ($item) => $item !== $mutation->target));
+
+                if (count($newCollection) !== count($current)) {
+                    $editableFields = $this->upsertCollectionField($editableFields, $field, $label, $newCollection, $mutation->source);
+                    $changes[]      = [
+                        'field'     => $field,
+                        'label'     => $label,
+                        'operation' => 'remove',
+                        'from'      => $current,
+                        'to'        => $newCollection,
+                    ];
+                }
             }
 
             $mutatedFieldKeys[] = $field;
@@ -260,6 +305,39 @@ class ActionProposalRefinementService
         return $proposal;
     }
 
+    /**
+     * Upsert an array value into editable_fields for collection mutations.
+     *
+     * @param array<int, array<string, mixed>> $editableFields
+     * @return array<int, array<string, mixed>>
+     */
+    private function upsertCollectionField(array $editableFields, string $field, string $label, array $value, string $source): array
+    {
+        if (collect($editableFields)->contains('key', $field)) {
+            return array_map(
+                function (array $f) use ($field, $value, $source): array {
+                    if ($f['key'] === $field) {
+                        $f['value']  = $value;
+                        $f['source'] = $source;
+                    }
+
+                    return $f;
+                },
+                $editableFields
+            );
+        }
+
+        $editableFields[] = [
+            'key'      => $field,
+            'label'    => $label,
+            'value'    => $value,
+            'source'   => $source,
+            'required' => false,
+        ];
+
+        return $editableFields;
+    }
+
     private function buildSummary(array $changes): string
     {
         if (empty($changes)) {
@@ -295,6 +373,23 @@ class ActionProposalRefinementService
 
         if (in_array('priority', $dataFields, true)) {
             return $byField->get('priority')['to'] === null ? 'Priority cleared.' : 'Priority set.';
+        }
+
+        if (in_array('participants', $dataFields, true)) {
+            $from      = $byField->get('participants')['from'] ?? [];
+            $to        = $byField->get('participants')['to'] ?? [];
+            $fromCount = is_array($from) ? count($from) : 0;
+            $toCount   = is_array($to)   ? count($to)   : 0;
+
+            if ($toCount > $fromCount) {
+                return 'Participant added.';
+            }
+
+            if ($toCount < $fromCount) {
+                return 'Participant removed.';
+            }
+
+            return 'Participants updated.';
         }
 
         return 'Proposal updated.';

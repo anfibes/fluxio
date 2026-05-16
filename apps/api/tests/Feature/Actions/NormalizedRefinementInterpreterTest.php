@@ -251,4 +251,111 @@ class NormalizedRefinementInterpreterTest extends TestCase
         $this->assertCount(1, $mutations);
         $this->assertEquals('clear', $mutations[0]->operation);
     }
+
+    // ── Proposal-local references ─────────────────────────────────────────────
+
+    public function test_move_it_to_friday_produces_date_mutation(): void
+    {
+        // "it" is a proposal-local pronoun; date extraction still works via weekday matching
+        $mutations = $this->interpreter->interpret('Move it to Friday');
+
+        $dateMutations = array_filter($mutations, fn ($m) => $m->field === 'date');
+        $this->assertCount(1, $dateMutations);
+        $this->assertEquals(Carbon::parse('next friday')->toDateString(), array_values($dateMutations)[0]->value);
+    }
+
+    public function test_move_it_to_friday_operation_is_replace(): void
+    {
+        $mutations = $this->interpreter->interpret('Move it to Friday');
+
+        $dateMutation = array_values(array_filter($mutations, fn ($m) => $m->field === 'date'))[0];
+        $this->assertEquals('replace', $dateMutation->operation);
+    }
+
+    // ── Collection append ─────────────────────────────────────────────────────
+
+    public function test_add_too_produces_append_mutation(): void
+    {
+        $mutations = $this->interpreter->interpret('Add Mario too');
+
+        $this->assertCount(1, $mutations);
+        $this->assertEquals('participants', $mutations[0]->field);
+        $this->assertEquals('Participants', $mutations[0]->label);
+        $this->assertEquals('append', $mutations[0]->operation);
+        $this->assertEquals('Mario', $mutations[0]->value);
+    }
+
+    public function test_also_add_produces_append_mutation(): void
+    {
+        $mutations = $this->interpreter->interpret('Also add Marco');
+
+        $this->assertCount(1, $mutations);
+        $this->assertEquals('participants', $mutations[0]->field);
+        $this->assertEquals('append', $mutations[0]->operation);
+        $this->assertEquals('Marco', $mutations[0]->value);
+    }
+
+    public function test_append_mutation_target_is_null(): void
+    {
+        $mutations = $this->interpreter->interpret('Add Mario too');
+
+        $this->assertNull($mutations[0]->target);
+    }
+
+    // ── Collection remove ─────────────────────────────────────────────────────
+
+    public function test_remove_name_produces_remove_mutation(): void
+    {
+        $mutations = $this->interpreter->interpret('Remove Marco');
+
+        $this->assertCount(1, $mutations);
+        $this->assertEquals('participants', $mutations[0]->field);
+        $this->assertEquals('remove', $mutations[0]->operation);
+        $this->assertNull($mutations[0]->value);
+    }
+
+    public function test_remove_name_sets_target(): void
+    {
+        $mutations = $this->interpreter->interpret('Remove Marco');
+
+        $this->assertEquals('Marco', $mutations[0]->target);
+    }
+
+    public function test_remove_priority_still_produces_clear_not_remove(): void
+    {
+        // Regression: "Remove priority" must remain a clear on priority, not remove on participants
+        $mutations = $this->interpreter->interpret('Remove priority');
+
+        $this->assertCount(1, $mutations);
+        $this->assertEquals('priority', $mutations[0]->field);
+        $this->assertEquals('clear', $mutations[0]->operation);
+    }
+
+    // ── Collection replace ────────────────────────────────────────────────────
+
+    public function test_replace_x_with_y_produces_replace_mutation(): void
+    {
+        $mutations = $this->interpreter->interpret('Replace Luca with Marco');
+
+        $this->assertCount(1, $mutations);
+        $this->assertEquals('participants', $mutations[0]->field);
+        $this->assertEquals('replace', $mutations[0]->operation);
+        $this->assertEquals('Marco', $mutations[0]->value);
+    }
+
+    public function test_replace_x_with_y_sets_target(): void
+    {
+        $mutations = $this->interpreter->interpret('Replace Luca with Marco');
+
+        $this->assertEquals('Luca', $mutations[0]->target);
+    }
+
+    public function test_replace_multiword_names_with(): void
+    {
+        $mutations = $this->interpreter->interpret('Replace Luca Bianchi with Marco Rossi');
+
+        $this->assertCount(1, $mutations);
+        $this->assertEquals('Luca Bianchi', $mutations[0]->target);
+        $this->assertEquals('Marco Rossi', $mutations[0]->value);
+    }
 }

@@ -677,6 +677,225 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     // ── 13. Persistence assertions ───────────────────────────────────────────
 
+    // ── 14. Contextual mutation semantics ────────────────────────────────────
+
+    private function readyScheduleCallProposalWithParticipants(User $user, array $participants = ['Luca', 'Marco']): ActionProposal
+    {
+        return $this->readyScheduleCallProposal($user, [
+            'editable_fields' => [
+                ['key' => 'lead',         'label' => 'Lead',         'value' => 'Rossini',                      'source' => 'detected', 'required' => true],
+                ['key' => 'date',         'label' => 'Date',         'value' => now()->addDay()->toDateString(), 'source' => 'detected', 'required' => true],
+                ['key' => 'time',         'label' => 'Time',         'value' => '09:00',                        'source' => 'detected', 'required' => true],
+                ['key' => 'participants', 'label' => 'Participants', 'value' => $participants,                  'source' => 'detected', 'required' => false],
+            ],
+        ]);
+    }
+
+    public function test_move_it_to_friday_changes_date_preserves_other_fields(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposal($user);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Move it to Friday']);
+
+        $response->assertStatus(200);
+
+        $fields = collect($response->json('data.editable_fields'))->keyBy('key');
+        $this->assertEquals(\Carbon\Carbon::parse('next friday')->toDateString(), $fields['date']['value']);
+        $this->assertEquals('09:00', $fields['time']['value']);   // time preserved
+        $this->assertEquals('Rossini', $fields['lead']['value']); // lead preserved
+    }
+
+    public function test_move_it_to_friday_last_refinement_contains_only_date_change(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposal($user);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Move it to Friday']);
+
+        $changeFields = collect($response->json('data.last_refinement.changes'))->pluck('field')->all();
+        $this->assertContains('date', $changeFields);
+        $this->assertNotContains('time', $changeFields);
+        $this->assertNotContains('lead', $changeFields);
+    }
+
+    public function test_add_participant_appends_to_participants_list(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca']);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Mario too']);
+
+        $response->assertStatus(200);
+
+        $fields = collect($response->json('data.editable_fields'))->keyBy('key');
+        $this->assertEquals(['Luca', 'Mario'], $fields['participants']['value']);
+    }
+
+    public function test_add_participant_summary_says_participant_added(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca']);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Mario too']);
+
+        $response->assertJsonPath('data.last_refinement.summary', 'Participant added.');
+    }
+
+    public function test_add_participant_change_record_shows_from_and_to_arrays(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca']);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Mario too']);
+
+        $change = collect($response->json('data.last_refinement.changes'))->firstWhere('field', 'participants');
+        $this->assertNotNull($change);
+        $this->assertEquals(['Luca'], $change['from']);
+        $this->assertEquals(['Luca', 'Mario'], $change['to']);
+        $this->assertEquals('append', $change['operation']);
+    }
+
+    public function test_add_existing_participant_is_idempotent(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca']);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Luca too']);
+
+        $response->assertStatus(200);
+        $this->assertEmpty($response->json('data.last_refinement.changes'));
+        $response->assertJsonPath('data.last_refinement.summary', 'No changes applied.');
+
+        $fields = collect($response->json('data.editable_fields'))->keyBy('key');
+        $this->assertEquals(['Luca'], $fields['participants']['value']); // unchanged
+    }
+
+    public function test_remove_participant_removes_from_list(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca', 'Marco']);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Remove Marco']);
+
+        $response->assertStatus(200);
+
+        $fields = collect($response->json('data.editable_fields'))->keyBy('key');
+        $this->assertEquals(['Luca'], $fields['participants']['value']);
+    }
+
+    public function test_remove_participant_summary_says_participant_removed(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca', 'Marco']);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Remove Marco']);
+
+        $response->assertJsonPath('data.last_refinement.summary', 'Participant removed.');
+    }
+
+    public function test_remove_participant_change_record_shows_from_and_to_arrays(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca', 'Marco']);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Remove Marco']);
+
+        $change = collect($response->json('data.last_refinement.changes'))->firstWhere('field', 'participants');
+        $this->assertNotNull($change);
+        $this->assertEquals(['Luca', 'Marco'], $change['from']);
+        $this->assertEquals(['Luca'], $change['to']);
+        $this->assertEquals('remove', $change['operation']);
+    }
+
+    public function test_remove_nonexistent_participant_produces_no_change(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca', 'Marco']);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Remove Giovanni']);
+
+        $response->assertStatus(200);
+        $this->assertEmpty($response->json('data.last_refinement.changes'));
+        $response->assertJsonPath('data.last_refinement.summary', 'No changes applied.');
+    }
+
+    public function test_replace_participant_replaces_specific_item(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca', 'Marco']);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Replace Luca with Giovanni']);
+
+        $response->assertStatus(200);
+
+        $fields = collect($response->json('data.editable_fields'))->keyBy('key');
+        $this->assertEquals(['Giovanni', 'Marco'], $fields['participants']['value']);
+    }
+
+    public function test_replace_participant_summary_says_participants_updated(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca', 'Marco']);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Replace Luca with Giovanni']);
+
+        $response->assertJsonPath('data.last_refinement.summary', 'Participants updated.');
+    }
+
+    public function test_replace_participant_change_record_shows_target(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca', 'Marco']);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Replace Luca with Giovanni']);
+
+        $change = collect($response->json('data.last_refinement.changes'))->firstWhere('field', 'participants');
+        $this->assertNotNull($change);
+        $this->assertEquals('Luca', $change['target']);
+        $this->assertEquals(['Luca', 'Marco'], $change['from']);
+        $this->assertEquals(['Giovanni', 'Marco'], $change['to']);
+    }
+
+    public function test_collection_mutation_preserves_unrelated_scalar_fields(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca']);
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Mario too']);
+
+        $fields = collect($response->json('data.editable_fields'))->keyBy('key');
+        $this->assertEquals('Rossini', $fields['lead']['value']);
+        $this->assertEquals(now()->addDay()->toDateString(), $fields['date']['value']);
+        $this->assertEquals('09:00', $fields['time']['value']);
+    }
+
+    public function test_collection_mutation_status_remains_ready(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca']);
+
+        $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Mario too'])
+            ->assertJsonPath('data.status', 'ready');
+    }
+
+    public function test_add_participant_is_persisted_to_database(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca']);
+
+        $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Mario too'])
+            ->assertStatus(200);
+
+        $proposal->refresh();
+
+        $fields = collect($proposal->editable_fields)->keyBy('key');
+        $this->assertEquals(['Luca', 'Mario'], $fields['participants']['value']);
+        $this->assertEquals('Participant added.', $proposal->last_refinement['summary']);
+    }
+
+
+
     public function test_time_mutation_is_fully_persisted_to_database(): void
     {
         $user     = $this->actingAsUser();
