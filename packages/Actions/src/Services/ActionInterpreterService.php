@@ -38,7 +38,7 @@ class ActionInterpreterService
         }
 
         [$status, $missing, $editableFields, $changes, $ambiguities] = match ($command->intent) {
-            'create_task'   => $this->buildCreateTask($entities),
+            'create_task'   => $this->buildCreateTask($entities, $prebuiltAmbiguities),
             'schedule_call' => $this->buildScheduleCall($entities, $prebuiltAmbiguities),
             default         => $definition !== null
                 ? $this->buildFromDefinition($definition, $entities, $prebuiltAmbiguities)
@@ -101,10 +101,11 @@ class ActionInterpreterService
 
     // ── Intent builders ──────────────────────────────────────────────────────
 
-    private function buildCreateTask(array $entities): array
+    private function buildCreateTask(array $entities, array $prebuiltAmbiguities = []): array
     {
-        $hasLead = isset($entities['lead']);
-        $status  = $hasLead ? 'ready' : 'draft';
+        $hasLead              = isset($entities['lead']);
+        $hasBlockingAmbiguity = collect($prebuiltAmbiguities)->contains(fn ($a) => $a['blocking'] ?? false);
+        $status               = $hasBlockingAmbiguity ? 'draft' : 'ready';
 
         $editableFields = [
             new EditableField(
@@ -122,7 +123,7 @@ class ActionInterpreterService
                 label:    'Lead',
                 value:    $entities['lead'],
                 source:   'detected',
-                required: true,
+                required: false,
             );
         }
 
@@ -140,7 +141,7 @@ class ActionInterpreterService
             ),
         ];
 
-        return [$status, [], $editableFields, $changes, []];
+        return [$status, [], $editableFields, $changes, $prebuiltAmbiguities];
     }
 
     private function buildScheduleCall(array $entities, array $prebuiltAmbiguities = []): array

@@ -125,7 +125,7 @@ class InterpretActionTest extends TestCase
         $this->assertEquals('tasks', $changes[0]['module']);
     }
 
-    public function test_create_task_without_lead_returns_draft_proposal(): void
+    public function test_create_task_without_lead_returns_ready_proposal(): void
     {
         $this->actingAsUser();
 
@@ -135,7 +135,66 @@ class InterpretActionTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonPath('data.intent', 'create_task')
+            ->assertJsonPath('data.status', 'ready');
+    }
+
+    public function test_create_task_without_lead_has_no_missing_fields(): void
+    {
+        $this->actingAsUser();
+
+        $response = $this->postJson('/api/actions/interpret', [
+            'text' => 'Create a task for tomorrow',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertEmpty($response->json('data.missing'));
+
+        $missingKeys = collect($response->json('data.missing'))->pluck('key')->all();
+        $this->assertNotContains('lead', $missingKeys);
+    }
+
+    public function test_create_task_lead_is_optional_in_editable_field(): void
+    {
+        $this->actingAsUser();
+
+        $response = $this->postJson('/api/actions/interpret', [
+            'text' => 'Create a task for Rossini',
+        ]);
+
+        $leadField = collect($response->json('data.editable_fields'))->firstWhere('key', 'lead');
+        $this->assertNotNull($leadField);
+        $this->assertFalse($leadField['required']);
+    }
+
+    public function test_create_task_with_ambiguous_lead_is_draft(): void
+    {
+        $this->actingAsUser();
+
+        // "Rossi" matches multiple leads — blocking ambiguity should keep proposal draft
+        $response = $this->postJson('/api/actions/interpret', [
+            'text' => 'Create a task for Rossi',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.intent', 'create_task')
             ->assertJsonPath('data.status', 'draft');
+
+        $ambiguities = $response->json('data.ambiguities');
+        $this->assertNotEmpty($ambiguities);
+        $this->assertEquals('lead', $ambiguities[0]['key']);
+        $this->assertTrue($ambiguities[0]['blocking']);
+    }
+
+    public function test_create_task_with_ambiguous_lead_has_no_lead_in_missing(): void
+    {
+        $this->actingAsUser();
+
+        $response = $this->postJson('/api/actions/interpret', [
+            'text' => 'Create a task for Rossi',
+        ]);
+
+        $missingKeys = collect($response->json('data.missing'))->pluck('key')->all();
+        $this->assertNotContains('lead', $missingKeys);
     }
 
     // --- schedule_call intent ---
