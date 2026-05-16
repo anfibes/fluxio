@@ -4,180 +4,200 @@
 
 # Purpose
 
-Fluxio is an open-source CRM/ERP prototype focused on proposal-driven business operations.
+Fluxio is an open-source CRM/ERP prototype exploring:
 
-The project explores how enterprise software can evolve from:
-- forms
-- dashboards
-- manual workflows
-
-toward:
-- natural-language intent
-- structured action proposals
-- controlled refinement
-- validation-first execution
-- explainable operational AI
-
-Fluxio is intentionally:
-- architecture-first
-- proposal-centric
-- deterministic-first
-- operational
-
-The core idea is simple:
-
-```text
-Natural language should never directly execute business actions.
+```text id="gij7a7"
+proposal-driven enterprise software
 ```
 
-Every operation must pass through a structured proposal lifecycle.
+Core hypothesis:
+
+```text id="r2d1xz"
+Business systems can evolve from CRUD-first workflows
+toward validated Action Proposal workflows.
+```
+
+Fluxio focuses on:
+- controlled operational AI
+- deterministic execution
+- proposal continuity
+- ambiguity-aware workflows
+- explainable business interaction
+
+The project is intentionally:
+- architecture-first
+- proposal-centric
+- operational
+- deterministic-first
+- refinement-oriented
+
+Fluxio is intentionally NOT:
+- a generic chatbot
+- an autonomous agent framework
+- dashboard-heavy ERP software
+- prompt-wrapper infrastructure
+
+---
+
+# Architectural Invariants
+
+These rules should never be violated.
+
+- Natural language never executes business operations directly
+- Proposal execution always requires explicit confirmation
+- Refinements mutate existing proposals
+- Proposal IDs remain stable across refinements
+- Ambiguities remain explicit
+- Proposal lifecycle remains deterministic
+- AI never bypasses validation or execution control
+- Proposal state remains explainable and inspectable
+
+These invariants are foundational to Fluxio’s architecture.
 
 ---
 
 # Core Interaction Model
 
-Fluxio follows this flow:
+Fluxio follows this operational flow:
 
-```text
-Natural language input
-→ Intent resolution
+```text id="w8q73g"
+Natural language
+→ Intent interpretation
 → Entity extraction
+→ Entity resolution
 → Action Proposal
-→ Proposal refinement
 → Validation
-→ User confirmation
+→ Proposal refinement
+→ Confirmation
 → Execution
 ```
 
-Natural language only:
-- creates proposals
-- refines proposals
-- resolves ambiguities
-- improves confidence
+Natural language is used ONLY to:
+- create proposals
+- refine proposals
+- resolve ambiguity
+- improve confidence
+- mutate proposal state
 
-Execution always requires:
-- validation
-- explicit confirmation
-- deterministic orchestration
+Execution always remains:
+- validated
+- explicit
+- deterministic
+- controlled
 
 The proposal is the central architectural object.
 
 ---
 
-# Proposal-Driven Architecture
+# Controlled Operational Intelligence
 
-Fluxio is NOT:
-- a generic chatbot
-- an autonomous agent framework
-- a CRUD-heavy ERP
-- a dashboard-first system
-
-Fluxio is:
-- proposal-centric
-- operational
-- explainable
-- controlled
-- refinement-oriented
-
-Conversation exists only to improve proposals.
-
-The system intentionally avoids:
-- assistant prose
-- conversational clutter
-- infinite timelines
-- hidden automation
-- fake certainty
-
----
-
-# Deterministic Operational AI
-
-Fluxio follows a deterministic-first AI strategy.
+Fluxio follows a deterministic-first operational AI strategy.
 
 The system must:
 - expose uncertainty
-- preserve explainability
-- avoid hallucinated confidence
-- maintain operational trust
+- preserve operational trust
+- maintain explainability
+- avoid hallucinated certainty
+- keep execution explicit
 
-Core principles:
-- proposals are structured
-- ambiguities are explicit
-- confidence is visible
-- execution is controlled
-- proposal continuity is preserved
+Current architecture validates:
+- proposal continuity
+- refinement semantics
+- ambiguity-aware workflows
+- controlled execution
+- proposal mutation intelligence
+
+WITHOUT requiring LLM infrastructure.
+
+LLMs are optional interpretation assistants, not operational authorities.
+
+---
+
+# Proposal Intelligence Architecture
+
+Fluxio is evolving toward:
+
+```text id="0kzy48"
+Proposal Mutation Intelligence
+```
+
+The system must understand:
+- what changed
+- which fields mutated
+- what remains unchanged
+- whether readiness changed
+- whether ambiguity changed
+
+Current supported refinement behaviors:
+- add information
+- replace information
+- correct information
+- resolve ambiguity
+- fill missing fields
+- mutate collections
+
+Examples:
+
+```text id="5r2m2n"
+Tomorrow morning
+At 10:30
+Friday instead
+High priority
+Add Mario too
+Replace Luca with Marco
+```
+
+Current mutation operations:
+- replace
+- append
+- remove
+- clear
+- replace + target
+
+Key principle:
+
+```text id="j04wdm"
+Proposal continuity alone is not enough.
+Fluxio also requires proposal mutation semantics.
+```
 
 ---
 
 # Proposal Continuity
 
-Fluxio supports stateful proposal continuity.
-
-Refinement updates the SAME proposal instead of creating disconnected conversational steps.
+Refinement updates the SAME proposal instead of creating disconnected conversational state.
 
 Example:
 
-```text
+```text id="svcb68"
 Schedule a call with Rossini
 ```
 
-System:
-- creates draft proposal
-- detects missing information
+Refinement:
 
-User refinement:
-
-```text
+```text id="yywv1j"
 Tomorrow morning
 ```
 
 Expected behavior:
-- refine existing proposal
-- improve confidence
-- reduce missing fields
 - preserve proposal identity
+- improve readiness
+- preserve existing operational state
+- mutate only affected fields
 
-Proposal continuity is one of Fluxio’s main architectural differentiators.
+The system intentionally avoids:
+- conversational timelines
+- hidden memory
+- assistant-style statefulness
+- opaque AI reasoning
 
----
-
-# Proposal Mutation Transparency
-
-Fluxio intentionally exposes proposal mutations.
-
-The UI should clearly communicate:
-- what changed
-- why it changed
-- how confidence evolved
-- what still blocks execution
-
-Example:
-
-```text
-Last update
-"Tomorrow morning"
-
-Date → 2026-05-10
-Time → 09:00
-Status → ready
-```
-
-This interaction model is intentionally:
-- compact
-- operational
-- deterministic
-- explainable
-
-NOT:
-- conversational
-- assistant-oriented
-- chat-driven
+Conversation exists ONLY to improve proposals.
 
 ---
 
 # Ambiguity Resolution
 
-Fluxio treats ambiguity as a first-class operational concept.
+Ambiguity is treated as structured operational state.
 
 The system must NEVER:
 - silently choose entities
@@ -186,7 +206,7 @@ The system must NEVER:
 
 Example:
 
-```text
+```text id="a6b44u"
 Call Rossi
 ```
 
@@ -205,25 +225,65 @@ Ambiguity is part of the proposal lifecycle.
 
 ---
 
+# Entity Resolution Architecture
+
+Fluxio is evolving toward a dedicated:
+
+```text id="9w7n6h"
+Entity Resolution Layer
+```
+
+Goal:
+Separate:
+- intent interpretation
+- entity extraction
+- entity resolution
+
+Target architecture:
+- `EntityResolverInterface`
+- resolver registry
+- domain-specific resolvers
+- deterministic candidate scoring
+
+Planned resolvers:
+- LeadResolver
+- UserResolver
+- ProductResolver
+- CalendarParticipantResolver
+
+Current direction:
+- deterministic
+- explainable
+- repository-backed
+- multilingual-ready
+
+Future-ready for:
+- semantic search
+- hybrid AI assistance
+- local inference
+- vector search
+
+---
+
 # Modular Monolith
 
 Fluxio is designed as a modular monolith.
 
 Principle:
 
-```text
+```text id="ed8y79"
 Modularize first, microservice later.
 ```
 
 Goals:
+- explicit boundaries
 - simple deployment
-- explicit internal boundaries
 - isolated domains
 - future extraction capability
 
 Current structure:
 
-```text
+```text id="xf8yr0"
 fluxio/
   apps/
     api/
@@ -243,52 +303,57 @@ fluxio/
 Each module owns:
 - models
 - services
+- DTOs
 - actions
 - migrations
 - routes
-- events
-- listeners
 - translations
 - business rules
+
+Avoid architectural noise.
 
 ---
 
 # Applications
 
-## apps/api
+---
+
+# apps/api
 
 Laravel backend application.
 
 Responsibilities:
-- expose APIs
-- orchestrate modules
-- handle authentication
-- manage proposal lifecycle
-- execute validated actions
-- expose standardized responses
+- API exposure
+- proposal orchestration
+- authentication
+- proposal lifecycle
+- refinement orchestration
+- ambiguity handling
+- execution workflows
+- standardized responses
 
 Controllers must remain thin.
 
 Business logic belongs in:
 - services
-- actions
+- action classes
 - jobs
-- domain classes
+- orchestration classes
 
 ---
 
-## apps/web
+# apps/web
 
 Nuxt frontend application.
 
 Responsibilities:
 - command-first UX
 - proposal rendering
-- refinement workflows
-- ambiguity resolution UX
+- ambiguity workflows
 - mutation visibility
-- execution visualization
-- confidence rendering
+- refinement continuity
+- confidence visualization
+- execution rendering
 - operational interaction flow
 
 The frontend is intentionally:
@@ -300,26 +365,26 @@ NOT dashboard-first.
 
 ---
 
-# Frontend Architecture & UX Principles
-
-## UX Direction
+# Frontend UX Direction
 
 The UI should feel like:
-- a business copilot
-- a structured operational workspace
-- a controlled execution environment
 
-NOT:
-- a chatbot
-- a consumer AI tool
-- a traditional ERP
+```text id="o1m5h9"
+Operational Copilot UX
+```
+
+The interface intentionally avoids:
+- assistant bubbles
+- infinite chat timelines
+- verbose AI prose
+- conversational clutter
 
 Current visual direction:
 - dark enterprise SaaS
-- compact typography
+- compact operational spacing
 - restrained motion
 - minimal chrome
-- proposal-focused layout
+- proposal-first composition
 
 Inspirations:
 - Linear
@@ -328,12 +393,12 @@ Inspirations:
 
 ---
 
-## State Management
+# Frontend Architecture
 
-Frontend principles:
+Core principles:
 - composables orchestrate logic
-- visual components remain presentational
-- API calls stay outside components
+- components remain presentational
+- API calls stay outside UI components
 - proposal lifecycle remains centralized
 - avoid premature global stores
 
@@ -343,13 +408,9 @@ Current orchestration composables:
 - `useActionProposal()`
 - `useTheme()`
 
----
-
-## Proposal Orchestration
-
 Current frontend flow:
 
-```text
+```text id="yr9wnk"
 Command input
 → Interpret
 → Proposal
@@ -359,41 +420,11 @@ Command input
 → Execution Result
 ```
 
-Current `useActionProposal()` responsibilities:
-- interpret proposals
-- refine proposals
-- resolve ambiguities
-- confirm proposals
-- execute proposals
-- preserve proposal continuity
-- centralize proposal lifecycle state
-
----
-
-## Current Frontend Milestones
-
-Implemented:
-- proposal rail
-- refinement rendering
-- ambiguity rendering
-- mutation visibility
-- confidence UX
-- contextual placeholders
-- operational reset flow
-- responsive mobile shell
-- dark/light/system theme support
-
-Current UX direction:
-- operational
-- compact
-- mobile-capable
-- proposal-driven
-
 ---
 
 # Current Frontend Components
 
-```text
+```text id="3i9goz"
 layout/
   AppSidebar
   AppTopbar
@@ -417,22 +448,20 @@ context/
   ContextTabs
 ```
 
-The proposal rail is the central UI object.
-
-It acts as:
+`ActionProposalRail` acts as:
 - proposal inspector
-- lifecycle viewer
 - ambiguity resolver
-- mutation summary
-- operational truth surface
+- mutation viewer
+- lifecycle surface
+- operational truth panel
 
 ---
 
 # Package Structure
 
-Typical module structure:
+Typical package structure:
 
-```text
+```text id="h26cxn"
 src/
   Http/
     Controllers/
@@ -455,22 +484,22 @@ lang/
 
 Folders should only exist when needed.
 
-Avoid architectural noise.
-
 ---
 
 # Modules
 
-## Core
+---
+
+# Core
 
 Shared infrastructure.
 
 Responsibilities:
-- base API controller
-- response standard
+- API response standard
 - exception rendering
 - shared contracts
 - shared helpers
+- base API controller
 
 The Core module must remain:
 - stable
@@ -479,7 +508,7 @@ The Core module must remain:
 
 ---
 
-## Identity
+# Identity
 
 Authentication and user identity.
 
@@ -496,23 +525,24 @@ Planned:
 
 ---
 
-## Leads
+# Leads
 
-Basic CRM lead management.
+CRM lead management.
 
 Implemented:
 - CRUD
-- pagination
 - filtering
+- pagination
 - search
 
-Future:
-- proposal integration
-- ambiguity-aware entity workflows
+Future direction:
+- entity resolution
+- proposal-aware lead workflows
+- ambiguity-aware CRM interaction
 
 ---
 
-## Tasks
+# Tasks
 
 Execution-oriented work items.
 
@@ -522,42 +552,42 @@ Implemented:
 - lead relation
 - protected endpoints
 
-Tasks are currently the primary executable domain used by the Actions module.
+Tasks currently represent the primary executable operational domain.
 
 ---
 
-## Actions
+# Actions
 
-The most distinctive Fluxio module.
+The central Fluxio module.
 
 Responsibilities:
-- parse natural language
-- detect intent
-- extract entities
-- calculate confidence
-- detect ambiguities
-- detect missing information
-- create proposals
-- refine proposals
-- preserve continuity
-- track mutations
-- validate lifecycle transitions
-- execute confirmed actions
+- intent interpretation
+- entity extraction
+- confidence calculation
+- ambiguity handling
+- proposal creation
+- proposal refinement
+- proposal continuity
+- mutation tracking
+- lifecycle orchestration
+- execution orchestration
 
 Implemented:
-- rule-based intent resolver
+- intent registry
 - proposal persistence
-- refinement flow
-- ambiguity structure
-- mutation tracking
-- confirmation flow
-- execution flow
-- idempotent execution
+- refinement semantics
+- contextual mutations
+- ambiguity structures
+- collection mutations
+- execution idempotency
+- shared temporal parser
 
 Current intents:
 - `create_task`
 - `schedule_call`
-- `unknown`
+- `schedule_meeting`
+- `assign_lead`
+- `prepare_contract_from_quote`
 
 Execution always requires explicit confirmation.
 
@@ -567,80 +597,47 @@ Execution always requires explicit confirmation.
 
 Current lifecycle:
 
-```text
+```text id="4mk9z4"
 draft
 → ready
 → confirmed
 → executed / failed
 ```
 
-Meaning:
-- `draft`
-  incomplete proposal
-
-- `ready`
-  valid and confirmable proposal
-
-- `confirmed`
-  approved proposal awaiting execution
-
-- `executed`
-  successful execution
-
-- `failed`
-  execution failure
-
 Rules:
 - refinement does NOT create new proposals
 - proposal IDs remain stable
-- ready proposals may still be refined
-- execution must remain explicit
+- ambiguities may block readiness
+- ready proposals may still mutate
+- execution remains explicit
+- execution remains idempotent
 
 ---
 
 # Action Proposal Contract
 
-The `ActionProposal` is the central contract between:
+The `ActionProposal` is the central transport contract between:
 - backend
 - frontend
 - future AI providers
 
 Example:
 
-```json
+```json id="03dfp2"
 {
     "id": "proposal_uuid",
-    "intent": "create_task",
+    "intent": "schedule_meeting",
     "status": "draft",
     "confidence": 0.74,
-    "source_text": "Call Rossi",
+    "source_text": "Schedule a meeting with Rossi tomorrow morning",
     "entities": {},
     "missing": [],
     "warnings": [],
-    "ambiguities": [
-        {
-            "key": "lead",
-            "label": "Lead",
-            "reason": "multiple_matches",
-            "blocking": true,
-            "selected_candidate_id": null,
-            "candidates": [
-                {
-                    "id": 1,
-                    "type": "person",
-                    "label": "Mario Rossi"
-                },
-                {
-                    "id": 7,
-                    "type": "company",
-                    "label": "Rossi SRL"
-                }
-            ]
-        }
-    ],
+    "ambiguities": [],
     "editable_fields": [],
     "changes": [],
-    "needs_confirmation": true
+    "needs_confirmation": true,
+    "last_refinement": null
 }
 ```
 
@@ -654,11 +651,11 @@ The proposal contract must remain:
 
 # API Response Standard
 
-All API responses must use standardized structures.
+All API responses follow standardized envelopes.
 
 Success:
 
-```json
+```json id="cvs6g4"
 {
     "success": true,
     "message": "Operation completed successfully.",
@@ -668,7 +665,7 @@ Success:
 
 Error:
 
-```json
+```json id="2xmd2h"
 {
     "success": false,
     "message": "Error message.",
@@ -678,7 +675,7 @@ Error:
 
 Paginated:
 
-```json
+```json id="09qhnr"
 {
     "success": true,
     "message": "Data retrieved successfully.",
@@ -691,13 +688,7 @@ Paginated:
 }
 ```
 
-The frontend depends heavily on stable contracts because proposal payloads drive:
-- proposal rendering
-- refinement rendering
-- ambiguity UX
-- mutation visibility
-- confidence UX
-- execution state
+The frontend depends heavily on stable proposal contracts.
 
 ---
 
@@ -733,13 +724,12 @@ Frontend:
 - German progressively
 
 Documentation:
-- English only
+- English-only
 - concise technical language
-- suitable for European B2B audiences
 
 ---
 
-# Controller Rules
+# Backend Rules
 
 Controllers must remain thin.
 
@@ -750,29 +740,15 @@ Allowed:
 
 Avoid:
 - business logic
-- manual JSON construction
 - cross-domain orchestration
 - large methods
-
----
-
-# Services and Action Classes
+- manual JSON construction
 
 Business logic belongs in:
 - services
-- action classes
+- actions
 - jobs
 - orchestration classes
-
-Guidelines:
-- services → orchestration
-- actions → focused operations
-- jobs → async execution
-
-Avoid:
-- god services
-- hidden side effects
-- multi-domain coupling
 
 ---
 
@@ -784,18 +760,18 @@ Prefer:
 - contracts
 - DTOs
 
-Avoid direct domain coupling.
+Avoid:
+- direct domain coupling
+- hidden side effects
+- model-driven orchestration
 
 Preferred:
 
-```php
+```php id="z3xn9f"
 event(new LeadFollowUpRequested($leadId, $dueAt));
 ```
 
-instead of:
-- model-driven orchestration
-- hidden side effects
-- direct cross-domain mutations
+instead of direct cross-domain mutations.
 
 ---
 
@@ -803,16 +779,18 @@ instead of:
 
 Fluxio is deterministic-first.
 
-The MVP currently uses:
+Current implementation:
 - rule-based parsing
 - explicit validation
-- predictable refinement flows
+- deterministic refinement
+- explainable proposal state
 
 Future LLM support may assist:
 - intent detection
 - entity extraction
 - ambiguity resolution
-- proposal refinement
+- refinement interpretation
+- semantic search
 
 Possible future providers:
 - Ollama
@@ -820,73 +798,85 @@ Possible future providers:
 - local lightweight models
 
 However:
-- all AI output must be validated
-- proposals remain structured
+- AI output must remain schema-validated
+- proposals remain authoritative
 - confirmation remains mandatory
 - AI NEVER executes business actions directly
+
+Core principle:
+
+```text id="hgl8vb"
+LLM = interpretation assistant
+Fluxio = operational control system
+```
 
 ---
 
 # Testing Strategy
 
 Testing priorities:
-- proposal integrity
 - proposal continuity
 - refinement consistency
+- mutation tracking
 - ambiguity handling
 - lifecycle transitions
 - API contracts
 - deterministic execution
 
 Backend priorities:
-- response standard
-- exception rendering
-- Actions parser
-- confidence calculation
 - proposal lifecycle
-- refinement tracking
-- idempotent execution
+- mutation semantics
+- refinement workflows
+- execution idempotency
+- API response consistency
 
 Frontend priorities:
-- command UX
 - proposal rendering
 - ambiguity rendering
-- confidence UX
 - mutation visibility
+- confidence UX
 - execution rendering
 - API error handling
 
 ---
 
-# Current MVP Scope
+# Current MVP Position
 
-Current implemented vertical slice:
-
-```text
-Schedule a call with Rossini
-→ refinement
-→ ambiguity resolution
-→ confirmation
-→ execution
-```
-
-This validates:
+Fluxio already validates:
 - proposal continuity
-- operational refinement
+- mutation semantics
 - ambiguity-aware workflows
+- operational AI-first UX
 - deterministic execution
-- AI-first operational UX
+- structured refinement
 
-Current focus:
+Current implemented flows include:
+- contextual refinements
+- collection mutations
 - proposal continuity
 - ambiguity resolution
-- mutation transparency
-- mobile operational UX
-- controlled execution
+- operational execution workflows
+
+The project has already moved beyond:
+```text id="ppl8o1"
+simple parser demo territory
+```
+
+---
+
+# Current Development Direction
+
+Current focus:
+- entity resolution architecture
+- multilingual-ready parsing
+- resolver registry abstraction
+- confidence scoring evolution
+- operational mobile workflows
+- proposal intelligence evolution
 
 NOT:
 - CRUD expansion
-- dashboard complexity
+- dashboard accumulation
 - autonomous AI behavior
 
 ---
@@ -898,9 +888,17 @@ Fluxio aims to demonstrate that enterprise software can evolve toward:
 - proposal-centric UX
 - controlled operational AI
 - ambiguity-aware workflows
-- deterministic business automation
-- explainable natural-language interaction
+- deterministic business interaction
+- explainable natural-language orchestration
 
-The goal is not to build “another CRM”.
+The goal is NOT:
+```text id="0c6o0z"
+building another CRM
+```
 
-The goal is to validate a new operational interaction model for business software.
+The goal is:
+
+```text id="72t4vz"
+validating proposal-centric operational software
+as a viable future paradigm for enterprise systems.
+```
