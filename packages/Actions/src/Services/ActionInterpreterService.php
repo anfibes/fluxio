@@ -5,22 +5,30 @@ namespace Fluxio\Actions\Services;
 use Fluxio\Actions\Contracts\CommandInterpreterInterface;
 use Fluxio\Actions\DTO\ActionProposalData;
 use Fluxio\Actions\DTO\EditableField;
+use Fluxio\Actions\DTO\IntentDefinition;
 use Fluxio\Actions\DTO\MissingField;
 use Fluxio\Actions\DTO\ProposedChange;
+use Fluxio\Actions\Registry\IntentRegistry;
 use Illuminate\Support\Str;
 
 class ActionInterpreterService
 {
-    public function __construct(private readonly CommandInterpreterInterface $interpreter) {}
+    public function __construct(
+        private readonly CommandInterpreterInterface $interpreter,
+        private readonly IntentRegistry $registry,
+    ) {}
 
     public function interpret(string $text): ActionProposalData
     {
-        $command = $this->interpreter->interpret($text);
+        $command    = $this->interpreter->interpret($text);
+        $definition = $this->registry->find($command->intent);
 
         [$status, $missing, $editableFields, $changes, $ambiguities] = match ($command->intent) {
             'create_task'   => $this->buildCreateTask($command->entities),
             'schedule_call' => $this->buildScheduleCall($command->entities),
-            default         => ['draft', [], [], [], []],
+            default         => $definition !== null
+                ? $this->buildFromDefinition($definition, $command->entities)
+                : ['draft', [], [], [], []],
         };
 
         return new ActionProposalData(
@@ -152,5 +160,78 @@ class ActionInterpreterService
         ];
 
         return ['draft', $missing, $editableFields, $changes, $ambiguities];
+    }
+
+    private function buildFromDefinition(IntentDefinition $definition, array $entities): array
+    {
+        $missing        = [];
+        $editableFields = [];
+        $ambiguities    = [];
+
+        foreach ($definition->requiredEntities as $key) {
+            $label = ucwords(str_replace('_', ' ', $key));
+
+            if (isset($entities[$key])) {
+                $editableFields[] = new EditableField(
+                    key:      $key,
+                    label:    $label,
+                    value:    $entities[$key],
+                    source:   'detected',
+                    required: true,
+                );
+            } elseif ($key === 'lead' && isset($entities['lead_query'])) {
+                // Ambiguous lead reference — blocking ambiguity, not a plain missing field
+                $ambiguities[] = [
+                    'key'                   => 'lead',
+                    'label'                 => 'Lead',
+                    'reason'                => 'multiple_matches',
+                    'blocking'              => true,
+                    'query'                 => $entities['lead_query'],
+                    'selected_candidate_id' => null,
+                    'candidates'            => self::ROSSI_CANDIDATES,
+                ];
+            } else {
+                $missing[] = new MissingField(
+                    key:      $key,
+                    label:    $label,
+                    reason:   "The command does not specify a {$label}.",
+                    required: true,
+                );
+                $editableFields[] = new EditableField(
+                    key:      $key,
+                    label:    $label,
+                    value:    null,
+                    source:   'missing',
+                    required: true,
+                );
+            }
+        }
+
+        foreach ($definition->optionalEntities as $key) {
+            if (isset($entities[$key])) {
+                $label = ucwords(str_replace('_', ' ', $key));
+                $editableFields[] = new EditableField(
+                    key:      $key,
+                    label:    $label,
+                    value:    $entities[$key],
+                    source:   'detected',
+                    required: false,
+                );
+            }
+        }
+
+        $hasBlockingAmbiguity = collect($ambiguities)->contains(fn ($a) => $a['blocking'] ?? false);
+        $status               = (empty($missing) && ! $hasBlockingAmbiguity) ? 'ready' : 'draft';
+
+        $changes = [
+            new ProposedChange(
+                type:    $definition->operation,
+                label:   $definition->label,
+                module:  $definition->module,
+                payload: $entities,
+            ),
+        ];
+
+        return [$status, $missing, $editableFields, $changes, $ambiguities];
     }
 }

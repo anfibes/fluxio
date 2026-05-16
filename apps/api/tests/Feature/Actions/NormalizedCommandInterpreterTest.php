@@ -19,7 +19,7 @@ class NormalizedCommandInterpreterTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->interpreter = new RuleBasedCommandInterpreter(new RuleBasedIntentResolver());
+        $this->interpreter = $this->app->make(RuleBasedCommandInterpreter::class);
     }
 
     // ── Intent detection ─────────────────────────────────────────────────────
