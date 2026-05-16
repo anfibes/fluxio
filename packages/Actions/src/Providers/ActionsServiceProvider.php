@@ -6,6 +6,8 @@ use Fluxio\Actions\Contracts\CommandInterpreterInterface;
 use Fluxio\Actions\Contracts\IntentResolverInterface;
 use Fluxio\Actions\Contracts\RefinementInterpreterInterface;
 use Fluxio\Actions\DTO\IntentDefinition;
+use Fluxio\Actions\EntityResolution\Registry\EntityResolverRegistry;
+use Fluxio\Actions\EntityResolution\Resolvers\LeadEntityResolver;
 use Fluxio\Actions\Executors\AssignLeadActionExecutor;
 use Fluxio\Actions\Executors\CreateTaskActionExecutor;
 use Fluxio\Actions\Executors\PrepareContractActionExecutor;
@@ -22,6 +24,14 @@ class ActionsServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        // Entity resolver registry — routes entity queries to the correct resolver
+        $this->app->singleton(EntityResolverRegistry::class, function ($app) {
+            $registry = new EntityResolverRegistry();
+            $registry->register($app->make(LeadEntityResolver::class));
+
+            return $registry;
+        });
+
         // Intent registry — single source of truth for intent metadata
         $this->app->singleton(IntentRegistry::class, function () {
             $registry = new IntentRegistry();

@@ -68,12 +68,14 @@ class NormalizedCommandInterpreterTest extends TestCase
 
     // ── Entity extraction ────────────────────────────────────────────────────
 
-    public function test_rossini_command_extracts_lead_entity(): void
+    public function test_rossini_command_extracts_lead_query_entity(): void
     {
+        // The interpreter always emits lead_query so entity resolution can decide
+        // whether to auto-resolve (single match) or surface an ambiguity panel.
         $command = $this->interpreter->interpret('Call Rossini');
 
-        $this->assertArrayHasKey('lead', $command->entities);
-        $this->assertEquals('Rossini', $command->entities['lead']);
+        $this->assertArrayHasKey('lead_query', $command->entities);
+        $this->assertEquals('Rossini', $command->entities['lead_query']);
     }
 
     public function test_rossi_command_extracts_lead_query_entity(): void

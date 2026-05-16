@@ -8,6 +8,9 @@ use Fluxio\Actions\DTO\EditableField;
 use Fluxio\Actions\DTO\IntentDefinition;
 use Fluxio\Actions\DTO\MissingField;
 use Fluxio\Actions\DTO\ProposedChange;
+use Fluxio\Actions\EntityResolution\DTO\ResolutionCandidate;
+use Fluxio\Actions\EntityResolution\DTO\ResolutionContext;
+use Fluxio\Actions\EntityResolution\Registry\EntityResolverRegistry;
 use Fluxio\Actions\Registry\IntentRegistry;
 use Illuminate\Support\Str;
 
@@ -15,7 +18,8 @@ class ActionInterpreterService
 {
     public function __construct(
         private readonly CommandInterpreterInterface $interpreter,
-        private readonly IntentRegistry $registry,
+        private readonly IntentRegistry             $registry,
+        private readonly EntityResolverRegistry     $resolverRegistry,
     ) {}
 
     public function interpret(string $text): ActionProposalData
@@ -23,11 +27,21 @@ class ActionInterpreterService
         $command    = $this->interpreter->interpret($text);
         $definition = $this->registry->find($command->intent);
 
+        // Pre-resolve ambiguous entity queries before dispatching to intent builders.
+        // Auto-resolved queries promote to detected entities; unresolved ones carry
+        // pre-built ambiguity objects so builders never touch hardcoded candidate data.
+        $entities            = $command->entities;
+        $prebuiltAmbiguities = [];
+
+        if (isset($entities['lead_query'])) {
+            [$entities, $prebuiltAmbiguities] = $this->resolveEntityQuery('lead_query', $entities);
+        }
+
         [$status, $missing, $editableFields, $changes, $ambiguities] = match ($command->intent) {
-            'create_task'   => $this->buildCreateTask($command->entities),
-            'schedule_call' => $this->buildScheduleCall($command->entities),
+            'create_task'   => $this->buildCreateTask($entities),
+            'schedule_call' => $this->buildScheduleCall($entities, $prebuiltAmbiguities),
             default         => $definition !== null
-                ? $this->buildFromDefinition($definition, $command->entities)
+                ? $this->buildFromDefinition($definition, $entities, $prebuiltAmbiguities)
                 : ['draft', [], [], [], []],
         };
 
@@ -37,7 +51,7 @@ class ActionInterpreterService
             status:             $status,
             confidence:         $command->confidence,
             source_text:        $command->sourceText,
-            entities:           $command->entities,
+            entities:           $entities,
             missing:            $missing,
             editable_fields:    $editableFields,
             changes:            $changes,
@@ -45,6 +59,47 @@ class ActionInterpreterService
             ambiguities:        $ambiguities,
         );
     }
+
+    // ── Entity resolution ────────────────────────────────────────────────────
+
+    /**
+     * Run entity resolution for a query key, returning the updated entities array
+     * and any pre-built ambiguity objects for unresolved multi-match cases.
+     *
+     * @return array{array, array}
+     */
+    private function resolveEntityQuery(string $queryKey, array $entities): array
+    {
+        $query = $entities[$queryKey];
+        unset($entities[$queryKey]);
+
+        $result      = $this->resolverRegistry->resolve($query, new ResolutionContext($queryKey));
+        $ambiguities = [];
+
+        if ($result->resolved) {
+            // Single strong match — promote to a concrete entity value.
+            $entities['lead'] = $result->resolvedCandidate->label;
+        } elseif (! empty($result->candidates)) {
+            // Multiple matches — emit a blocking ambiguity; the builder adds no missing field.
+            $ambiguities[] = [
+                'key'                   => 'lead',
+                'label'                 => 'Lead',
+                'reason'                => 'multiple_matches',
+                'blocking'              => true,
+                'query'                 => $query,
+                'selected_candidate_id' => null,
+                'candidates'            => array_map(
+                    fn (ResolutionCandidate $c) => $c->toArray(),
+                    $result->candidates,
+                ),
+            ];
+        }
+        // else: no match → entities['lead'] remains absent → builder treats as missing
+
+        return [$entities, $ambiguities];
+    }
+
+    // ── Intent builders ──────────────────────────────────────────────────────
 
     private function buildCreateTask(array $entities): array
     {
@@ -88,13 +143,7 @@ class ActionInterpreterService
         return [$status, [], $editableFields, $changes, []];
     }
 
-    private const ROSSI_CANDIDATES = [
-        ['id' => 1,  'type' => 'person',  'label' => 'Mario Rossi',   'description' => 'Individual lead',    'confidence' => 0.72],
-        ['id' => 7,  'type' => 'company', 'label' => 'Rossi SRL',     'description' => 'Company lead',        'confidence' => 0.68],
-        ['id' => 12, 'type' => 'company', 'label' => 'Studio Rossi',  'description' => 'Professional studio', 'confidence' => 0.61],
-    ];
-
-    private function buildScheduleCall(array $entities): array
+    private function buildScheduleCall(array $entities, array $prebuiltAmbiguities = []): array
     {
         $missing = [
             new MissingField(
@@ -112,7 +161,7 @@ class ActionInterpreterService
         ];
 
         $editableFields = [];
-        $ambiguities    = [];
+        $ambiguities    = $prebuiltAmbiguities;
 
         if (isset($entities['lead'])) {
             $editableFields[] = new EditableField(
@@ -122,16 +171,6 @@ class ActionInterpreterService
                 source:   'detected',
                 required: true,
             );
-        } elseif (isset($entities['lead_query'])) {
-            $ambiguities[] = [
-                'key'                  => 'lead',
-                'label'                => 'Lead',
-                'reason'               => 'multiple_matches',
-                'blocking'             => true,
-                'query'                => $entities['lead_query'],
-                'selected_candidate_id' => null,
-                'candidates'           => self::ROSSI_CANDIDATES,
-            ];
         }
 
         $editableFields[] = new EditableField(
@@ -162,11 +201,14 @@ class ActionInterpreterService
         return ['draft', $missing, $editableFields, $changes, $ambiguities];
     }
 
-    private function buildFromDefinition(IntentDefinition $definition, array $entities): array
+    private function buildFromDefinition(IntentDefinition $definition, array $entities, array $prebuiltAmbiguities = []): array
     {
         $missing        = [];
         $editableFields = [];
-        $ambiguities    = [];
+        $ambiguities    = $prebuiltAmbiguities;
+
+        // Keys already handled by pre-built ambiguities must not appear in missing.
+        $ambiguousKeys = array_column($prebuiltAmbiguities, 'key');
 
         foreach ($definition->requiredEntities as $key) {
             $label = ucwords(str_replace('_', ' ', $key));
@@ -179,17 +221,8 @@ class ActionInterpreterService
                     source:   'detected',
                     required: true,
                 );
-            } elseif ($key === 'lead' && isset($entities['lead_query'])) {
-                // Ambiguous lead reference — blocking ambiguity, not a plain missing field
-                $ambiguities[] = [
-                    'key'                   => 'lead',
-                    'label'                 => 'Lead',
-                    'reason'                => 'multiple_matches',
-                    'blocking'              => true,
-                    'query'                 => $entities['lead_query'],
-                    'selected_candidate_id' => null,
-                    'candidates'            => self::ROSSI_CANDIDATES,
-                ];
+            } elseif (in_array($key, $ambiguousKeys, true)) {
+                // Handled by a pre-built blocking ambiguity — skip missing and editable field.
             } else {
                 $missing[] = new MissingField(
                     key:      $key,

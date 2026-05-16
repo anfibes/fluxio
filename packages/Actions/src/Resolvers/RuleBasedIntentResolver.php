@@ -25,8 +25,9 @@ class RuleBasedIntentResolver implements IntentResolverInterface
 
         $entities = [];
 
+        // Always emit lead_query so entity resolution handles both exact and ambiguous names.
         if (str_contains($lower, 'rossini')) {
-            $entities['lead'] = 'Rossini';
+            $entities['lead_query'] = 'Rossini';
         } elseif ((bool) preg_match('/\brossi\b/i', $text)) {
             $entities['lead_query'] = 'Rossi';
         }

@@ -227,35 +227,36 @@ Ambiguity is part of the proposal lifecycle.
 
 # Entity Resolution Architecture
 
-Fluxio is evolving toward a dedicated:
+Fluxio now has a dedicated Entity Resolution Layer inside `packages/Actions/src/EntityResolution/`.
 
-```text id="9w7n6h"
-Entity Resolution Layer
-```
+Implemented:
+- `EntityResolverInterface` — `supports(string $entityType)` + `resolve(string $query, ResolutionContext $context): ResolutionResult`
+- `EntityResolverRegistry` — routes queries to the first matching registered resolver
+- `ResolutionContext` — carries entity type and locale
+- `ResolutionCandidate` — scored match candidate (id, type, label, description?, confidence)
+- `ResolutionResult` — sealed result: `autoResolved()` / `ambiguous()` / `noMatch()`
+- `LeadEntityResolver` — deterministic word-boundary scoring for lead names
+- `InMemoryLeadRepository` — demo dataset, injectable for tests
 
-Goal:
-Separate:
-- intent interpretation
-- entity extraction
-- entity resolution
+Scoring tiers (LeadEntityResolver):
+- `1.0` — exact match (case-insensitive)
+- `0.8` — label starts with query at word boundary
+- `0.65` — query appears at word boundary within label
 
-Target architecture:
-- `EntityResolverInterface`
-- resolver registry
-- domain-specific resolvers
-- deterministic candidate scoring
+Auto-resolve rules:
+- exactly one candidate
+- confidence ≥ `AUTO_RESOLVE_THRESHOLD` (0.8)
+- single low-confidence match surfaces as ambiguity requiring explicit selection
 
-Planned resolvers:
-- LeadResolver
+Separation of concerns:
+- intent interpretation — `RuleBasedIntentResolver`
+- entity extraction — produces `lead_query` tokens
+- entity resolution — `EntityResolverRegistry` decides auto-resolve vs ambiguity
+
+Planned additional resolvers:
 - UserResolver
 - ProductResolver
 - CalendarParticipantResolver
-
-Current direction:
-- deterministic
-- explainable
-- repository-backed
-- multilingual-ready
 
 Future-ready for:
 - semantic search

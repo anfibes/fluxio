@@ -160,32 +160,36 @@ class AmbiguousProposalTest extends TestCase
     {
         $user = $this->actingAsUser();
 
-        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
+        $interpret  = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
         $proposalId = $interpret->json('data.id');
 
+        // Candidates are sorted by confidence desc: [Rossi SRL (0.8), Mario Rossi (0.65), Studio Rossi (0.65)]
+        // "The second one" → index 1 → Mario Rossi (id: 1)
         $response = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The second one']);
-
-        $response->assertStatus(200)
-            ->assertJsonPath('data.ambiguities.0.selected_candidate_id', 7);
-
-        $fields = collect($response->json('data.editable_fields'))->keyBy('key');
-        $this->assertEquals('Rossi SRL', $fields['lead']['value']);
-    }
-
-    public function test_refinement_the_first_one_resolves_to_first_candidate(): void
-    {
-        $user = $this->actingAsUser();
-
-        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
-        $proposalId = $interpret->json('data.id');
-
-        $response = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The first one']);
 
         $response->assertStatus(200)
             ->assertJsonPath('data.ambiguities.0.selected_candidate_id', 1);
 
         $fields = collect($response->json('data.editable_fields'))->keyBy('key');
         $this->assertEquals('Mario Rossi', $fields['lead']['value']);
+    }
+
+    public function test_refinement_the_first_one_resolves_to_first_candidate(): void
+    {
+        $user = $this->actingAsUser();
+
+        $interpret  = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
+        $proposalId = $interpret->json('data.id');
+
+        // Candidates are sorted by confidence desc: [Rossi SRL (0.8), Mario Rossi (0.65), Studio Rossi (0.65)]
+        // "The first one" → index 0 → Rossi SRL (id: 7)
+        $response = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The first one']);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.ambiguities.0.selected_candidate_id', 7);
+
+        $fields = collect($response->json('data.editable_fields'))->keyBy('key');
+        $this->assertEquals('Rossi SRL', $fields['lead']['value']);
     }
 
     // --- refinement: partial name ---

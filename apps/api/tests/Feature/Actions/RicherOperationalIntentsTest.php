@@ -464,4 +464,77 @@ class RicherOperationalIntentsTest extends TestCase
         $this->assertEquals(now()->addDay()->toDateString(), $fields['date']['value']);
         $this->assertEquals('09:00', $fields['time']['value']);
     }
+
+    // ── Entity resolution — lifecycle and ID preservation ────────────────────
+
+    public function test_proposal_id_is_preserved_after_entity_resolution_refinement(): void
+    {
+        $this->actingAsUser();
+
+        $r1         = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossi tomorrow morning']);
+        $proposalId = $r1->json('data.id');
+
+        $r2 = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The second one']);
+
+        $r2->assertStatus(200)
+            ->assertJsonPath('data.id', $proposalId);
+    }
+
+    public function test_the_second_one_resolves_ambiguous_lead_by_ordinal(): void
+    {
+        $this->actingAsUser();
+
+        $r1         = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossi tomorrow morning']);
+        $proposalId = $r1->json('data.id');
+        $candidates = $r1->json('data.ambiguities.0.candidates');
+
+        $r2 = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The second one']);
+
+        $r2->assertStatus(200)
+            ->assertJsonPath('data.status', 'ready');
+
+        $fields = collect($r2->json('data.editable_fields'))->keyBy('key');
+        $this->assertEquals($candidates[1]['label'], $fields['lead']['value']);
+    }
+
+    public function test_entity_resolution_lifecycle_from_ambiguous_to_executed(): void
+    {
+        $this->actingAsUser();
+
+        // Interpret — ambiguous
+        $r1         = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossi tomorrow morning']);
+        $proposalId = $r1->json('data.id');
+        $this->assertEquals('draft', $r1->json('data.status'));
+
+        // Refine — resolve ambiguity
+        $r2 = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'Rossi SRL']);
+        $this->assertEquals('ready', $r2->json('data.status'));
+
+        // Confirm
+        $r3 = $this->postJson("/api/actions/{$proposalId}/confirm");
+        $r3->assertStatus(200)->assertJsonPath('data.status', 'confirmed');
+
+        // Execute
+        $r4 = $this->postJson("/api/actions/{$proposalId}/execute");
+        $r4->assertStatus(200)->assertJsonPath('data.status', 'executed');
+
+        $this->assertEquals($proposalId, $r4->json('data.id'));
+    }
+
+    public function test_rossini_auto_resolves_directly_to_ready_proposal(): void
+    {
+        $this->actingAsUser();
+
+        $response = $this->postJson('/api/actions/interpret', [
+            'text' => 'Schedule a meeting with Rossini tomorrow at 4pm',
+        ]);
+
+        // Entity resolution auto-resolves single exact match — no ambiguity panel.
+        $response->assertStatus(200)
+            ->assertJsonPath('data.status', 'ready')
+            ->assertJsonPath('data.ambiguities', []);
+
+        $fields = collect($response->json('data.editable_fields'))->keyBy('key');
+        $this->assertEquals('Rossini', $fields['lead']['value']);
+    }
 }
