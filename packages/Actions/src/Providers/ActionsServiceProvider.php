@@ -7,6 +7,7 @@ use Fluxio\Actions\Contracts\IntentResolverInterface;
 use Fluxio\Actions\Contracts\RefinementInterpreterInterface;
 use Fluxio\Actions\DTO\EntityRequirement;
 use Fluxio\Actions\DTO\IntentDefinition;
+use Fluxio\Actions\Support\DefaultIntentCapabilities;
 use Fluxio\Actions\EntityResolution\Registry\EntityResolverRegistry;
 use Fluxio\Actions\EntityResolution\Resolvers\LeadEntityResolver;
 use Fluxio\Actions\Enums\IntentComplexity;
@@ -19,6 +20,7 @@ use Fluxio\Actions\Interpretation\Contracts\InterpretationProviderInterface;
 use Fluxio\Actions\Interpretation\InterpretationProviderAdapter;
 use Fluxio\Actions\Interpretation\Providers\DeterministicInterpretationProvider;
 use Fluxio\Actions\Interpreters\RuleBasedRefinementInterpreter;
+use Fluxio\Actions\Registry\IntentCapabilityRegistry;
 use Fluxio\Actions\Registry\IntentRegistry;
 use Fluxio\Actions\Resolvers\RuleBasedIntentResolver;
 use Illuminate\Support\Facades\Route;
@@ -112,6 +114,19 @@ class ActionsServiceProvider extends ServiceProvider
                 executorClass: PrepareContractActionExecutor::class,
                 confidence:    0.75,
             ));
+
+            return $registry;
+        });
+
+        // Intent capability registry — static, in-memory declaration of what each intent permits.
+        // Consulted by ActionProposalRefinementService before applying any mutation.
+        // Capability definitions live in DefaultIntentCapabilities::all().
+        $this->app->singleton(IntentCapabilityRegistry::class, function () {
+            $registry = new IntentCapabilityRegistry();
+
+            foreach (DefaultIntentCapabilities::all() as $capability) {
+                $registry->register($capability);
+            }
 
             return $registry;
         });

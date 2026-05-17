@@ -5,13 +5,17 @@ namespace Fluxio\Actions\Services;
 use Fluxio\Actions\Contracts\RefinementInterpreterInterface;
 use Fluxio\Actions\DTO\NormalizedMutation;
 use Fluxio\Actions\Models\ActionProposal;
+use Fluxio\Actions\Registry\IntentCapabilityRegistry;
 use Illuminate\Validation\ValidationException;
 
 class ActionProposalRefinementService
 {
     private const REFINABLE_STATUSES = ['draft', 'ready'];
 
-    public function __construct(private readonly RefinementInterpreterInterface $interpreter) {}
+    public function __construct(
+        private readonly RefinementInterpreterInterface $interpreter,
+        private readonly IntentCapabilityRegistry $capabilityRegistry,
+    ) {}
 
     public function refine(ActionProposal $proposal, string $text): ActionProposal
     {
@@ -26,24 +30,58 @@ class ActionProposalRefinementService
         // Delegate NL → mutation extraction to the interpreter
         $fieldMutations = $this->interpreter->interpret($effectiveText);
 
-        // Try ambiguity resolution when a blocking ambiguity exists
+        // Capability validation: filter out mutations that are not permitted for this intent.
+        // Disallowed mutations produce a warning; the proposal is left unchanged for that field.
+        [$fieldMutations, $rejectedMutations] = $this->partitionByCapability($proposal->intent, $fieldMutations);
+
+        if (! empty($rejectedMutations)) {
+            $warnings   = $proposal->warnings ?? [];
+            $warnings[] = __('actions::actions.mutation_not_allowed');
+            $proposal->warnings = $warnings;
+        }
+
+        // If ALL mutations were rejected and there is nothing else to process, bail early.
+        if (! empty($rejectedMutations) && empty($fieldMutations)) {
+            $proposal->last_refinement = [
+                'text'           => $text,
+                'effective_text' => $effectiveText,
+                'summary'        => 'No changes applied.',
+                'changes'        => [],
+            ];
+            $proposal->save();
+
+            return $proposal;
+        }
+
+        // Try ambiguity resolution when a blocking ambiguity exists.
+        // Check capability first — if the intent does not support ambiguity resolution,
+        // skip the attempt entirely.
         $ambiguityResolution = null;
         if ($this->hasUnresolvedBlockingAmbiguity($proposal)) {
-            $ambiguityResolution = $this->tryClassifyAmbiguityResolution($proposal, $effectiveText);
+            if ($this->intentSupportsAmbiguityResolution($proposal->intent)) {
+                $ambiguityResolution = $this->tryClassifyAmbiguityResolution($proposal, $effectiveText);
 
-            if ($ambiguityResolution === null && empty($fieldMutations)) {
+                if ($ambiguityResolution === null && empty($fieldMutations)) {
+                    $warnings   = $proposal->warnings ?? [];
+                    $warnings[] = __('actions::actions.ambiguity_still_unresolved');
+                    $proposal->warnings        = $warnings;
+                    $proposal->last_refinement = [
+                        'text'           => $text,
+                        'effective_text' => $effectiveText,
+                        'summary'        => 'No changes applied.',
+                        'changes'        => [],
+                    ];
+                    $proposal->save();
+
+                    return $proposal;
+                }
+            } else {
+                // Ambiguity exists but this intent cannot resolve it via refinement.
+                // Emit a warning so the caller knows why resolution was not attempted,
+                // then fall through to apply any field mutations that were provided.
                 $warnings   = $proposal->warnings ?? [];
-                $warnings[] = __('actions::actions.ambiguity_still_unresolved');
-                $proposal->warnings        = $warnings;
-                $proposal->last_refinement = [
-                    'text'           => $text,
-                    'effective_text' => $effectiveText,
-                    'summary'        => 'No changes applied.',
-                    'changes'        => [],
-                ];
-                $proposal->save();
-
-                return $proposal;
+                $warnings[] = __('actions::actions.ambiguity_resolution_not_supported');
+                $proposal->warnings = $warnings;
             }
         }
 
@@ -64,6 +102,45 @@ class ActionProposalRefinementService
         }
 
         return $this->applyAll($proposal, $fieldMutations, $ambiguityResolution, $text, $effectiveText);
+    }
+
+    // ── Capability validation ────────────────────────────────────────────────
+
+    /**
+     * Split mutations into allowed and rejected lists based on intent capabilities.
+     *
+     * If no capability is registered for the intent, all mutations are rejected
+     * (conservative default — unlisted intents have no explicit mutation contract).
+     *
+     * @param NormalizedMutation[] $mutations
+     * @return array{0: NormalizedMutation[], 1: NormalizedMutation[]}
+     */
+    private function partitionByCapability(string $intent, array $mutations): array
+    {
+        $allowed  = [];
+        $rejected = [];
+
+        foreach ($mutations as $mutation) {
+            if ($this->capabilityRegistry->allowsMutation($intent, $mutation)) {
+                $allowed[] = $mutation;
+            } else {
+                $rejected[] = $mutation;
+            }
+        }
+
+        return [$allowed, $rejected];
+    }
+
+    private function intentSupportsAmbiguityResolution(string $intent): bool
+    {
+        $capability = $this->capabilityRegistry->find($intent);
+
+        // Conservative default: if no capability is registered, do not attempt resolution.
+        if ($capability === null) {
+            return false;
+        }
+
+        return $capability->supportsAmbiguityResolution;
     }
 
     // ── Ambiguity resolution ─────────────────────────────────────────────────
