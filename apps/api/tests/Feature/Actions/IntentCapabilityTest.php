@@ -741,6 +741,84 @@ class IntentCapabilityTest extends TestCase
         );
     }
 
+    // ── 12. Proposal API response includes capabilities ───────────────────────
+
+    public function test_proposal_api_response_includes_capabilities_key(): void
+    {
+        $this->actingAsUser();
+
+        $response = $this->postJson('/api/actions/interpret', ['text' => 'Create a task for tomorrow']);
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'data' => [
+                'capabilities' => [
+                    'supports_contextual_references',
+                    'supports_ambiguity_resolution',
+                    'supports_collection_mutations',
+                    'mutations',
+                    'refinements',
+                ],
+            ],
+        ]);
+    }
+
+    public function test_schedule_meeting_proposal_returns_supports_collection_mutations_true(): void
+    {
+        $user = $this->actingAsUser();
+
+        $proposal = ActionProposal::create([
+            'user_id'            => $user->id,
+            'intent'             => 'schedule_meeting',
+            'status'             => 'ready',
+            'confidence'         => 0.85,
+            'source_text'        => 'Meeting with Rossini tomorrow',
+            'entities'           => ['lead' => 'Rossini'],
+            'missing'            => [],
+            'warnings'           => [],
+            'editable_fields'    => [
+                ['key' => 'lead', 'label' => 'Lead', 'value' => 'Rossini', 'source' => 'detected', 'required' => true],
+            ],
+            'changes'            => [
+                ['type' => 'schedule', 'label' => 'Schedule Meeting', 'module' => 'calendar', 'payload' => []],
+            ],
+            'needs_confirmation' => true,
+            'ambiguities'        => [],
+        ]);
+
+        // Refine to get back a full resource response that includes capabilities
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'High priority']);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.capabilities.supports_collection_mutations', true);
+    }
+
+    public function test_create_task_proposal_returns_supports_collection_mutations_false(): void
+    {
+        $user = $this->actingAsUser();
+
+        // Use the interpret endpoint — it returns an ActionProposalResource directly
+        $response = $this->postJson('/api/actions/interpret', ['text' => 'Create a task for tomorrow']);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.intent', 'create_task');
+        $response->assertJsonPath('data.capabilities.supports_collection_mutations', false);
+    }
+
+    public function test_persistence_service_does_not_persist_capabilities(): void
+    {
+        $user = $this->actingAsUser();
+
+        $proposal = $this->createTaskProposal($user);
+
+        // The persisted model must not have a 'capabilities' attribute
+        $this->assertArrayNotHasKey('capabilities', $proposal->getAttributes());
+
+        // Capabilities must not appear in the raw DB record
+        $fresh = ActionProposal::find($proposal->id);
+        $this->assertArrayNotHasKey('capabilities', $fresh->getAttributes());
+    }
+
     // ── 11. DefaultIntentCapabilities covers all 5 known intents ─────────────
 
     public function test_capability_registry_returns_expected_capabilities_for_all_five_intents(): void

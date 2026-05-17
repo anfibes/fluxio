@@ -1,5 +1,28 @@
 export type ActionProposalStatus = 'draft' | 'ready' | 'confirmed' | 'executed' | 'failed'
 
+export interface ProposalMutationCapability {
+  operation: string
+  fields: string[]
+  collection: boolean
+}
+
+export type ProposalRefinementCapability =
+  | 'replace_field'
+  | 'clear_field'
+  | 'append_collection_item'
+  | 'remove_collection_item'
+  | 'replace_collection_item'
+  | 'resolve_ambiguity'
+  | 'contextual_reference'
+
+export interface ProposalCapabilities {
+  supports_contextual_references: boolean
+  supports_ambiguity_resolution: boolean
+  supports_collection_mutations: boolean
+  mutations: ProposalMutationCapability[]
+  refinements: ProposalRefinementCapability[]
+}
+
 export interface AmbiguityCandidate {
   id: string | number
   type: string
@@ -75,4 +98,5 @@ export interface ActionProposal {
   execution_result: Record<string, unknown> | null
   last_refinement: ActionProposalRefinement | null
   ambiguities: ProposalAmbiguity[]
+  capabilities?: ProposalCapabilities
 }

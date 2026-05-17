@@ -3,6 +3,7 @@
 namespace Fluxio\Actions\Http\Resources;
 
 use Fluxio\Actions\Models\ActionProposal;
+use Fluxio\Actions\Registry\IntentCapabilityRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -17,6 +18,20 @@ class ActionProposalResource extends JsonResource
     {
         /** @var ActionProposal $proposal */
         $proposal = $this->resource;
+
+        /** @var IntentCapabilityRegistry $registry */
+        $registry   = app(IntentCapabilityRegistry::class);
+        $capability = $registry->find($proposal->intent);
+
+        $capabilities = $capability !== null
+            ? $capability->toArray()
+            : [
+                'supports_contextual_references' => false,
+                'supports_ambiguity_resolution'  => false,
+                'supports_collection_mutations'  => false,
+                'mutations'                      => [],
+                'refinements'                    => [],
+            ];
 
         return [
             'id' => $proposal->id,
@@ -37,6 +52,7 @@ class ActionProposalResource extends JsonResource
             'execution_result' => $proposal->execution_result,
             'last_refinement' => $proposal->last_refinement,
             'ambiguities' => $proposal->ambiguities ?? [],
+            'capabilities' => $capabilities,
         ];
     }
 }

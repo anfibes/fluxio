@@ -21,4 +21,13 @@ readonly class MutationCapability
         public array  $fields,
         public bool   $collection = false,
     ) {}
+
+    public function toArray(): array
+    {
+        return [
+            'operation'  => $this->operation,
+            'fields'     => $this->fields,
+            'collection' => $this->collection,
+        ];
+    }
 }

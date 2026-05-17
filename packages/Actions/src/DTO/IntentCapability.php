@@ -25,4 +25,15 @@ readonly class IntentCapability
         public bool   $supportsAmbiguityResolution   = false,
         public bool   $supportsCollectionMutations   = false,
     ) {}
+
+    public function toArray(): array
+    {
+        return [
+            'supports_contextual_references' => $this->supportsContextualReferences,
+            'supports_ambiguity_resolution'  => $this->supportsAmbiguityResolution,
+            'supports_collection_mutations'  => $this->supportsCollectionMutations,
+            'mutations'                      => array_map(fn ($m) => $m->toArray(), $this->mutations),
+            'refinements'                    => array_map(fn ($r) => $r->value, $this->refinements),
+        ];
+    }
 }
