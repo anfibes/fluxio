@@ -6,9 +6,9 @@
 
 The `ActionProposal` is the central architectural object of Fluxio.
 
-Fluxio does NOT execute business operations directly from natural language.
+Fluxio never executes business operations directly from natural language.
 
-Instead, every command becomes:
+Every command becomes:
 - structured
 - reviewable
 - refinable
@@ -17,14 +17,14 @@ Instead, every command becomes:
 
 before execution.
 
-Core operational flow:
+Current operational flow:
 
-```text id="4m2bqz"
+```text id="j7m2xq"
 Natural language
 → Intent interpretation
 → Entity extraction
 → Entity resolution
-→ Action Proposal
+→ Proposal creation
 → Proposal refinement
 → Validation
 → Confirmation
@@ -33,11 +33,10 @@ Natural language
 
 The proposal lifecycle exists to provide:
 - deterministic execution
-- operational transparency
-- explainable AI assistance
 - proposal continuity
 - ambiguity-aware workflows
-- controlled business interaction
+- explainable operational interaction
+- controlled business execution
 
 The proposal itself is authoritative.
 
@@ -68,7 +67,7 @@ These invariants define Fluxio’s operational model.
 
 Traditional systems usually follow:
 
-```text id="ag5g8g"
+```text id="x8k5tp"
 User
 → Form
 → Submit
@@ -77,15 +76,15 @@ User
 
 Many AI systems follow:
 
-```text id="q3u3tb"
+```text id="v9t3gr"
 User
 → AI
 → Execute
 ```
 
-Fluxio introduces a different model:
+Fluxio introduces:
 
-```text id="pmv4z6"
+```text id="r4m6bn"
 User
 → Interpretation
 → Structured proposal
@@ -99,9 +98,8 @@ This enables:
 - controlled execution
 - proposal continuity
 - ambiguity visibility
-- confidence-aware UX
 - deterministic workflows
-- explainable operational AI
+- explainable proposal state
 
 The proposal is more important than the conversation itself.
 
@@ -113,7 +111,7 @@ Every interpretation produces an `ActionProposal`.
 
 Example:
 
-```json id="p1o1h8"
+```json id="n2w6zc"
 {
     "id": "proposal_uuid",
     "intent": "schedule_meeting",
@@ -148,7 +146,7 @@ The proposal acts as:
 
 Current lifecycle:
 
-```text id="qfdz45"
+```text id="s6p9tv"
 draft
 → ready
 → confirmed
@@ -166,12 +164,12 @@ Refinement never creates disconnected proposals.
 A proposal remains in `draft` when:
 - required information is missing
 - ambiguities remain unresolved
-- confidence is insufficient
 - validation is incomplete
+- execution is not yet safe
 
 Example:
 
-```text id="mhn59z"
+```text id="f7g2qy"
 Schedule a meeting with Rossi
 ```
 
@@ -199,7 +197,7 @@ A proposal becomes `ready` when:
 
 Example:
 
-```text id="w9nqbd"
+```text id="a1v8zk"
 Schedule a meeting with Rossi tomorrow at 10:30
 ```
 
@@ -213,11 +211,10 @@ A proposal becomes `confirmed` after explicit user approval.
 
 Confirmation intentionally remains separate from execution.
 
-This supports future workflows such as:
+This prepares future support for:
 - async execution
 - approval chains
 - delayed execution
-- scheduling
 - auditability
 
 ---
@@ -267,7 +264,7 @@ Each proposal exposes confidence metadata.
 
 Example:
 
-```json id="n7a4n2"
+```json id="g9m3xt"
 {
     "confidence": 0.91
 }
@@ -294,7 +291,7 @@ Incomplete proposals expose missing information.
 
 Example:
 
-```json id="sv6i95"
+```json id="h8x2rq"
 {
     "missing": [
         {
@@ -319,7 +316,7 @@ Proposals expose editable operational state.
 
 Example:
 
-```json id="n5hqvx"
+```json id="m5q8cv"
 {
     "editable_fields": [
         {
@@ -368,7 +365,7 @@ Proposals expose intended business mutations before execution.
 
 Example:
 
-```json id="4lfjlwm"
+```json id="x7c5pv"
 {
     "changes": [
         {
@@ -387,15 +384,15 @@ This allows the frontend to render:
 
 ---
 
-# Proposal Mutation Intelligence
+# Proposal Mutation Semantics
 
 Fluxio supports:
 
-```text id="yljlwm"
+```text id="b6n1wy"
 controlled proposal mutation semantics
 ```
 
-The system must understand:
+The system tracks:
 - what changed
 - what remains unchanged
 - whether readiness changed
@@ -410,8 +407,9 @@ WITHOUT introducing:
 Proposal continuity alone is not enough.
 
 Fluxio also requires:
-```text id="kq7f0z"
-proposal mutation semantics
+
+```text id="u3r8kf"
+deterministic proposal mutation semantics
 ```
 
 ---
@@ -430,7 +428,7 @@ Current mutation operations:
 
 Examples:
 
-```text id="m3lnby"
+```text id="n4t7gs"
 Tomorrow instead
 At 10:30
 Add Mario too
@@ -459,19 +457,19 @@ Example:
 
 Initial proposal:
 
-```text id="s7t6kz"
+```text id="d8m1rv"
 Schedule a meeting with Rossi
 ```
 
 Refinement:
 
-```text id="n9gf4v"
+```text id="f4z9yb"
 Tomorrow morning
 ```
 
 Then:
 
-```text id="rujlwm"
+```text id="q6s3pk"
 At 10:30
 ```
 
@@ -499,13 +497,13 @@ Example:
 
 Initial proposal:
 
-```text id="egvjlwm"
+```text id="z9x2gh"
 Schedule a meeting with Rossi
 ```
 
 Refinement:
 
-```text id="g9jjlwm"
+```text id="j5r7vn"
 Schedule a meeting with Rossi tomorrow morning
 ```
 
@@ -527,7 +525,7 @@ Fluxio supports proposal-local contextual references.
 
 Examples:
 
-```text id="tjlwm1"
+```text id="t4k8wf"
 Move it to Friday
 The second one
 Add Mario too
@@ -550,7 +548,7 @@ Fluxio intentionally exposes proposal mutations.
 
 Example:
 
-```json id="jlwmt8"
+```json id="w2n9qs"
 {
     "last_refinement": {
         "text": "At 10:30",
@@ -580,13 +578,13 @@ The frontend should expose:
 
 The UX should communicate:
 
-```text id="jlwmf4"
+```text id="r7f2mg"
 "The proposal evolved."
 ```
 
 NOT:
 
-```text id="jlwmw9"
+```text id="k9x1qt"
 "The assistant replied."
 ```
 
@@ -605,7 +603,7 @@ Fluxio must NEVER:
 
 Example:
 
-```text id="jlwmc2"
+```text id="h3v8pc"
 Call Rossi
 ```
 
@@ -622,7 +620,7 @@ Expected behavior:
 
 Example ambiguity structure:
 
-```json id="6pjlwm"
+```json id="y5m7zd"
 {
     "ambiguities": [
         {
@@ -649,10 +647,86 @@ Ambiguity resolution is part of the proposal lifecycle itself.
 
 ---
 
+# Entity Resolution Layer
+
+Fluxio now includes a dedicated entity resolution architecture.
+
+Current structure:
+
+```text id="n8f1wr"
+EntityResolverInterface
+→ EntityResolverRegistry
+→ Resolver implementations
+→ ResolutionResult
+```
+
+Current implemented resolver:
+- `LeadEntityResolver`
+
+Current implemented behaviors:
+- exact match scoring
+- starts-with scoring
+- contains scoring
+- confidence ordering
+- ambiguity generation
+- auto-resolution threshold
+
+Current ambiguity flows already support:
+- proposal-local resolution
+- ordinal refinements
+- SAME proposal continuity
+
+Example:
+
+```text id="q1v4nk"
+The second one
+```
+
+updates the SAME proposal instead of generating conversational state.
+
+---
+
+# Provider Validation Boundary
+
+Fluxio validates every `NormalizedCommand` before it enters the proposal lifecycle.
+
+Current flow:
+
+```text id="s5x8zd"
+Interpretation Provider
+→ NormalizedCommand
+→ Validation Layer
+→ Proposal Lifecycle
+```
+
+Validation currently checks:
+- valid intent
+- valid confidence range
+- non-empty entities
+- compatible entity keys
+
+Invalid provider output throws:
+
+```text id="g6k3pm"
+InvalidNormalizedCommandException
+```
+
+which becomes a safe `422` response.
+
+This boundary protects:
+- proposal integrity
+- frontend stability
+- deterministic lifecycle semantics
+
+The proposal lifecycle never trusts raw provider output directly.
+
+---
+
 # Execution Safety
 
 Fluxio is designed around:
-```text id="jlwm92"
+
+```text id="m2t9rq"
 controlled execution
 ```
 
@@ -672,7 +746,7 @@ AI never directly mutates business data.
 
 ---
 
-# AI Strategy
+# Interpretation Strategy
 
 Fluxio currently uses:
 - deterministic parsing
@@ -680,21 +754,27 @@ Fluxio currently uses:
 - structured validation
 - deterministic refinement semantics
 
-Future versions may integrate:
+Current interpretation architecture includes:
+- interpretation provider abstraction
+- deterministic provider
+- fake LLM provider sandbox
+- provider validation layer
+
+Future providers may include:
 - local LLMs
 - Ollama
 - Qwen
-- provider abstractions
+- semantic interpretation providers
 
 However:
-- AI remains assistive
+- providers remain assistive
 - proposals remain authoritative
 - confirmation remains mandatory
 - execution remains controlled
 
 Core principle:
 
-```text id="jlwm6v"
+```text id="z4q7fx"
 LLM assists interpretation.
 Fluxio controls execution.
 ```
@@ -712,7 +792,7 @@ The proposal rail acts as:
 - ambiguity resolver
 - operational truth surface
 
-The frontend should expose:
+The frontend exposes:
 - proposal state
 - confidence
 - ambiguities
@@ -735,13 +815,13 @@ Current implemented flow:
 
 1. User writes:
 
-```text id="jlwmx7"
+```text id="w8m4pc"
 Schedule a meeting with Rossi tomorrow morning
 ```
 
 2. Frontend calls:
 
-```text id="9jlwm0"
+```text id="n5x2qb"
 /api/actions/interpret
 ```
 
@@ -759,7 +839,7 @@ Schedule a meeting with Rossi tomorrow morning
 
 5. User refines:
 
-```text id="jlwm3q"
+```text id="j7k9zs"
 The second one
 ```
 
@@ -791,7 +871,6 @@ Current implemented behaviors include:
 
 Next evolution areas:
 - richer ambiguity workflows
-- resolver-driven entity resolution
 - multilingual parsing
 - confidence scoring evolution
 - multi-step proposals
@@ -817,7 +896,7 @@ Fluxio explores how enterprise software can evolve from:
 toward:
 - proposal-driven workflows
 - ambiguity-aware systems
-- explainable operational AI
+- explainable operational interaction
 - controlled business execution
 
 The proposal lifecycle is the foundation of that vision.
@@ -826,8 +905,8 @@ The goal is NOT autonomous AI execution.
 
 The goal is:
 
-```text id="jlwmk8"
+```text id="c7m2vw"
 Validated, explainable and controllable
-AI-assisted business execution
+proposal-driven business execution
 through structured Action Proposals.
 ```

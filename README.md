@@ -1,11 +1,12 @@
 # Fluxio
 
-AI-first proposal-driven CRM/ERP prototype exploring controlled and explainable business execution through structured Action Proposals.
+Proposal-driven operational CRM/ERP prototype exploring controlled and explainable business execution through structured Action Proposals.
 
 Fluxio is NOT:
 - a chatbot
 - an autonomous AI agent
 - a dashboard-heavy ERP
+- a generic AI wrapper
 
 Fluxio is:
 - proposal-centric
@@ -20,19 +21,19 @@ Fluxio is:
 
 Traditional business software usually follows:
 
-```text
+```text id="w7n2ps"
 User → Form → Validation → Save
 ```
 
 Many AI systems follow:
 
-```text
+```text id="x4k8mb"
 User → AI → Execute
 ```
 
 Fluxio explores a different model:
 
-```text
+```text id="q6v1rc"
 User
 → Natural Language
 → Action Proposal
@@ -51,6 +52,8 @@ Every command becomes a structured proposal that must be:
 - explicitly confirmed
 
 before execution.
+
+The proposal is the authoritative operational object.
 
 ---
 
@@ -93,15 +96,16 @@ The system intentionally exposes:
 - execution consequences
 
 The goal is NOT:
-```text
+
+```text id="m5x9tn"
 AI autonomy
 ```
 
 The goal is:
 
-```text
+```text id="d3q7vk"
 safe, explainable and controllable
-AI-assisted business interaction
+proposal-driven business interaction
 ```
 
 ---
@@ -110,7 +114,7 @@ AI-assisted business interaction
 
 Core lifecycle:
 
-```text
+```text id="j8w4qs"
 Natural Language
 → Intent Interpretation
 → Entity Extraction
@@ -124,7 +128,7 @@ Natural Language
 
 Current proposal states:
 
-```text
+```text id="u9m1pr"
 draft
 → ready
 → confirmed
@@ -137,11 +141,11 @@ Conversation exists ONLY to improve proposal state.
 
 ---
 
-# Proposal Mutation Intelligence
+# Proposal Mutation Semantics
 
 Fluxio supports:
 
-```text
+```text id="b7n4zk"
 controlled proposal mutation semantics
 ```
 
@@ -158,7 +162,7 @@ Current supported mutation operations:
 
 Examples:
 
-```text
+```text id="h2q8tm"
 Move it to Friday
 At 10:30
 Add Mario too
@@ -175,13 +179,13 @@ Fluxio tracks:
 
 The UX should communicate:
 
-```text
+```text id="r5k1vx"
 "The proposal evolved."
 ```
 
 NOT:
 
-```text
+```text id="f6z3mn"
 "The assistant replied."
 ```
 
@@ -195,7 +199,7 @@ The system never silently chooses entities.
 
 Example:
 
-```text
+```text id="n4t7wj"
 Call Rossi
 ```
 
@@ -212,7 +216,7 @@ Instead of hallucinating certainty, Fluxio:
 
 Example refinement flow:
 
-```text
+```text id="p2x8qa"
 Schedule a meeting with Rossi tomorrow morning
 → ambiguity detected
 
@@ -317,7 +321,7 @@ The proposal rail remains the operational center of the interface.
 
 Fluxio is built as a modular monolith with explicit boundaries.
 
-```text
+```text id="s4m7vb"
 fluxio/
 ├── apps/
 │   ├── api/
@@ -336,7 +340,7 @@ fluxio/
 
 Core principle:
 
-```text
+```text id="g1n8qk"
 Modularize first, microservice later.
 ```
 
@@ -362,6 +366,7 @@ Responsibilities:
 - execution orchestration
 - execution safety
 - refinement tracking
+- entity resolution
 
 Current capabilities:
 - proposal continuity
@@ -371,6 +376,9 @@ Current capabilities:
 - mutation summaries
 - operational intent registry
 - deterministic execution flows
+- interpretation provider abstraction
+- normalized command validation
+- entity resolution layer
 
 ---
 
@@ -378,7 +386,7 @@ Current capabilities:
 
 Input:
 
-```text
+```text id="x8k3pb"
 Schedule a meeting with Rossi tomorrow morning
 ```
 
@@ -390,7 +398,7 @@ System:
 
 Refinement:
 
-```text
+```text id="m4v1tn"
 The second one
 ```
 
@@ -401,7 +409,7 @@ System:
 
 Refinement:
 
-```text
+```text id="c7q5zx"
 Move it to Friday at 10:30
 ```
 
@@ -412,7 +420,7 @@ System:
 
 Execution:
 
-```text
+```text id="u5n2wr"
 Confirm
 → Execute
 ```
@@ -421,6 +429,59 @@ Result:
 - operation executed
 - execution result rendered
 - proposal becomes immutable
+
+---
+
+# Entity Resolution Layer
+
+Fluxio now includes a dedicated entity resolution architecture.
+
+Current structure:
+
+```text id="b9m6qv"
+EntityResolverInterface
+→ EntityResolverRegistry
+→ Resolver implementations
+→ ResolutionResult
+```
+
+Current implemented resolver:
+- `LeadEntityResolver`
+
+Current behaviors:
+- deterministic scoring
+- confidence ordering
+- ambiguity generation
+- auto-resolution thresholds
+- proposal-scoped refinement
+
+---
+
+# Provider Validation Boundary
+
+Every interpreted command is validated before entering the proposal lifecycle.
+
+Current flow:
+
+```text id="q3w8tp"
+Interpretation Provider
+→ NormalizedCommand
+→ Validation Layer
+→ Proposal Lifecycle
+```
+
+Current validation includes:
+- intent validation
+- confidence validation
+- entity validation
+- requirement compatibility checks
+
+Malformed provider output is rejected before proposal creation.
+
+This protects:
+- proposal integrity
+- frontend stability
+- deterministic lifecycle semantics
 
 ---
 
@@ -467,7 +528,7 @@ Fluxio exposes a standardized JSON API.
 
 ## Success Response
 
-```json
+```json id="r6m2zc"
 {
   "success": true,
   "message": "Operation completed successfully.",
@@ -479,7 +540,7 @@ Fluxio exposes a standardized JSON API.
 
 ## Error Response
 
-```json
+```json id="w1q7vn"
 {
   "success": false,
   "message": "Error message."
@@ -490,7 +551,7 @@ Fluxio exposes a standardized JSON API.
 
 ## Validation Error
 
-```json
+```json id="f8t4pk"
 {
   "success": false,
   "message": "Validation failed.",
@@ -523,7 +584,7 @@ Fluxio already includes:
 - modular backend architecture
 - standardized API layer
 - proposal lifecycle
-- proposal mutation intelligence
+- proposal mutation semantics
 - ambiguity-aware refinement
 - operational intent registry
 - contextual mutations
@@ -534,6 +595,9 @@ Fluxio already includes:
 - ambiguity-aware UX
 - execution rendering
 - responsive operational UI
+- entity resolution layer
+- interpretation provider abstraction
+- normalized command validation
 
 Current implemented operational intents:
 - `create_task`
@@ -560,17 +624,16 @@ Implemented frontend capabilities:
 - i18n support
 
 Frontend direction remains:
-- AI-first
 - proposal-centric
 - operational
 - deterministic-first
+- non-chatbot
 
 ---
 
 # Not Yet Implemented
 
 - Real LLM provider integration
-- Provider abstraction layer
 - Semantic entity search
 - Advanced resolver ranking
 - Voice workflows
@@ -606,7 +669,7 @@ However:
 
 Core principle:
 
-```text
+```text id="n2v5rk"
 LLM assists interpretation.
 Fluxio controls execution.
 ```
@@ -615,7 +678,6 @@ Possible future providers:
 - Ollama
 - Qwen
 - local lightweight models
-- provider abstraction layer
 
 ---
 
@@ -685,6 +747,35 @@ npm run dev
 
 ---
 
+# Why Fluxio Exists
+
+Fluxio started as an exploration of whether business software could evolve beyond:
+- CRUD-heavy workflows
+- dashboard-first ERP interfaces
+- generic AI chat experiences
+
+The project focuses on:
+- proposal-driven operational interaction
+- deterministic execution
+- ambiguity-aware workflows
+- explainable proposal lifecycle semantics
+
+The goal is not to automate human decisions away.
+
+The goal is to explore software that helps operators work through:
+- structured proposals
+- controlled refinements
+- explicit confirmations
+- safe operational execution
+
+while preserving:
+- clarity
+- control
+- explainability
+- operational trust
+
+---
+
 # Development Philosophy
 
 Fluxio evolves through:
@@ -714,10 +805,9 @@ Avoided intentionally:
 Fluxio is currently NOT production-ready.
 
 The project exists to explore:
-- AI-first operational UX
-- proposal-driven business interaction
+- proposal-driven operational UX
 - ambiguity-aware workflows
-- explainable AI-assisted execution
+- explainable proposal interaction
 - deterministic proposal mutation semantics
 - future enterprise interaction models
 
@@ -726,7 +816,16 @@ while demonstrating:
 - scalable frontend structure
 - proposal-centric UX
 - maintainable domain separation
-- controlled AI-assisted workflows
+- controlled operational workflows
+
+---
+
+# Author
+
+Fluxio is designed and developed by Paolo Servilio.
+
+GitHub:
+https://github.com/anfibes
 
 ---
 

@@ -6,29 +6,29 @@
 
 Fluxio frontend explores:
 
-```text id="xtxjnd"
+```text id="r0k2mq"
 proposal-driven operational UX
 ```
 
 instead of:
 - dashboard-first ERP UX
-- CRUD-heavy workflows
+- CRUD-heavy interaction
 - conversational assistant interfaces
-- autonomous AI interaction
+- autonomous AI workflows
 
 Core hypothesis:
 
-```text id="fskh4v"
+```text id="9g8v2t"
 Business software can evolve from forms and dashboards
 toward proposal-centric operational workflows.
 ```
 
 The frontend exists to:
 - operationalize proposal workflows
-- expose refinement state
 - preserve execution control
+- expose proposal state clearly
 - support ambiguity-aware interaction
-- make AI assistance explainable
+- visualize proposal mutations
 
 The experience should feel closer to:
 - an operational workspace
@@ -52,7 +52,6 @@ These rules should never be violated.
 - Ambiguities remain explicit
 - Execution remains explicit
 - Mutation visibility is preserved
-- AI never feels autonomous
 - Conversational timelines are avoided
 - Proposal state remains inspectable
 - Operational clarity is prioritized over conversational realism
@@ -65,7 +64,7 @@ These invariants define the frontend identity of Fluxio.
 
 Fluxio revolves around:
 
-```text id="wew5py"
+```text id="s4r8yk"
 Command
 → Proposal
 → Refinement
@@ -79,7 +78,6 @@ Natural language exists ONLY to:
 - refine proposals
 - resolve ambiguities
 - complete missing information
-- improve confidence
 - mutate proposal state
 
 Execution always remains:
@@ -97,9 +95,9 @@ The proposal is the central UI object.
 Fluxio frontend is intentionally:
 - proposal-centric
 - operational
-- AI-first
 - execution-oriented
 - refinement-oriented
+- deterministic-first
 
 The interface should communicate:
 - control
@@ -123,7 +121,7 @@ Operational clarity is more important than conversational realism.
 
 Current frontend flow:
 
-```text id="9r12zm"
+```text id="5d7t6x"
 Login
 → Command input
 → Proposal creation
@@ -167,24 +165,19 @@ Current frontend already validates:
 - proposal-centric interaction
 - operational refinement workflows
 - deterministic proposal execution
-- explainable AI-assisted UX
+- explainable proposal-driven UX
 
 The project has moved beyond:
-```text id="j2f4wn"
+
+```text id="j3f1qe"
 simple parser demo territory
 ```
 
 ---
 
-# Proposal Intelligence UX
+# Proposal Mutation UX
 
-Fluxio is evolving toward:
-
-```text id="svfqk7"
-Proposal Intelligence UX
-```
-
-The frontend must clearly communicate:
+Fluxio frontend communicates:
 - what changed
 - what remains unresolved
 - what became executable
@@ -194,13 +187,13 @@ The frontend must clearly communicate:
 
 The UI should communicate:
 
-```text id="rqovgq"
+```text id="0j9g5s"
 "The proposal changed."
 ```
 
 NOT:
 
-```text id="8myk36"
+```text id="u2f7cn"
 "The assistant replied."
 ```
 
@@ -221,13 +214,13 @@ Refinements must:
 
 Example:
 
-```text id="69p47z"
+```text id="l4x9bd"
 Schedule a meeting with Rossi
 ```
 
 Refinement:
 
-```text id="mg8m0g"
+```text id="n2k8yv"
 Tomorrow morning
 ```
 
@@ -249,7 +242,7 @@ Fluxio supports contextual proposal mutations.
 
 Examples:
 
-```text id="f4dn3z"
+```text id="k5v1jt"
 At 10:30
 Friday instead
 Add Mario too
@@ -289,7 +282,7 @@ Fluxio must NEVER:
 
 Example:
 
-```text id="n9q0ym"
+```text id="d4n0zc"
 Call Rossi
 ```
 
@@ -315,36 +308,36 @@ NOT conversational.
 
 # Entity Resolution UX
 
-Fluxio is evolving toward:
+Fluxio now includes a resolver-driven proposal workflow.
 
-```text id="v5t9b0"
-resolver-driven operational UX
+Current frontend responsibilities:
+- candidate rendering
+- ambiguity visualization
+- proposal-scoped resolution
+- confidence-aware selection flows
+
+Current entity resolution flow:
+
+```text id="n6q8tm"
+Intent interpretation
+→ Entity extraction
+→ Entity resolution
+→ Proposal update
 ```
 
-Future frontend responsibilities:
-- candidate ranking
-- entity previews
-- contextual suggestions
-- proposal-scoped entity resolution
-- confidence-aware resolution workflows
+Current implemented resolver UX:
+- lead ambiguity rendering
+- candidate selection
+- ordinal refinements
+- blocking ambiguity states
 
-Examples:
-- Lead suggestions
-- Product suggestions
-- Calendar participant resolution
-- User assignment suggestions
+Future expansion may include:
+- product suggestions
+- calendar participant resolution
+- user assignment resolution
+- semantic search assistance
 
-Important distinction:
-
-```text id="qk5n2d"
-intent interpretation
-≠
-entity extraction
-≠
-entity resolution
-```
-
-The frontend will progressively expose these phases explicitly.
+without changing the proposal lifecycle.
 
 ---
 
@@ -362,8 +355,8 @@ Low confidence is NOT considered failure.
 
 It is part of:
 - operational transparency
-- deterministic AI workflows
-- explainable business interaction
+- deterministic workflows
+- explainable interaction
 
 The system should never pretend certainty it does not have.
 
@@ -375,7 +368,7 @@ Incomplete proposals are a core interaction pattern.
 
 Example:
 
-```text id="6z9o6j"
+```text id="r6g3kp"
 Schedule a meeting with Rossi
 ```
 
@@ -439,11 +432,38 @@ NOT conversational.
 
 ---
 
+# Provider Validation Boundary
+
+Fluxio frontend intentionally receives only:
+- proposal-safe payloads
+- validated proposal state
+- deterministic lifecycle data
+
+Malformed provider outputs are rejected before entering the proposal lifecycle.
+
+Current flow:
+
+```text id="u9v4qh"
+Interpretation Provider
+→ Validation Layer
+→ Proposal Lifecycle
+→ Frontend
+```
+
+This allows the frontend to remain:
+- deterministic
+- proposal-centric
+- operationally stable
+
+without depending on provider internals.
+
+---
+
 # Core Layout
 
 Current layout:
 
-```text id="yvl7eh"
+```text id="m1t7vk"
 ┌──────────────────────────────────────────────────────────┐
 │ Sidebar                                                  │
 ├──────────────────────────────────────────────────────────┤
@@ -543,7 +563,7 @@ It should feel:
 
 The user should immediately understand:
 
-```text id="n8q8m7"
+```text id="x7n0vz"
 "I can operate the system from here."
 ```
 
@@ -567,7 +587,7 @@ Future direction:
 
 Fluxio intentionally exposes interpretation in real time.
 
-The frontend should render:
+The frontend renders:
 - detected intent
 - detected entities
 - confidence
@@ -740,7 +760,7 @@ Fluxio should progressively standardize:
 
 Preferred semantic utilities:
 
-```text id="3yx0zh"
+```text id="a4v1zg"
 bg-surface
 text-muted
 border-border
@@ -751,15 +771,16 @@ Avoid uncontrolled utility sprawl.
 
 ---
 
-# AI-First Principle
+# Frontend Principles
 
-Fluxio is NOT:
-```text id="6m0vry"
+Fluxio frontend is NOT:
+
+```text id="f6x7dr"
 an AI wrapper
 ```
 
 The frontend exists to:
-- operationalize AI assistance
+- operationalize proposal workflows
 - preserve human control
 - expose proposal lifecycle
 - maintain explainability
@@ -777,7 +798,7 @@ The frontend must reinforce this behavior visually and structurally.
 
 # Future Frontend Direction
 
-## Proposal Intelligence
+## Proposal Workflows
 
 Planned:
 - richer ambiguity workflows
@@ -838,15 +859,18 @@ without sacrificing:
 - explainability
 - operational safety
 
-The frontend is the visible manifestation of that vision.
+The frontend is the visible manifestation of that direction.
 
 The goal is NOT:
-```text id="dxd4k7"
+
+```text id="g1u9zt"
 replacing operators with AI
 ```
 
 The goal is:
 
-```text id="rvvqk8"
-building operational software where AI assists structured human decision-making through validated Action Proposals.
+```text id="q7m4vk"
+building operational software where AI assists
+structured human decision-making through
+validated Action Proposals.
 ```

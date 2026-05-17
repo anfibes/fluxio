@@ -4,28 +4,31 @@
 
 # Introduction
 
-Fluxio is an experimental proposal-driven CRM/ERP prototype exploring:
+Fluxio is an experimental proposal-driven operational CRM prototype.
 
-```text
-controlled operational AI workflows
+Core hypothesis:
+
+```text id="r5g2kv"
+Business systems can evolve from CRUD-heavy workflows
+toward validated Action Proposal workflows.
 ```
-
-instead of:
-- dashboard-first ERP interaction
-- CRUD-heavy operational flows
-- conversational assistant UX
-- autonomous AI execution
 
 Fluxio is intentionally:
 - proposal-centric
 - operational
 - deterministic-first
-- architecture-first
 - refinement-oriented
+- architecture-first
+
+Fluxio is intentionally NOT:
+- a chatbot wrapper
+- an autonomous AI system
+- dashboard-heavy ERP software
+- conversational assistant software
 
 Natural language never executes business operations directly.
 
-Every operation must pass through:
+Every operation passes through:
 1. interpretation
 2. proposal creation
 3. refinement
@@ -51,12 +54,14 @@ These rules should never be violated.
 - Proposal state remains explainable
 
 Fluxio is intentionally:
-```text
+
+```text id="f7m1cz"
 operational
 ```
 
 NOT:
-```text
+
+```text id="n4w2qr"
 conversational
 ```
 
@@ -66,7 +71,7 @@ conversational
 
 Current implemented flow:
 
-```text
+```text id="w8v6ta"
 Command
 → Interpret
 → Draft proposal
@@ -89,18 +94,22 @@ Current implemented capabilities:
 - proposal-local references
 - mutation summaries
 - confidence-aware UX
+- entity resolution
+- interpretation provider abstraction
+- provider validation boundaries
 
 The current prototype already validates:
 - proposal-driven interaction
-- operational AI UX
-- deterministic refinement semantics
-- explainable execution workflows
+- deterministic refinement workflows
+- explainable proposal lifecycle
+- ambiguity-aware operational UX
+- controlled execution workflows
 
 ---
 
 # Repository Structure
 
-```text
+```text id="j9s4yf"
 fluxio/
 ├── apps/
 │   ├── api/
@@ -118,8 +127,14 @@ fluxio/
 │
 ├── docs/
 │
+├── .docs/
+│
 └── README.md
 ```
+
+Documentation strategy:
+- `docs/` → public versioned documentation
+- `.docs/` → local internal architecture notes and working documents
 
 ---
 
@@ -217,7 +232,7 @@ php artisan serve
 
 Default API URL:
 
-```text
+```text id="n0v6zy"
 http://localhost:8000
 ```
 
@@ -227,7 +242,7 @@ http://localhost:8000
 
 Recommended local API URL:
 
-```text
+```text id="r1q5bo"
 https://fluxio.test
 ```
 
@@ -238,7 +253,7 @@ Typical setup:
 
 Typical public root:
 
-```text
+```text id="d7m8tk"
 /Applications/progetti/fluxio/apps/api/public
 ```
 
@@ -266,7 +281,7 @@ NUXT_PUBLIC_API_BASE=https://fluxio.test/api
 
 Fallback configuration exists in:
 
-```text
+```text id="v5k2sa"
 nuxt.config.ts
 ```
 
@@ -278,7 +293,7 @@ npm run dev
 
 Default frontend URL:
 
-```text
+```text id="k8r1fw"
 http://localhost:3000
 ```
 
@@ -291,7 +306,7 @@ http://localhost:3000
 | Laravel API | `https://fluxio.test/api` |
 | Nuxt frontend | `http://localhost:3000` |
 
-Frontend communicates with backend through API requests.
+Frontend communicates with backend exclusively through API requests.
 
 ---
 
@@ -301,7 +316,7 @@ Credentials depend on current seeders.
 
 Typical local credentials:
 
-```text
+```text id="t3v6mn"
 email: test@example.com
 password: password
 ```
@@ -314,7 +329,7 @@ Check actual seeders if credentials differ.
 
 Example:
 
-```text
+```text id="e9x4qp"
 Schedule a meeting with Rossi tomorrow morning
 ```
 
@@ -326,7 +341,7 @@ Expected behavior:
 
 Refinement:
 
-```text
+```text id="h6s2ra"
 The second one
 ```
 
@@ -337,7 +352,7 @@ Expected behavior:
 
 Execution flow:
 
-```text
+```text id="m5f1uc"
 Confirm
 → Execute
 → Execution result
@@ -364,6 +379,9 @@ Implemented backend capabilities:
 - execution idempotency
 - shared temporal parser
 - operational intent registry
+- entity resolution layer
+- interpretation provider abstraction
+- normalized command validation
 
 Current Actions endpoints:
 
@@ -400,9 +418,9 @@ Implemented frontend capabilities:
 - i18n support
 
 Frontend direction:
-- AI-first
 - proposal-centric
 - operational
+- deterministic-first
 - non-chatbot
 
 ---
@@ -420,7 +438,7 @@ php artisan test
 Run filtered tests:
 
 ```bash
-php artisan test --filter=ProposalMutationIntelligenceTest
+php artisan test --filter=ProposalMutationTest
 ```
 
 Clear caches:
@@ -466,13 +484,13 @@ Planned:
 
 Frontend translations:
 
-```text
+```text id="q8p4zd"
 apps/web/locales/
 ```
 
 Backend translations:
 
-```text
+```text id="u2m7xr"
 apps/api/lang/
 ```
 
@@ -486,7 +504,7 @@ Fluxio uses semantic Tailwind utilities and design tokens.
 
 Preferred utilities:
 
-```text
+```text id="b4s6wy"
 bg-surface
 text-muted
 border-border
@@ -510,14 +528,24 @@ Fluxio follows:
 - deterministic refinement workflows
 - ambiguity-aware operations
 - controlled execution
-- explainable operational AI
+- explainable operational workflows
 
-Important concepts:
+Important implemented concepts:
 - proposal continuity
 - mutation semantics
 - ambiguity handling
-- operational explainability
+- entity resolution
+- provider validation
 - explicit execution control
+
+Current provider flow:
+
+```text id="z1m8ta"
+Interpretation Provider
+→ NormalizedCommand
+→ Validation
+→ Proposal Lifecycle
+```
 
 The project intentionally prioritizes:
 - operational consistency
@@ -533,7 +561,7 @@ over:
 
 # Documentation
 
-Main documents:
+Public versioned documentation:
 
 | File | Purpose |
 |---|---|
@@ -545,6 +573,15 @@ Main documents:
 | `docs/development-plan.md` | roadmap and milestones |
 | `docs/api-response-standard.md` | API response contracts |
 
+Internal local notes:
+- `.docs/`
+
+Used for:
+- architecture notes
+- implementation planning
+- work-in-progress documentation
+- internal technical tracking
+
 ---
 
 # Known Limitations
@@ -553,17 +590,16 @@ Current prototype limitations:
 - no advanced permissions
 - no production deployment pipeline
 - no realtime collaboration
-- no advanced provider abstraction
 - limited ERP modules
 - no semantic search yet
-- no advanced entity resolution yet
 - no voice workflows yet
+- no real LLM providers yet
 
 Current focus intentionally remains:
 - proposal continuity
 - mutation semantics
 - ambiguity workflows
-- operational AI UX
+- operational UX
 - deterministic execution
 
 ---
@@ -597,9 +633,9 @@ Fluxio is NOT:
 
 Fluxio explores:
 
-```text
+```text id="p7n2vd"
 structured, explainable and controllable
-AI-assisted business execution
+proposal-driven business interaction
 ```
 
 through:

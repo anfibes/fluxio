@@ -31,18 +31,17 @@ instead of manually constructing JSON payloads.
 
 The response layer provides:
 - stable frontend/backend contracts
-- deterministic proposal transport
+- deterministic transport structures
 - centralized exception rendering
 - predictable TypeScript integration
-- operational explainability
-- proposal lifecycle consistency
+- proposal-safe payload transport
 
 The response contract must remain:
 - explicit
 - stable
 - frontend-safe
 - composable
-- proposal-compatible
+- deterministic
 
 ---
 
@@ -71,6 +70,14 @@ Must:
 - expose ambiguities explicitly
 - expose refinement mutations explicitly
 - remain deterministic
+
+The response layer transports proposal state but does NOT implement:
+- proposal lifecycle logic
+- ambiguity resolution logic
+- mutation semantics
+- execution orchestration
+
+Those remain inside the Actions module.
 
 ---
 
@@ -115,19 +122,17 @@ This enables:
 
 ## Stable proposal transport
 
-Fluxio is proposal-driven.
+Many Actions endpoints return proposal payloads instead of executing business operations directly.
 
-Many endpoints return `ActionProposal` payloads instead of executing business operations directly.
+The response layer transports proposal state without requiring endpoint-specific response structures.
 
-The response layer must support:
+This includes:
 - proposal interpretation
-- proposal refinement
-- ambiguity resolution
-- proposal mutation tracking
-- confirmation workflows
-- execution workflows
-
-without requiring custom response formats.
+- refinement state
+- ambiguities
+- mutations
+- execution state
+- execution results
 
 ---
 
@@ -308,6 +313,38 @@ core::api.not_found
 
 ---
 
+# Invalid Provider Output Response
+
+HTTP status:
+- `422 Unprocessable Entity`
+
+Structure:
+
+```json
+{
+    "success": false,
+    "message": "The interpreted command is invalid."
+}
+```
+
+Triggered automatically by:
+
+```text
+InvalidNormalizedCommandException
+```
+
+Purpose:
+- isolate malformed provider output
+- protect proposal lifecycle integrity
+- prevent invalid `NormalizedCommand` payloads from entering proposal orchestration
+
+This currently applies to:
+- interpretation providers
+- fake LLM providers
+- future external inference providers
+
+---
+
 # Server Error Response
 
 HTTP status:
@@ -405,7 +442,7 @@ Current proposal endpoints:
 | POST | `/api/actions/{proposal}/confirm` |
 | POST | `/api/actions/{proposal}/execute` |
 
-These endpoints still use the same standardized response envelope.
+These endpoints use the same standardized response envelope used by the rest of the API.
 
 ---
 
@@ -668,6 +705,7 @@ The response layer automatically:
 | `AuthorizationException` | `AccessDeniedHttpException` | 403 |
 | `ModelNotFoundException` | `NotFoundHttpException` | 404 |
 | `NotFoundHttpException` | itself | 404 |
+| `InvalidNormalizedCommandException` | itself | 422 |
 | Generic `Throwable` | itself | 500 |
 
 Rendering applies only to:
@@ -677,6 +715,30 @@ Accept: application/json
 ```
 
 Non-JSON requests fall back to Laravel HTML rendering.
+
+---
+
+# Validation Boundaries
+
+Current provider flow:
+
+```text
+Interpretation Provider
+→ NormalizedCommand
+→ Validation
+→ Proposal Lifecycle
+```
+
+The response layer participates in provider isolation by:
+- rendering validation failures safely
+- preventing malformed provider payloads from leaking
+- preserving deterministic API contracts
+
+The response layer does NOT:
+- validate business workflows
+- decide proposal readiness
+- resolve ambiguities
+- execute business actions
 
 ---
 
@@ -692,6 +754,7 @@ Priority areas:
 - execution consistency
 - frontend compatibility
 - idempotent execution
+- provider validation
 
 The response layer is foundational infrastructure and must remain highly stable.
 
@@ -701,9 +764,9 @@ The response layer is foundational infrastructure and must remain highly stable.
 
 The response layer acts as:
 - backend/frontend transport contract
-- proposal lifecycle transport layer
+- deterministic API boundary
+- proposal transport layer
 - operational explainability layer
-- deterministic proposal orchestration layer
 
 Fluxio depends heavily on:
 - stable proposal payloads
@@ -712,6 +775,6 @@ Fluxio depends heavily on:
 - explicit ambiguity handling
 
 This layer is one of the core foundations enabling:
-- proposal-centric UX
-- AI-first operational workflows
-- controlled enterprise AI interaction
+- proposal-driven operational workflows
+- controlled interpretation pipelines
+- frontend/backend contract stability

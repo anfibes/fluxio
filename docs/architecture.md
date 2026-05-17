@@ -4,32 +4,27 @@
 
 # Purpose
 
-Fluxio is an open-source CRM/ERP prototype exploring:
-
-```text id="gij7a7"
-proposal-driven enterprise software
-```
+Fluxio is an open-source proposal-driven operational CRM prototype.
 
 Core hypothesis:
 
-```text id="r2d1xz"
+```text id="qg5d0y"
 Business systems can evolve from CRUD-first workflows
 toward validated Action Proposal workflows.
 ```
 
 Fluxio focuses on:
-- controlled operational AI
-- deterministic execution
 - proposal continuity
+- deterministic execution
 - ambiguity-aware workflows
-- explainable business interaction
+- explainable operational interaction
+- refinement-oriented UX
 
 The project is intentionally:
 - architecture-first
 - proposal-centric
-- operational
 - deterministic-first
-- refinement-oriented
+- operational
 
 Fluxio is intentionally NOT:
 - a generic chatbot
@@ -60,7 +55,7 @@ These invariants are foundational to Fluxio’s architecture.
 
 Fluxio follows this operational flow:
 
-```text id="w8q73g"
+```text id="ykm8t1"
 Natural language
 → Intent interpretation
 → Entity extraction
@@ -89,9 +84,9 @@ The proposal is the central architectural object.
 
 ---
 
-# Controlled Operational Intelligence
+# Deterministic Operational Strategy
 
-Fluxio follows a deterministic-first operational AI strategy.
+Fluxio follows a deterministic-first strategy.
 
 The system must:
 - expose uncertainty
@@ -105,7 +100,7 @@ Current architecture validates:
 - refinement semantics
 - ambiguity-aware workflows
 - controlled execution
-- proposal mutation intelligence
+- proposal mutation semantics
 
 WITHOUT requiring LLM infrastructure.
 
@@ -113,20 +108,16 @@ LLMs are optional interpretation assistants, not operational authorities.
 
 ---
 
-# Proposal Intelligence Architecture
+# Proposal Mutation Semantics
 
-Fluxio is evolving toward:
+Fluxio supports incremental proposal mutation.
 
-```text id="0kzy48"
-Proposal Mutation Intelligence
-```
-
-The system must understand:
+The system tracks:
 - what changed
 - which fields mutated
 - what remains unchanged
-- whether readiness changed
-- whether ambiguity changed
+- readiness changes
+- ambiguity changes
 
 Current supported refinement behaviors:
 - add information
@@ -138,7 +129,7 @@ Current supported refinement behaviors:
 
 Examples:
 
-```text id="5r2m2n"
+```text id="p8m5wq"
 Tomorrow morning
 At 10:30
 Friday instead
@@ -156,7 +147,7 @@ Current mutation operations:
 
 Key principle:
 
-```text id="j04wdm"
+```text id="4g2ghq"
 Proposal continuity alone is not enough.
 Fluxio also requires proposal mutation semantics.
 ```
@@ -169,13 +160,13 @@ Refinement updates the SAME proposal instead of creating disconnected conversati
 
 Example:
 
-```text id="svcb68"
+```text id="x5zjfa"
 Schedule a call with Rossini
 ```
 
 Refinement:
 
-```text id="yywv1j"
+```text id="h0b4rb"
 Tomorrow morning
 ```
 
@@ -206,7 +197,7 @@ The system must NEVER:
 
 Example:
 
-```text id="a6b44u"
+```text id="u7f5h1"
 Call Rossi
 ```
 
@@ -227,31 +218,37 @@ Ambiguity is part of the proposal lifecycle.
 
 # Entity Resolution Architecture
 
-Fluxio now has a dedicated Entity Resolution Layer inside `packages/Actions/src/EntityResolution/`.
+Fluxio includes a dedicated Entity Resolution Layer inside:
+
+```text id="8vmd5l"
+packages/Actions/src/EntityResolution/
+```
 
 Implemented:
-- `EntityResolverInterface` — `supports(string $entityType)` + `resolve(string $query, ResolutionContext $context): ResolutionResult`
-- `EntityResolverRegistry` — routes queries to the first matching registered resolver
-- `ResolutionContext` — carries entity type and locale
-- `ResolutionCandidate` — scored match candidate (id, type, label, description?, confidence)
-- `ResolutionResult` — sealed result: `autoResolved()` / `ambiguous()` / `noMatch()`
-- `LeadEntityResolver` — deterministic word-boundary scoring for lead names
-- `InMemoryLeadRepository` — demo dataset, injectable for tests
+- `EntityResolverInterface`
+- `EntityResolverRegistry`
+- `ResolutionContext`
+- `ResolutionCandidate`
+- `ResolutionResult`
+- `LeadEntityResolver`
+- `InMemoryLeadRepository`
 
-Scoring tiers (LeadEntityResolver):
-- `1.0` — exact match (case-insensitive)
-- `0.8` — label starts with query at word boundary
-- `0.65` — query appears at word boundary within label
+Current scoring tiers:
+- `1.0` → exact match
+- `0.8` → starts-with
+- `0.65` → word-boundary contains
 
 Auto-resolve rules:
 - exactly one candidate
-- confidence ≥ `AUTO_RESOLVE_THRESHOLD` (0.8)
-- single low-confidence match surfaces as ambiguity requiring explicit selection
+- confidence ≥ `0.8`
 
-Separation of concerns:
-- intent interpretation — `RuleBasedIntentResolver`
-- entity extraction — produces `lead_query` tokens
-- entity resolution — `EntityResolverRegistry` decides auto-resolve vs ambiguity
+Single low-confidence matches remain ambiguous and require explicit selection.
+
+Current separation of concerns:
+- intent interpretation
+- entity extraction
+- entity resolution
+- proposal building
 
 Planned additional resolvers:
 - UserResolver
@@ -264,6 +261,8 @@ Future-ready for:
 - local inference
 - vector search
 
+without requiring them today.
+
 ---
 
 # Modular Monolith
@@ -272,7 +271,7 @@ Fluxio is designed as a modular monolith.
 
 Principle:
 
-```text id="ed8y79"
+```text id="s29o8f"
 Modularize first, microservice later.
 ```
 
@@ -284,7 +283,7 @@ Goals:
 
 Current structure:
 
-```text id="xf8yr0"
+```text id="p4v3fg"
 fluxio/
   apps/
     api/
@@ -360,7 +359,7 @@ Responsibilities:
 The frontend is intentionally:
 - proposal-centric
 - operational
-- AI-first
+- workflow-oriented
 
 NOT dashboard-first.
 
@@ -370,7 +369,7 @@ NOT dashboard-first.
 
 The UI should feel like:
 
-```text id="o1m5h9"
+```text id="8i2l9r"
 Operational Copilot UX
 ```
 
@@ -411,7 +410,7 @@ Current orchestration composables:
 
 Current frontend flow:
 
-```text id="yr9wnk"
+```text id="r8k6rj"
 Command input
 → Interpret
 → Proposal
@@ -425,7 +424,7 @@ Command input
 
 # Current Frontend Components
 
-```text id="3i9goz"
+```text id="9bx1fa"
 layout/
   AppSidebar
   AppTopbar
@@ -462,7 +461,7 @@ context/
 
 Typical package structure:
 
-```text id="h26cxn"
+```text id="8k8w5j"
 src/
   Http/
     Controllers/
@@ -537,8 +536,7 @@ Implemented:
 - search
 
 Future direction:
-- entity resolution
-- proposal-aware lead workflows
+- proposal-aware workflows
 - ambiguity-aware CRM interaction
 
 ---
@@ -582,6 +580,9 @@ Implemented:
 - collection mutations
 - execution idempotency
 - shared temporal parser
+- interpretation provider abstraction
+- normalized command validation
+- entity resolution layer
 
 Current intents:
 - `create_task`
@@ -596,7 +597,9 @@ Execution always requires explicit confirmation.
 
 # NormalizedCommand Validation Layer
 
-Every `NormalizedCommand` produced by any provider is validated by `NormalizedCommandValidator` before it enters the proposal pipeline. This is a structural safety layer designed for future LLM provider integration.
+Every `NormalizedCommand` produced by a provider is validated before entering the proposal pipeline.
+
+Flow:
 
 ```text
 InterpretationProvider
@@ -614,39 +617,46 @@ Structure:
 packages/Actions/src/Validation/
   NormalizedCommandValidator.php
   NormalizedCommandValidationResult.php
+
 packages/Actions/src/Exceptions/
   InvalidNormalizedCommandException.php
 ```
 
 Validation rules:
-1. **Intent** — must not be empty; must be registered in `IntentRegistry` or the `unknown` sentinel
-2. **Confidence** — must be in `[0.0, 1.0]`
-3. **Entity values** — must not be null or empty string
-4. **Entity key compatibility** — keys must match the intent's `EntityRequirement.key`, `EntityRequirement.entityType`, or the transitional `UNIVERSAL_PARSER_KEYS` allowlist (`date`, `time`)
+1. intent must exist or be `unknown`
+2. confidence must be within `[0.0, 1.0]`
+3. entity values must not be null or empty
+4. entity keys must match `EntityRequirement` definitions or transitional parser keys
 
-Invalid provider output throws `InvalidNormalizedCommandException` → 422 API response with a safe generic message (internal errors never exposed).
+Invalid provider output throws:
 
-Key distinction:
-- Invalid command structure → validator rejects → exception → 422
-- Missing required entity → structurally valid → proposal becomes draft
+```text id="3p9e8m"
+InvalidNormalizedCommandException
+```
 
-Transitional compatibility: `date` and `time` are universal parser keys emitted by `DateTimeExpressionParser` for any intent. They are allowed regardless of the intent's specific requirement keys. This will be revisited when all intents declare explicit date/time field declarations.
+which becomes a safe `422` response.
 
-Future LLM providers must produce structurally valid `NormalizedCommand` objects to pass this layer.
+Important distinction:
+- invalid command structure → validation failure
+- missing required entities → valid command, draft proposal
+
+Future LLM providers must produce structurally valid `NormalizedCommand` payloads.
 
 ---
 
 # Interpretation Sandbox Layer
 
-Fluxio has an explicit provider abstraction for interpretation so the interpretation source is swappable without touching the proposal lifecycle.
+Fluxio has an explicit provider abstraction for interpretation.
+
+Flow:
 
 ```text
 InterpretationProviderInterface
-  → NormalizedCommand
-  → ActionInterpreterService
-  → Entity Resolution
-  → Proposal Builder
-  → ActionProposalData
+→ NormalizedCommand
+→ ActionInterpreterService
+→ Entity Resolution
+→ Proposal Builder
+→ ActionProposalData
 ```
 
 Structure:
@@ -661,57 +671,94 @@ packages/Actions/src/Interpretation/
 ```
 
 `InterpretationProviderInterface`:
+
 ```php
-public function interpret(string $text, InterpretationContext $context): NormalizedCommand;
+public function interpret(
+    string $text,
+    InterpretationContext $context
+): NormalizedCommand;
 ```
 
-`InterpretationContext` fields: `locale` (string, default `'en'`), `userId` (?int), `metadata` (array).
+Current providers:
+- `DeterministicInterpretationProvider`
+- `FakeLlmInterpretationProvider` (sandbox/test only)
 
-`DeterministicInterpretationProvider` — default registered provider. Wraps the rule-based resolver. Deterministic, no external dependencies.
+Providers produce ONLY:
+- `NormalizedCommand`
 
-`FakeLlmInterpretationProvider` — sandbox/test provider only. Accepts controlled `addResponse()` pairs. No API calls. Not registered as default. Validates that provider swapping works without touching the proposal lifecycle.
+Providers do NOT:
+- create proposals
+- resolve entities
+- decide readiness
+- execute business actions
 
-`InterpretationProviderAdapter` — bridges `InterpretationProviderInterface` → `CommandInterpreterInterface` so `ActionInterpreterService` needs no changes when the provider is swapped.
+`ActionInterpreterService` remains authoritative for:
+- entity resolution
+- proposal construction
+- ambiguity generation
+- lifecycle state
 
-Architectural constraints:
-- Providers produce ONLY `NormalizedCommand`
-- Providers do NOT create proposals, resolve entities, decide status, build missing fields, or access executors
-- `ActionInterpreterService` remains the place where entity resolution, proposal building, and draft/ready decisions happen
-- Real LLM integration is intentionally not implemented
+Real LLM integration is intentionally not implemented.
+
+---
+
+## Current Runtime Limitation
+
+`InterpretationContext` already exists, but runtime interpretation still passes through:
+
+```php
+CommandInterpreterInterface::interpret(string $text)
+```
+
+Because the legacy interface does not accept context, `InterpretationProviderAdapter` currently creates a default empty context.
+
+This is acceptable for now because Fluxio does not yet require:
+- locale-aware interpretation
+- timezone-aware interpretation
+- tenant context
+- voice metadata
+- runtime CRM context
+
+When those become necessary, `ActionInterpreterService` should depend directly on `InterpretationProviderInterface`.
+
+That migration must preserve:
+- `NormalizedCommand`
+- proposal lifecycle semantics
+- entity resolution behavior
+- ambiguity payload shape
+- refinement semantics
+- frontend contract compatibility
 
 ---
 
 # Intent Requirements Model
 
-Each intent in the registry declares its requirements explicitly as `EntityRequirement` objects instead of plain string arrays.
+Each intent declares requirements explicitly through `EntityRequirement`.
 
-`EntityRequirement` fields:
-- `key` — entity key used in proposal payload
-- `entityType` — semantic type (e.g. `lead_query`, `date_expression`, `participant_query`)
-- `label` — human-readable label used in missing/editable field payloads
-- `required` — whether absence blocks readiness
-- `cardinality` — `one` (default) or `many` for collection-type entities
-- `resolverRequired` — whether an EntityResolver must run before the builder
+Fields:
+- `key`
+- `entityType`
+- `label`
+- `required`
+- `cardinality`
+- `resolverRequired`
 
-`IntentComplexity` enum classifies intents:
-- `simple` — single-step, single-domain (most current intents)
-- `domain` — spans domain boundaries or requires cross-module resolution (e.g. `assign_lead`)
-- `workflow` — multi-step sequences (reserved, not yet implemented)
+`IntentComplexity`:
+- `simple`
+- `domain`
+- `workflow` (reserved)
 
-`ConfirmationPolicy` enum controls confirmation requirements:
-- `required` — user must confirm before execution (current default for all intents)
-- `strong` — reserved for future high-impact operations
-- `optional` — reserved for future low-risk operations
+`ConfirmationPolicy`:
+- `required`
+- `strong` (reserved)
+- `optional` (reserved)
 
-Helper methods on `IntentDefinition`:
-- `requiredRequirements()` — list of required `EntityRequirement` objects
-- `optionalRequirements()` — list of optional `EntityRequirement` objects
-- `requiredKeys()` — required entity key strings
-- `optionalKeys()` — optional entity key strings
-- `requirementKeys()` — all entity key strings
-- `findRequirement(string $key)` — lookup by key
+Current architecture prepares future:
+- generic resolver orchestration
+- richer workflows
+- stronger validation semantics
 
-This model prepares the architecture for generic entity resolution orchestration without changing the current proposal lifecycle or frontend contract.
+without changing the current lifecycle.
 
 ---
 
@@ -719,7 +766,7 @@ This model prepares the architecture for generic entity resolution orchestration
 
 Current lifecycle:
 
-```text id="4mk9z4"
+```text id="c5zx1v"
 draft
 → ready
 → confirmed
@@ -741,11 +788,11 @@ Rules:
 The `ActionProposal` is the central transport contract between:
 - backend
 - frontend
-- future AI providers
+- future providers
 
 Example:
 
-```json id="03dfp2"
+```json id="4l3nh5"
 {
     "id": "proposal_uuid",
     "intent": "schedule_meeting",
@@ -777,7 +824,7 @@ All API responses follow standardized envelopes.
 
 Success:
 
-```json id="cvs6g4"
+```json id="9ehm8t"
 {
     "success": true,
     "message": "Operation completed successfully.",
@@ -787,7 +834,7 @@ Success:
 
 Error:
 
-```json id="2xmd2h"
+```json id="gm4vfy"
 {
     "success": false,
     "message": "Error message.",
@@ -797,7 +844,7 @@ Error:
 
 Paginated:
 
-```json id="09qhnr"
+```json id="t1u3ol"
 {
     "success": true,
     "message": "Data retrieved successfully.",
@@ -889,7 +936,7 @@ Avoid:
 
 Preferred:
 
-```php id="z3xn9f"
+```php id="1sj34j"
 event(new LeadFollowUpRequested($leadId, $dueAt));
 ```
 
@@ -927,7 +974,7 @@ However:
 
 Core principle:
 
-```text id="hgl8vb"
+```text id="9tr0q0"
 LLM = interpretation assistant
 Fluxio = operational control system
 ```
@@ -968,7 +1015,6 @@ Fluxio already validates:
 - proposal continuity
 - mutation semantics
 - ambiguity-aware workflows
-- operational AI-first UX
 - deterministic execution
 - structured refinement
 
@@ -980,7 +1026,8 @@ Current implemented flows include:
 - operational execution workflows
 
 The project has already moved beyond:
-```text id="ppl8o1"
+
+```text id="g7m8u9"
 simple parser demo territory
 ```
 
@@ -989,12 +1036,12 @@ simple parser demo territory
 # Current Development Direction
 
 Current focus:
-- entity resolution architecture
+- resolver expansion
 - multilingual-ready parsing
-- resolver registry abstraction
 - confidence scoring evolution
 - operational mobile workflows
-- proposal intelligence evolution
+- proposal mutation evolution
+- interpretation provider boundaries
 
 NOT:
 - CRUD expansion
@@ -1006,21 +1053,20 @@ NOT:
 # Long-Term Vision
 
 Fluxio aims to demonstrate that enterprise software can evolve toward:
-
 - proposal-centric UX
-- controlled operational AI
 - ambiguity-aware workflows
 - deterministic business interaction
 - explainable natural-language orchestration
 
 The goal is NOT:
-```text id="0c6o0z"
+
+```text id="1qz0ps"
 building another CRM
 ```
 
 The goal is:
 
-```text id="72t4vz"
+```text id="4s6fwi"
 validating proposal-centric operational software
-as a viable future paradigm for enterprise systems.
+as a viable interaction model for enterprise systems.
 ```
