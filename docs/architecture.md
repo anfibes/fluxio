@@ -591,6 +591,10 @@ Current intents:
 - `assign_lead`
 - `prepare_contract_from_quote`
 
+Implemented:
+- intent capability model
+- proposal-scoped mutation validation
+
 Execution always requires explicit confirmation.
 
 ---
@@ -759,6 +763,98 @@ Current architecture prepares future:
 - stronger validation semantics
 
 without changing the current lifecycle.
+
+---
+
+# Intent Capability Layer
+
+The Intent Capability Layer sits between the refinement interpreter output and proposal mutation application.
+
+Its role is mutation legality enforcement — not workflow orchestration, not execution planning.
+
+## Refinement flow with capability validation
+
+```text
+Refinement text
+→ RefinementInterpreter
+→ NormalizedMutation[]
+→ IntentCapabilityRegistry (allowsMutation per intent)
+→ Allowed mutations → Mutation Engine → Proposal updated
+→ Rejected mutations → Warning added, proposal unchanged
+```
+
+## Separation of concerns
+
+The interpreter detects what the user said.
+The capability layer enforces what the intent semantically permits.
+
+These are deliberately separate:
+- a mutation may be syntactically valid (interpreter detects it)
+- but semantically disallowed for that intent (capability denies it)
+
+Example: the interpreter correctly detects "Add Mario too" as a participant append.
+For `create_task`, `IntentCapabilityRegistry.allowsMutation()` returns false.
+The mutation is rejected, a warning is added, and the proposal remains unchanged.
+
+## IntentCapabilityRegistry
+
+`IntentCapabilityRegistry` is a legality oracle — NOT a workflow engine, NOT an orchestrator.
+
+Responsibilities:
+- `register(IntentCapability)` — registers a capability at boot
+- `find(string $intent)` — lookup by intent key
+- `allowsMutation(string $intent, NormalizedMutation)` — returns bool
+
+Deny-by-default: if no capability is registered for an intent, all mutations are denied.
+
+## Capability declarations
+
+Each `IntentCapability` declares:
+- `mutations` — list of `MutationCapability` entries (operation + fields + collection flag)
+- `refinements` — list of `RefinementCapabilityType` enum cases
+- `supportsAmbiguityResolution` — bool, gates the ambiguity resolution code path
+- `supportsCollectionMutations` — bool
+- `supportsContextualReferences` — bool
+
+`RefinementCapabilityType` cases:
+- `ReplaceField`, `ClearField`
+- `AppendCollectionItem`, `RemoveCollectionItem`, `ReplaceCollectionItem`
+- `ResolveAmbiguity`, `ContextualReference`
+
+## Ambiguity resolution gating
+
+Ambiguity resolution is capability-scoped.
+
+If a proposal has an unresolved blocking ambiguity AND the intent does not declare
+`supportsAmbiguityResolution = true`, the resolution attempt is skipped entirely.
+A warning is added; the proposal remains continuable.
+
+This prevents silent resolution attempts on intents where entity disambiguation is
+not part of the defined refinement contract.
+
+## Static, deterministic, in-memory
+
+Capability declarations are:
+- registered once at provider boot
+- never persisted to the database
+- deterministic — same input always produces the same legality decision
+- inspectable — `DefaultIntentCapabilities::all()` is the single source of truth
+
+Structure:
+
+```text
+packages/Actions/src/DTO/IntentCapability.php
+packages/Actions/src/DTO/MutationCapability.php
+packages/Actions/src/Enums/RefinementCapabilityType.php
+packages/Actions/src/Registry/IntentCapabilityRegistry.php
+packages/Actions/src/Support/DefaultIntentCapabilities.php
+```
+
+## Future-ready
+
+Capability declarations are structured to potentially inform frontend affordances —
+for example, surfacing collection mutation controls only for intents that declare
+`supportsCollectionMutations`. No frontend capability-driven UX is currently implemented.
 
 ---
 
