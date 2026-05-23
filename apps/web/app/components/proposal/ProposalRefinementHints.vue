@@ -19,12 +19,30 @@ function humanize(value: string): string {
     .replace(/\b\w/g, c => c.toUpperCase())
 }
 
-const isVisibleStatus = computed(() =>
-  props.proposal.status === 'draft' || props.proposal.status === 'ready',
+const TERMINAL_STATUSES = ['confirmed', 'executed', 'failed'] as const
+
+const requiredMissingFields = computed(
+  () => (props.proposal.missing ?? []).filter(m => m.required),
 )
 
+const hasResolvableBlockingAmbiguity = computed(() => {
+  const blocking = (props.proposal.ambiguities ?? []).some(
+    a => a.blocking && a.selected_candidate_id === null,
+  )
+  return blocking && props.proposal.capabilities?.supports_ambiguity_resolution === true
+})
+
+const shouldRenderHints = computed(() => {
+  if ((TERMINAL_STATUSES as readonly string[]).includes(props.proposal.status)) {
+    return false
+  }
+  return props.proposal.status === 'draft'
+    || requiredMissingFields.value.length > 0
+    || hasResolvableBlockingAmbiguity.value
+})
+
 const hints = computed<Hint[]>(() => {
-  if (!isVisibleStatus.value) return []
+  if (!shouldRenderHints.value) return []
 
   const out: Hint[] = []
   const seen = new Set<string>()
@@ -36,8 +54,7 @@ const hints = computed<Hint[]>(() => {
     out.push(hint)
   }
 
-  for (const m of props.proposal.missing ?? []) {
-    if (!m.required) continue
+  for (const m of requiredMissingFields.value) {
     push({
       key: `missing:${m.key}`,
       label: t('proposal.refinement_hints.add_missing', { field: m.label }),
@@ -45,10 +62,7 @@ const hints = computed<Hint[]>(() => {
     })
   }
 
-  const hasBlockingAmbiguity = (props.proposal.ambiguities ?? []).some(
-    a => a.blocking && a.selected_candidate_id === null,
-  )
-  if (hasBlockingAmbiguity && props.proposal.capabilities?.supports_ambiguity_resolution) {
+  if (hasResolvableBlockingAmbiguity.value) {
     push({
       key: 'ambiguity',
       label: t('proposal.refinement_hints.resolve_ambiguity'),
