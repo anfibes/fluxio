@@ -485,14 +485,21 @@ Planned:
 Frontend translations:
 
 ```text id="q8p4zd"
-apps/web/locales/
+apps/web/i18n/locales/
 ```
 
-Backend translations:
+Backend translations live in each module's `lang/` directory, e.g.:
 
 ```text id="u2m7xr"
-apps/api/lang/
+packages/Actions/lang/en/actions.php
+packages/Actions/lang/it/actions.php
+packages/Core/lang/en/api.php
 ```
+
+The API picks the locale from the `Accept-Language` request header via the
+`Fluxio\Core\Http\Middleware\SetApiLocale` middleware (supported: `en`, `it`;
+fallback: `en`). The frontend's `useApi` sends the current Nuxt i18n locale
+on every request.
 
 Current parser implementation remains English-first.
 
@@ -569,12 +576,15 @@ Public versioned documentation:
 | `docs/architecture.md` | system architecture |
 | `docs/frontend-vision.md` | frontend UX philosophy |
 | `docs/proposal-lifecycle.md` | Action Proposal lifecycle |
-| `docs/backend-current-state.md` | backend implementation status |
-| `docs/development-plan.md` | roadmap and milestones |
 | `docs/api-response-standard.md` | API response contracts |
 
-Internal local notes:
-- `.docs/`
+Internal local notes (`.docs/`):
+
+| File | Purpose |
+|---|---|
+| `.docs/backend-current-state.md` | backend implementation snapshot |
+| `.docs/development-plan.md` | strategic plan and roadmap |
+| `.docs/llm-interpretation-contract.md` | rules any future LLM provider must satisfy |
 
 Used for:
 - architecture notes

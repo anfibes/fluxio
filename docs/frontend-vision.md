@@ -511,8 +511,32 @@ The rail should expose:
 - execution changes
 - warnings
 - execution results
+- intent capabilities (read-only operational metadata)
+- contextual refinement hints (capability- and state-gated)
 
 The proposal rail is the operational center of the frontend.
+
+---
+
+# Capability-Aware UX
+
+The proposal payload carries intent capabilities — both technical keys and
+localized human-readable labels. The frontend renders this metadata directly
+through two read-only components:
+
+- `ProposalCapabilitiesPanel` — shows the boolean flags
+  (`supports_ambiguity_resolution`, `supports_contextual_references`,
+  `supports_collection_mutations`) plus the supported refinement labels and
+  allowed mutation field labels.
+- `ProposalRefinementHints` — surfaces compact, contextually-gated guidance
+  derived from `proposal.missing`, `proposal.ambiguities`, and
+  `proposal.capabilities`. Hints are hidden once the proposal is ready and
+  has no resolvable blocking context.
+
+Architectural rule: the backend owns operational semantics. The frontend
+consumes capability flags and labels but never branches on
+`proposal.intent`. Labels are localized server-side; the active i18n locale
+is sent through `useApi` as `Accept-Language`.
 
 ---
 

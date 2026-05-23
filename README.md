@@ -367,6 +367,7 @@ Responsibilities:
 - execution safety
 - refinement tracking
 - entity resolution
+- mutation legality (intent capability model)
 
 Current capabilities:
 - proposal continuity
@@ -379,6 +380,9 @@ Current capabilities:
 - interpretation provider abstraction
 - normalized command validation
 - entity resolution layer
+- intent capability model (per-intent mutation/refinement legality)
+- localized capability labels in the proposal payload
+- refinement warning deduplication
 
 ---
 
@@ -619,6 +623,9 @@ Implemented frontend capabilities:
 - proposal continuity UX
 - execution rendering
 - contextual refinements
+- capability panel (operational metadata from the backend)
+- contextual refinement hints (gated by capabilities and proposal state)
+- locale-aware API calls (`Accept-Language`)
 - responsive/mobile-safe shell
 - dark/light/system themes
 - i18n support
@@ -683,17 +690,22 @@ Possible future providers:
 
 # Documentation
 
-Detailed documentation is available in `docs/`.
+Public, versioned documentation lives in `docs/`. Internal architectural
+notes and working documents live in `.docs/`.
 
-## Core Documentation
+## Public documentation (`docs/`)
 
 - [Architecture](docs/architecture.md)
 - [Frontend Vision](docs/frontend-vision.md)
 - [Proposal Lifecycle](docs/proposal-lifecycle.md)
-- [Backend Current State](docs/backend-current-state.md)
-- [Development Plan](docs/development-plan.md)
 - [API Response Standard](docs/api-response-standard.md)
 - [Getting Started](docs/getting-started.md)
+
+## Internal notes (`.docs/`)
+
+- [Backend Current State](.docs/backend-current-state.md)
+- [Development Plan](.docs/development-plan.md)
+- [LLM Interpretation Contract](.docs/llm-interpretation-contract.md)
 
 ---
 

@@ -443,6 +443,8 @@ proposal/
   ProposedChangesList
   LastRefinementPanel
   ExecutionResultPanel
+  ProposalCapabilitiesPanel
+  ProposalRefinementHints
 
 context/
   ContextTabs
@@ -850,11 +852,40 @@ packages/Actions/src/Registry/IntentCapabilityRegistry.php
 packages/Actions/src/Support/DefaultIntentCapabilities.php
 ```
 
-## Future-ready
+## Capability-driven frontend UX
 
-Capability declarations are structured to potentially inform frontend affordances —
-for example, surfacing collection mutation controls only for intents that declare
-`supportsCollectionMutations`. No frontend capability-driven UX is currently implemented.
+Capability declarations are surfaced to the frontend through the proposal
+payload (`capabilities` block). The proposal rail consumes them in two
+read-only components:
+
+- `ProposalCapabilitiesPanel` — renders the supported operations, fields and
+  refinement labels for the current intent.
+- `ProposalRefinementHints` — derives compact, contextually-gated guidance
+  (missing fields, resolvable blocking ambiguities, allowed refinements) from
+  capabilities + proposal state. The frontend is intent-agnostic: it reads
+  capability flags and labels, never branches on `proposal.intent`.
+
+## Localized capability labels
+
+The capability payload exposes both technical keys and localized
+human-readable labels. Serialization is centralized in
+`Fluxio\Actions\Http\Resources\IntentCapabilityResource`, which resolves
+labels through the `actions::actions.capabilities.*` translation namespace
+(operations, fields, refinements, plus an intent-specific override map).
+
+Locale selection follows the request: `Fluxio\Core\Http\Middleware\SetApiLocale`
+parses `Accept-Language` and sets the Laravel locale (supported: `en`, `it`;
+fallback: `en`). The frontend sends the active i18n locale via `useApi`.
+
+The backend owns operational semantics and labels; the frontend renders what
+it receives.
+
+## Refinement warning deduplication
+
+`ActionProposalRefinementService::addWarning()` centralizes warning append
+logic and is idempotent: repeated refinements that fail for the same reason
+(unsupported mutation, ambiguity resolution not supported, etc.) do not
+accumulate duplicate warnings on the proposal.
 
 ---
 
@@ -1074,6 +1105,10 @@ Core principle:
 LLM = interpretation assistant
 Fluxio = operational control system
 ```
+
+The detailed contract that any future LLM provider must satisfy — JSON output
+shape, allowed intents/entities, validation rules, fallback strategy and
+phased rollout — lives in [`.docs/llm-interpretation-contract.md`](../.docs/llm-interpretation-contract.md).
 
 ---
 

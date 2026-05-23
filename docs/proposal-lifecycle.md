@@ -645,6 +645,20 @@ Example ambiguity structure:
 
 Ambiguity resolution is part of the proposal lifecycle itself.
 
+## Capability gating
+
+Ambiguity resolution is capability-scoped. The refinement service consults
+`IntentCapabilityRegistry` before attempting resolution: if the current
+intent does not declare `supportsAmbiguityResolution = true`, the attempt is
+skipped, a warning is added, and the proposal remains continuable. The
+mutation engine applies the same gate to detected refinement mutations
+through `IntentCapabilityRegistry::allowsMutation()`.
+
+Warnings produced during refinement (unsupported mutation, ambiguity
+resolution not supported, refinement not recognized) are deduplicated on the
+proposal — repeated refinements that fail the same way do not accumulate
+duplicate messages.
+
 ---
 
 # Entity Resolution Layer
