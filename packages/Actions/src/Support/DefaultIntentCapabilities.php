@@ -107,8 +107,9 @@ final class DefaultIntentCapabilities
                 supportsCollectionMutations:  false,
             ),
 
-            // prepare_contract_from_quote: minimal — lead replacement only.
-            // No ambiguity resolution or collection mutations supported via refinement.
+            // prepare_contract_from_quote: lead and quote replacement.
+            // Ambiguity resolution is supported because lead requires entity resolution.
+            // Collection mutations and contextual references remain disabled.
             new IntentCapability(
                 intent:    'prepare_contract_from_quote',
                 mutations: [
@@ -116,9 +117,10 @@ final class DefaultIntentCapabilities
                 ],
                 refinements: [
                     RefinementCapabilityType::ReplaceField,
+                    RefinementCapabilityType::ResolveAmbiguity,
                 ],
                 supportsContextualReferences: false,
-                supportsAmbiguityResolution:  false,
+                supportsAmbiguityResolution:  true,
                 supportsCollectionMutations:  false,
             ),
         ];

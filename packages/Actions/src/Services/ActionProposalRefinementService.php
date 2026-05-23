@@ -35,9 +35,10 @@ class ActionProposalRefinementService
         [$fieldMutations, $rejectedMutations] = $this->partitionByCapability($proposal->intent, $fieldMutations);
 
         if (! empty($rejectedMutations)) {
-            $warnings   = $proposal->warnings ?? [];
-            $warnings[] = __('actions::actions.mutation_not_allowed');
-            $proposal->warnings = $warnings;
+            $proposal->warnings = $this->addWarning(
+                $proposal->warnings ?? [],
+                __('actions::actions.mutation_not_allowed'),
+            );
         }
 
         // If ALL mutations were rejected and there is nothing else to process, bail early.
@@ -62,9 +63,10 @@ class ActionProposalRefinementService
                 $ambiguityResolution = $this->tryClassifyAmbiguityResolution($proposal, $effectiveText);
 
                 if ($ambiguityResolution === null && empty($fieldMutations)) {
-                    $warnings   = $proposal->warnings ?? [];
-                    $warnings[] = __('actions::actions.ambiguity_still_unresolved');
-                    $proposal->warnings        = $warnings;
+                    $proposal->warnings = $this->addWarning(
+                        $proposal->warnings ?? [],
+                        __('actions::actions.ambiguity_still_unresolved'),
+                    );
                     $proposal->last_refinement = [
                         'text'           => $text,
                         'effective_text' => $effectiveText,
@@ -79,17 +81,19 @@ class ActionProposalRefinementService
                 // Ambiguity exists but this intent cannot resolve it via refinement.
                 // Emit a warning so the caller knows why resolution was not attempted,
                 // then fall through to apply any field mutations that were provided.
-                $warnings   = $proposal->warnings ?? [];
-                $warnings[] = __('actions::actions.ambiguity_resolution_not_supported');
-                $proposal->warnings = $warnings;
+                $proposal->warnings = $this->addWarning(
+                    $proposal->warnings ?? [],
+                    __('actions::actions.ambiguity_resolution_not_supported'),
+                );
             }
         }
 
         // Nothing recognized at all
         if (empty($fieldMutations) && $ambiguityResolution === null) {
-            $warnings   = $proposal->warnings ?? [];
-            $warnings[] = __('actions::actions.refinement_not_recognized');
-            $proposal->warnings        = $warnings;
+            $proposal->warnings = $this->addWarning(
+                $proposal->warnings ?? [],
+                __('actions::actions.refinement_not_recognized'),
+            );
             $proposal->last_refinement = [
                 'text'           => $text,
                 'effective_text' => $effectiveText,
@@ -129,6 +133,24 @@ class ActionProposalRefinementService
         }
 
         return [$allowed, $rejected];
+    }
+
+    /**
+     * Append a warning to the list only if it is not already present.
+     * Repeated refinements must not duplicate the same warning message.
+     *
+     * @param  list<string> $warnings
+     * @return list<string>
+     */
+    private function addWarning(array $warnings, string $warning): array
+    {
+        if (in_array($warning, $warnings, true)) {
+            return array_values($warnings);
+        }
+
+        $warnings[] = $warning;
+
+        return array_values($warnings);
     }
 
     private function intentSupportsAmbiguityResolution(string $intent): bool

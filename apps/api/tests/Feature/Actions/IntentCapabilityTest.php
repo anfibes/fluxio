@@ -426,14 +426,23 @@ class IntentCapabilityTest extends TestCase
         $this->assertEquals('Rossi SRL', $fields['lead']['value']);
     }
 
-    // ── 8. Ambiguity resolution is NOT attempted for unsupported intents ───────
+    // ── 8. Ambiguity resolution for prepare_contract_from_quote ───────────────
 
-    public function test_ambiguity_resolution_is_skipped_for_prepare_contract(): void
+    public function test_prepare_contract_supports_ambiguity_resolution_in_registry(): void
+    {
+        /** @var IntentCapabilityRegistry $registry */
+        $registry = $this->app->make(IntentCapabilityRegistry::class);
+
+        $capability = $registry->find('prepare_contract_from_quote');
+        $this->assertNotNull($capability);
+        $this->assertTrue($capability->supportsAmbiguityResolution);
+        $this->assertContains(RefinementCapabilityType::ResolveAmbiguity, $capability->refinements);
+    }
+
+    public function test_prepare_contract_ambiguity_can_be_resolved_with_ordinal(): void
     {
         $user = $this->actingAsUser();
 
-        // Manually create a prepare_contract proposal with a blocking ambiguity,
-        // simulating a future scenario where the lead resolver returns ambiguity.
         $proposal = ActionProposal::create([
             'user_id'         => $user->id,
             'intent'          => 'prepare_contract_from_quote',
@@ -457,27 +466,26 @@ class IntentCapabilityTest extends TestCase
                     'query'                => 'Rossi',
                     'selected_candidate_id' => null,
                     'candidates'           => [
-                        ['id' => 1,  'label' => 'Mario Rossi', 'type' => 'person',  'confidence' => 0.65],
-                        ['id' => 7,  'label' => 'Rossi SRL',   'type' => 'company', 'confidence' => 0.80],
+                        ['id' => 1, 'label' => 'Mario Rossi', 'type' => 'person',  'confidence' => 0.65],
+                        ['id' => 7, 'label' => 'Rossi SRL',   'type' => 'company', 'confidence' => 0.80],
                     ],
                 ],
             ],
         ]);
 
-        // "Rossi SRL" would resolve the ambiguity for schedule_call/schedule_meeting,
-        // but prepare_contract_from_quote does not support ambiguity resolution.
-        // The text may still be detected as a field mutation if applicable, but
-        // ambiguity resolution path must not fire.
-        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Rossi SRL']);
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'The second one']);
 
         $response->assertStatus(200);
+        $this->assertEquals(7, $response->json('data.ambiguities.0.selected_candidate_id'));
 
-        // Ambiguity must remain unresolved
-        $this->assertNull($response->json('data.ambiguities.0.selected_candidate_id'));
+        $fields = collect($response->json('data.editable_fields'))->keyBy('key');
+        $this->assertEquals('Rossi SRL', $fields['lead']['value']);
 
-        // Lead editable field must NOT have been set via ambiguity resolution
-        $fieldKeys = collect($response->json('data.editable_fields'))->pluck('key')->all();
-        $this->assertNotContains('lead', $fieldKeys);
+        $warnings = $response->json('data.warnings') ?? [];
+        $this->assertNotContains(
+            'This action type does not support ambiguity resolution.',
+            $warnings,
+        );
     }
 
     // ── Registry unit: allowsMutation edge cases ──────────────────────────────
@@ -907,6 +915,75 @@ class IntentCapabilityTest extends TestCase
     }
 
     // ── 11. DefaultIntentCapabilities covers all 5 known intents ─────────────
+
+    // ── Warning deduplication ─────────────────────────────────────────────────
+
+    public function test_repeated_unsupported_mutation_does_not_duplicate_warning(): void
+    {
+        $user     = $this->actingAsUser();
+        $proposal = $this->createTaskProposal($user);
+
+        $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Mario too'])->assertStatus(200);
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Luca too']);
+
+        $response->assertStatus(200);
+
+        $warnings = $response->json('data.warnings') ?? [];
+        $occurrences = array_filter(
+            $warnings,
+            fn (string $w) => $w === 'One or more requested changes are not supported for this action type.',
+        );
+
+        $this->assertCount(1, $occurrences);
+    }
+
+    public function test_repeated_unsupported_ambiguity_resolution_does_not_duplicate_warning(): void
+    {
+        $user = $this->actingAsUser();
+
+        $proposal = ActionProposal::create([
+            'user_id'         => $user->id,
+            'intent'          => 'create_task',
+            'status'          => 'draft',
+            'confidence'      => 0.9,
+            'source_text'     => 'Create a task for Rossi',
+            'entities'        => [],
+            'missing'         => [],
+            'warnings'        => [],
+            'editable_fields' => [],
+            'changes'         => [
+                ['type' => 'create', 'label' => 'Create Task', 'module' => 'tasks', 'payload' => []],
+            ],
+            'needs_confirmation' => true,
+            'ambiguities'     => [
+                [
+                    'key'                  => 'lead',
+                    'label'                => 'Lead',
+                    'reason'               => 'multiple_matches',
+                    'blocking'             => true,
+                    'query'                => 'Rossi',
+                    'selected_candidate_id' => null,
+                    'candidates'           => [
+                        ['id' => 1, 'label' => 'Mario Rossi', 'type' => 'person',  'confidence' => 0.65],
+                        ['id' => 7, 'label' => 'Rossi SRL',   'type' => 'company', 'confidence' => 0.80],
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Rossi SRL'])->assertStatus(200);
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Rossi SRL']);
+
+        $response->assertStatus(200);
+
+        $warnings = $response->json('data.warnings') ?? [];
+        $occurrences = array_filter(
+            $warnings,
+            fn (string $w) => $w === 'This action type does not support ambiguity resolution.',
+        );
+
+        $this->assertCount(1, $occurrences);
+    }
 
     public function test_capability_registry_returns_expected_capabilities_for_all_five_intents(): void
     {
