@@ -49,6 +49,16 @@
       "select_candidate": "Seleziona un candidato:",
       "confidence": "{pct}% corrispondenza",
       "blocking": "Bloccante"
+    },
+    "capabilities": {
+      "title": "Capacità",
+      "ambiguity_resolution": "Risoluzione ambiguità",
+      "contextual_references": "Riferimenti contestuali",
+      "collection_mutations": "Modifiche di raccolta",
+      "supported": "Supportata",
+      "not_supported": "Non supportata",
+      "supported_refinements": "Affinamenti supportati",
+      "allowed_fields": "Campi consentiti"
     }
   },
   "command": {

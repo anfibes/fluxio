@@ -49,6 +49,16 @@
       "select_candidate": "Select a candidate:",
       "confidence": "{pct}% match",
       "blocking": "Blocking"
+    },
+    "capabilities": {
+      "title": "Capabilities",
+      "ambiguity_resolution": "Ambiguity resolution",
+      "contextual_references": "Contextual references",
+      "collection_mutations": "Collection refinements",
+      "supported": "Supported",
+      "not_supported": "Not supported",
+      "supported_refinements": "Supported refinements",
+      "allowed_fields": "Allowed fields"
     }
   },
   "command": {
