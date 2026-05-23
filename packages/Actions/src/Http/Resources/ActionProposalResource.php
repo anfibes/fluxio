@@ -24,14 +24,8 @@ class ActionProposalResource extends JsonResource
         $capability = $registry->find($proposal->intent);
 
         $capabilities = $capability !== null
-            ? $capability->toArray()
-            : [
-                'supports_contextual_references' => false,
-                'supports_ambiguity_resolution'  => false,
-                'supports_collection_mutations'  => false,
-                'mutations'                      => [],
-                'refinements'                    => [],
-            ];
+            ? (new IntentCapabilityResource($capability))->resolve()
+            : IntentCapabilityResource::empty();
 
         return [
             'id' => $proposal->id,

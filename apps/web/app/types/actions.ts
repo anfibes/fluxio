@@ -1,8 +1,14 @@
 export type ActionProposalStatus = 'draft' | 'ready' | 'confirmed' | 'executed' | 'failed'
 
+export interface ProposalCapabilityField {
+  key: string
+  label: string
+}
+
 export interface ProposalMutationCapability {
   operation: string
-  fields: string[]
+  operation_label?: string
+  fields: ProposalCapabilityField[]
   collection: boolean
 }
 
@@ -15,12 +21,17 @@ export type ProposalRefinementCapability =
   | 'resolve_ambiguity'
   | 'contextual_reference'
 
+export interface ProposalRefinementCapabilityItem {
+  key: ProposalRefinementCapability
+  label: string
+}
+
 export interface ProposalCapabilities {
   supports_contextual_references: boolean
   supports_ambiguity_resolution: boolean
   supports_collection_mutations: boolean
   mutations: ProposalMutationCapability[]
-  refinements: ProposalRefinementCapability[]
+  refinements: ProposalRefinementCapabilityItem[]
 }
 
 export interface AmbiguityCandidate {

@@ -805,6 +805,93 @@ class IntentCapabilityTest extends TestCase
         $response->assertJsonPath('data.capabilities.supports_collection_mutations', false);
     }
 
+    // ── Capability labels (localized payload) ─────────────────────────────────
+
+    public function test_capabilities_payload_includes_localized_labels_in_english(): void
+    {
+        $this->actingAsUser();
+
+        $response = $this->postJson(
+            '/api/actions/interpret',
+            ['text' => 'Schedule a meeting with Rossi SRL tomorrow at 10am'],
+            ['Accept-Language' => 'en'],
+        );
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.intent', 'schedule_meeting');
+
+        $refinements = collect($response->json('data.capabilities.refinements'));
+        $append = $refinements->firstWhere('key', 'append_collection_item');
+
+        $this->assertNotNull($append);
+        $this->assertEquals('Add participants', $append['label']);
+
+        $mutations = collect($response->json('data.capabilities.mutations'));
+        $appendMutation = $mutations->firstWhere('operation', 'append');
+        $this->assertNotNull($appendMutation);
+        $this->assertEquals('Add', $appendMutation['operation_label']);
+
+        $field = collect($appendMutation['fields'])->firstWhere('key', 'participants');
+        $this->assertNotNull($field);
+        $this->assertEquals('Participants', $field['label']);
+    }
+
+    public function test_capabilities_payload_uses_italian_when_accept_language_is_it(): void
+    {
+        $this->actingAsUser();
+
+        $response = $this->postJson(
+            '/api/actions/interpret',
+            ['text' => 'Schedule a meeting with Rossi SRL tomorrow at 10am'],
+            ['Accept-Language' => 'it-IT'],
+        );
+
+        $response->assertStatus(200);
+
+        $refinements = collect($response->json('data.capabilities.refinements'));
+        $append = $refinements->firstWhere('key', 'append_collection_item');
+        $this->assertNotNull($append);
+        $this->assertEquals('Aggiungi partecipanti', $append['label']);
+
+        $mutations = collect($response->json('data.capabilities.mutations'));
+        $appendMutation = $mutations->firstWhere('operation', 'append');
+        $this->assertNotNull($appendMutation);
+        $this->assertEquals('Aggiungi', $appendMutation['operation_label']);
+    }
+
+    public function test_capabilities_payload_preserves_technical_keys(): void
+    {
+        $this->actingAsUser();
+
+        $response = $this->postJson(
+            '/api/actions/interpret',
+            ['text' => 'Schedule a meeting with Rossi SRL tomorrow at 10am'],
+            ['Accept-Language' => 'it'],
+        );
+
+        $response->assertStatus(200);
+
+        $refinements = $response->json('data.capabilities.refinements');
+        $this->assertNotEmpty($refinements);
+        foreach ($refinements as $r) {
+            $this->assertArrayHasKey('key', $r);
+            $this->assertArrayHasKey('label', $r);
+        }
+
+        $mutations = $response->json('data.capabilities.mutations');
+        $this->assertNotEmpty($mutations);
+        foreach ($mutations as $m) {
+            $this->assertArrayHasKey('operation', $m);
+            $this->assertArrayHasKey('operation_label', $m);
+            $this->assertArrayHasKey('fields', $m);
+            $this->assertArrayHasKey('collection', $m);
+            foreach ($m['fields'] as $f) {
+                $this->assertArrayHasKey('key', $f);
+                $this->assertArrayHasKey('label', $f);
+            }
+        }
+    }
+
     public function test_persistence_service_does_not_persist_capabilities(): void
     {
         $user = $this->actingAsUser();

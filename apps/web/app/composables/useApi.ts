@@ -17,9 +17,15 @@ export function useApi() {
   const baseURL = config.public.apiBase as string
 
   const { token } = useAuth()
+  const { locale } = useI18n()
 
   function authHeaders(): Record<string, string> {
     return token.value ? { Authorization: `Bearer ${token.value}` } : {}
+  }
+
+  function localeHeader(): Record<string, string> {
+    const value = unref(locale)
+    return value ? { 'Accept-Language': value } : {}
   }
 
   async function get<T>(path: string): Promise<ApiResponse<T>> {
@@ -53,6 +59,7 @@ export function useApi() {
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
+          ...localeHeader(),
           ...authHeaders(),
         },
         ...opts,

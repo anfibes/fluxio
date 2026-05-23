@@ -3,7 +3,7 @@ import type { ProposalCapabilities } from '~/types/actions'
 
 const props = defineProps<{ capabilities?: ProposalCapabilities }>()
 
-function formatCapabilityLabel(value: string): string {
+function humanize(value: string): string {
   return value
     .replace(/_/g, ' ')
     .replace(/\b\w/g, c => c.toUpperCase())
@@ -31,12 +31,20 @@ const rows = computed(() => {
 })
 
 const refinementLabels = computed(() =>
-  (props.capabilities?.refinements ?? []).map(formatCapabilityLabel),
+  (props.capabilities?.refinements ?? []).map(r => r.label || humanize(r.key)),
 )
 
-const mutationFields = computed(() => {
-  const fields = (props.capabilities?.mutations ?? []).flatMap(m => m.fields)
-  return Array.from(new Set(fields)).map(formatCapabilityLabel)
+const mutationFieldLabels = computed(() => {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const m of props.capabilities?.mutations ?? []) {
+    for (const f of m.fields) {
+      if (seen.has(f.key)) continue
+      seen.add(f.key)
+      out.push(f.label || humanize(f.key))
+    }
+  }
+  return out
 })
 </script>
 
@@ -76,14 +84,14 @@ const mutationFields = computed(() => {
     </div>
 
     <div
-      v-if="mutationFields.length"
+      v-if="mutationFieldLabels.length"
       class="mt-2"
     >
       <p class="mb-1 text-xs text-muted/70">
         {{ $t('proposal.capabilities.allowed_fields') }}
       </p>
       <p class="text-xs leading-relaxed text-text-muted">
-        {{ mutationFields.join(', ') }}
+        {{ mutationFieldLabels.join(', ') }}
       </p>
     </div>
   </div>
