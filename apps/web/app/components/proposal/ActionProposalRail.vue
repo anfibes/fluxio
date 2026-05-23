@@ -137,6 +137,8 @@ const exampleCommands = [
             :capabilities="proposal.capabilities"
           />
 
+          <ProposalRefinementHints :proposal="proposal" />
+
           <!-- ── C. INFORMATIONAL ─────────────────────────── -->
           <template v-if="hasInformationalItems">
             <p class="px-4 pb-1.5 pt-1 text-xs font-medium uppercase tracking-wide text-muted/60">

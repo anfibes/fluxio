@@ -59,6 +59,11 @@
       "not_supported": "Non supportata",
       "supported_refinements": "Affinamenti supportati",
       "allowed_fields": "Campi consentiti"
+    },
+    "refinement_hints": {
+      "title": "Affinamenti suggeriti",
+      "add_missing": "Aggiungi {field} mancante",
+      "resolve_ambiguity": "Risolvi ambiguità"
     }
   },
   "command": {

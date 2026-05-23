@@ -59,6 +59,11 @@
       "not_supported": "Not supported",
       "supported_refinements": "Supported refinements",
       "allowed_fields": "Allowed fields"
+    },
+    "refinement_hints": {
+      "title": "Suggested refinements",
+      "add_missing": "Add missing {field}",
+      "resolve_ambiguity": "Resolve ambiguity"
     }
   },
   "command": {
