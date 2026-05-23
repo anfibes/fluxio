@@ -704,7 +704,58 @@ Providers do NOT:
 - ambiguity generation
 - lifecycle state
 
-Real LLM integration is intentionally not implemented.
+No LLM-backed interpretation provider is wired into the runtime. The
+deterministic provider remains authoritative.
+
+A separate sandbox subsystem prepares the boundaries any future LLM
+provider must respect. It lives in `packages/Actions/src/Llm/` and is
+not consumed by any runtime service in the current build:
+
+```text
+packages/Actions/src/Llm/
+  Contracts/LlmClientInterface.php
+  DTO/LlmRequest.php
+  DTO/LlmResponse.php
+  Clients/OllamaLlmClient.php
+  Validation/LlmStructuredOutputValidator.php
+  Validation/LlmStructuredOutputValidationResult.php
+  Exceptions/LlmTransportException.php
+  Exceptions/InvalidLlmResponseException.php
+  Exceptions/InvalidLlmStructuredOutputException.php
+```
+
+Pieces:
+
+- `LlmClientInterface` — generic, Fluxio-agnostic transport boundary.
+  `OllamaLlmClient` is the first adapter (Ollama `POST /api/generate`).
+  Tests use `Http::fake()`; no real LLM calls are made.
+- `LlmStructuredOutputValidator` — validates the *parsed JSON* a future
+  LLM provider would emit, *before* any conversion to `NormalizedCommand`.
+  Enforces allowed/forbidden root keys, intent compatibility against
+  `IntentRegistry`, intent-aware entity-key compatibility, scalar/list
+  entity values, and the `unknown` intent contract. Raises
+  `InvalidLlmStructuredOutputException` on contract violations.
+- Configuration (`packages/Actions/config/actions.php`) carries the
+  transport settings (`actions.llm.provider`, `base_url`, `model`,
+  `timeout`). The active interpretation provider is **not**
+  configurable from this layer — that remains deterministic.
+
+The intended future pipeline is:
+
+```text
+LlmClientInterface
+→ LlmResponse::parsedJson
+→ LlmStructuredOutputValidator   (provider-level contract)
+→ [future] LlmInterpretationProvider builds NormalizedCommand
+→ NormalizedCommandValidator     (existing boundary)
+→ ActionInterpreterService       (authoritative — unchanged)
+```
+
+The phased rollout is described in
+[`.docs/llm-interpretation-contract.md`](../.docs/llm-interpretation-contract.md).
+Phases 2 and 3 (transport + structured output validation) are done as
+sandbox infrastructure; Phase 4 (`OllamaInterpretationProvider`
+sandbox, opt-in) is not implemented.
 
 ---
 
@@ -1075,27 +1126,33 @@ instead of direct cross-domain mutations.
 
 Fluxio is deterministic-first.
 
-Current implementation:
-- rule-based parsing
-- explicit validation
+Runtime interpretation today:
+- rule-based parsing (`DeterministicInterpretationProvider`)
+- explicit validation (`NormalizedCommandValidator`)
 - deterministic refinement
 - explainable proposal state
 
-Future LLM support may assist:
+LLM sandbox infrastructure (implemented, not wired into runtime):
+- generic transport boundary (`LlmClientInterface`, `OllamaLlmClient`)
+- provider-level JSON contract validation
+  (`LlmStructuredOutputValidator`)
+
+Any future LLM-backed provider will run **after** that sandbox
+validation and **before** `NormalizedCommandValidator`. It may assist:
 - intent detection
 - entity extraction
-- ambiguity resolution
+- ambiguity disambiguation hints
 - refinement interpretation
-- semantic search
 
-Possible future providers:
+Possible future runtime providers:
 - Ollama
 - Qwen
 - local lightweight models
 
-However:
-- AI output must remain schema-validated
+Invariants that hold across all phases:
+- AI output is schema-validated twice (LLM contract, then `NormalizedCommand`)
 - proposals remain authoritative
+- mutation legality stays gated by `IntentCapabilityRegistry`
 - confirmation remains mandatory
 - AI NEVER executes business actions directly
 

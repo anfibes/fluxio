@@ -640,7 +640,9 @@ Frontend direction remains:
 
 # Not Yet Implemented
 
-- Real LLM provider integration
+- LLM-backed interpretation provider in the proposal runtime
+  (the transport client and structured-output validator exist as sandbox
+  infrastructure but are not wired into `ActionInterpreterService`)
 - Semantic entity search
 - Advanced resolver ranking
 - Voice workflows
@@ -656,23 +658,29 @@ Frontend direction remains:
 
 Fluxio is deterministic-first and validation-first.
 
-Current implementation uses:
-- rule-based interpretation
+Current runtime interpretation uses:
+- rule-based interpretation (`DeterministicInterpretationProvider`)
 - deterministic proposal mutations
-- structured validation
+- structured validation (`NormalizedCommandValidator`)
 - explicit execution control
 
-Future LLM integration may assist:
-- intent extraction
-- ambiguity detection
-- entity extraction
-- mutation suggestions
+Sandbox infrastructure for future LLM-backed interpretation already
+exists in `packages/Actions/src/Llm/` and is not wired into the runtime:
 
-However:
-- proposals remain authoritative
-- all output remains validated
-- confirmation remains mandatory
-- AI never executes directly
+- `LlmClientInterface` + `OllamaLlmClient` — generic LLM transport
+  abstraction (Phase 2)
+- `LlmStructuredOutputValidator` + `InvalidLlmStructuredOutputException`
+  — provider-level JSON contract validation that any future LLM provider
+  must pass before producing a `NormalizedCommand` (Phase 3)
+
+The deterministic provider remains authoritative. Any future LLM
+integration will:
+
+- assist interpretation only (intent / entity extraction)
+- still go through `NormalizedCommandValidator`
+- still go through `IntentCapabilityRegistry`
+- never own proposal state
+- never execute, confirm, or mutate proposals directly
 
 Core principle:
 
@@ -681,7 +689,9 @@ LLM assists interpretation.
 Fluxio controls execution.
 ```
 
-Possible future providers:
+The detailed contract is in [`.docs/llm-interpretation-contract.md`](.docs/llm-interpretation-contract.md).
+
+Possible future runtime providers:
 - Ollama
 - Qwen
 - local lightweight models
