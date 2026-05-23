@@ -2,6 +2,7 @@
 
 namespace Fluxio\Actions\Providers;
 
+use InvalidArgumentException;
 use Fluxio\Actions\Contracts\CommandInterpreterInterface;
 use Fluxio\Actions\Contracts\IntentResolverInterface;
 use Fluxio\Actions\Contracts\RefinementInterpreterInterface;
@@ -20,9 +21,12 @@ use Fluxio\Actions\Interpretation\Contracts\InterpretationProviderInterface;
 use Fluxio\Actions\Interpretation\InterpretationProviderAdapter;
 use Fluxio\Actions\Interpretation\Providers\DeterministicInterpretationProvider;
 use Fluxio\Actions\Interpreters\RuleBasedRefinementInterpreter;
+use Fluxio\Actions\Llm\Clients\OllamaLlmClient;
+use Fluxio\Actions\Llm\Contracts\LlmClientInterface;
 use Fluxio\Actions\Registry\IntentCapabilityRegistry;
 use Fluxio\Actions\Registry\IntentRegistry;
 use Fluxio\Actions\Resolvers\RuleBasedIntentResolver;
+use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -30,6 +34,30 @@ class ActionsServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->mergeConfigFrom(__DIR__ . '/../../config/actions.php', 'actions');
+
+        // LLM transport boundary — generic client abstraction for future
+        // LLM-backed interpretation providers. Not wired into the proposal
+        // runtime; the deterministic provider remains authoritative.
+        $this->app->bind(LlmClientInterface::class, function ($app) {
+            $config = $app['config']->get('actions.llm', []);
+
+            $provider = (string) ($config['provider'] ?? 'ollama');
+
+            if ($provider !== 'ollama') {
+                throw new InvalidArgumentException(
+                    "Unsupported Actions LLM provider [{$provider}]."
+                );
+            }
+
+            return new OllamaLlmClient(
+                http:         $app->make(HttpFactory::class),
+                baseUrl:      (string) ($config['base_url'] ?? 'http://127.0.0.1:11434'),
+                defaultModel: (string) ($config['model']    ?? 'qwen3:0.6b'),
+                timeout:      (int)    ($config['timeout']  ?? 10),
+            );
+        });
+
         // Entity resolver registry — routes entity queries to the correct resolver
         $this->app->singleton(EntityResolverRegistry::class, function ($app) {
             $registry = new EntityResolverRegistry();
