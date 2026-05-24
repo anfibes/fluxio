@@ -34,6 +34,14 @@ class DateTimeExpressionParser
         'five' => 5, 'six' => 6, 'seven' => 7,
     ];
 
+    /** Parser-local confidence by recognition kind (temporal parse confidence only). */
+    private const CONFIDENCE = [
+        'explicit' => 1.0,
+        'relative' => 0.9,
+        'weekday' => 0.85,
+        'day_part' => 0.75,
+    ];
+
     /**
      * Parse temporal expressions from free text.
      *
@@ -46,48 +54,105 @@ class DateTimeExpressionParser
     {
         $result = [];
 
-        $date = $this->parseDate($text);
+        $date = $this->detectDate($text);
         if ($date !== null) {
-            $result['date'] = $date;
+            $result['date'] = $date['value'];
         }
 
-        $time = $this->parseTime($text);
+        $time = $this->detectTime($text);
         if ($time !== null) {
-            $result['time'] = $time;
+            $result['time'] = $time['value'];
         }
 
         return $result;
     }
 
+    /**
+     * Parse temporal expressions and explain how each value was derived.
+     *
+     * Same recognition logic as parse(); adds provenance (source + matched
+     * expression), human-readable explanations, and a parser-local confidence.
+     * Nothing in the proposal pipeline consumes this today — see
+     * TemporalParseResult for the strict scope of `confidence`.
+     */
+    public function explain(string $text): TemporalParseResult
+    {
+        $date = $this->detectDate($text);
+        $time = $this->detectTime($text);
+
+        $explanations = [];
+        $confidences = [];
+
+        if ($date !== null) {
+            $confidences[] = self::CONFIDENCE[$date['source']];
+            $explanations[] = $date['source'] === 'weekday'
+                ? "Date resolved from weekday expression '{$date['expression']}' as {$date['value']}."
+                : "Date from relative expression '{$date['expression']}' as {$date['value']}.";
+        }
+
+        if ($time !== null) {
+            $confidences[] = self::CONFIDENCE[$time['source']];
+            $explanations[] = $time['source'] === 'day_part'
+                ? "Time inferred from '{$time['expression']}' as {$time['value']}."
+                : "Time is explicit ('{$time['expression']}') as {$time['value']}.";
+        }
+
+        $confidence = $confidences === []
+            ? 0.0
+            : round(array_sum($confidences) / count($confidences), 4);
+
+        return new TemporalParseResult(
+            date: $date['value'] ?? null,
+            time: $time['value'] ?? null,
+            dateSource: $date['source'] ?? 'none',
+            timeSource: $time['source'] ?? 'none',
+            dateExpression: $date['expression'] ?? null,
+            timeExpression: $time['expression'] ?? null,
+            explanations: $explanations,
+            confidence: $confidence,
+        );
+    }
+
     // ── Date ─────────────────────────────────────────────────────────────────
 
-    private function parseDate(string $text): ?string
+    /**
+     * @return array{value: string, source: string, expression: string}|null
+     */
+    private function detectDate(string $text): ?array
     {
         $lower = mb_strtolower(trim($text));
 
         // Order matters: more specific phrases first.
         if (str_contains($lower, 'day after tomorrow')) {
-            return now()->addDays(2)->toDateString();
+            return ['value' => now()->addDays(2)->toDateString(), 'source' => 'relative', 'expression' => 'day after tomorrow'];
         }
 
         if (str_contains($lower, 'tomorrow')) {
-            return now()->addDay()->toDateString();
+            return ['value' => now()->addDay()->toDateString(), 'source' => 'relative', 'expression' => 'tomorrow'];
         }
 
         // "in two days" / "in 2 days"
         if ((bool) preg_match('/\bin\s+(\d+|one|two|three|four|five|six|seven)\s+days?\b/i', $lower, $m)) {
-            return now()->addDays($this->wordToNumber($m[1]))->toDateString();
+            return [
+                'value' => now()->addDays($this->wordToNumber($m[1]))->toDateString(),
+                'source' => 'relative',
+                'expression' => trim($m[0]),
+            ];
         }
 
         // "today" (also covers "later today"); guarded so it never matches inside other words.
         if ((bool) preg_match('/\btoday\b/i', $lower)) {
-            return now()->toDateString();
+            return ['value' => now()->toDateString(), 'source' => 'relative', 'expression' => 'today'];
         }
 
         // Weekday, with optional "next"/"this" qualifier.
         foreach (self::WEEKDAYS as $index => $day) {
             if ((bool) preg_match('/\b(next|this)?\s*'.$day.'\b/i', $lower, $m)) {
-                return $this->resolveWeekday($index, mb_strtolower(trim($m[1] ?? '')));
+                return [
+                    'value' => $this->resolveWeekday($index, mb_strtolower(trim($m[1] ?? ''))),
+                    'source' => 'weekday',
+                    'expression' => trim(preg_replace('/\s+/', ' ', mb_strtolower($m[0]))),
+                ];
             }
         }
 
@@ -125,7 +190,10 @@ class DateTimeExpressionParser
 
     // ── Time ─────────────────────────────────────────────────────────────────
 
-    private function parseTime(string $text): ?string
+    /**
+     * @return array{value: string, source: string, expression: string}|null
+     */
+    private function detectTime(string $text): ?array
     {
         // Explicit clock time wins: "at 10:30", "at 10.30", "at 9", "at 9am", "at 3pm", "at 9:30am".
         if ((bool) preg_match('/\bat\s+(\d{1,2})(?:[.:](\d{2}))?\s*(am|pm)?\b/i', $text, $m)) {
@@ -140,14 +208,18 @@ class DateTimeExpressionParser
                 $hour = 0;
             }
 
-            return sprintf('%02d:%02d', $hour, $min);
+            return [
+                'value' => sprintf('%02d:%02d', $hour, $min),
+                'source' => 'explicit',
+                'expression' => trim(preg_replace('/\s+/', ' ', mb_strtolower($m[0]))),
+            ];
         }
 
         // Fixed day-part mappings (most-specific phrases first).
         $lower = mb_strtolower($text);
         foreach (self::DAY_PARTS as $phrase => $time) {
             if (str_contains($lower, $phrase)) {
-                return $time;
+                return ['value' => $time, 'source' => 'day_part', 'expression' => $phrase];
             }
         }
 
