@@ -78,9 +78,13 @@ class TemporalWarningIntegrationTest extends TestCase
 
     // ── Explicit / weekday → no warning ───────────────────────────────────────
 
-    public function test_explicit_clock_time_emits_no_warning(): void
+    public function test_explicit_clock_time_emits_no_inferred_time_warning(): void
     {
-        $this->assertSame([], $this->warnings('Schedule a meeting with Rossini at 10:30'));
+        // Explicit time → no day-part inference warning. (A Phase 6D partial
+        // "date still missing" warning is expected here and asserted separately.)
+        $warnings = $this->warnings('Schedule a meeting with Rossini at 10:30');
+
+        $this->assertEmpty(array_filter($warnings, fn (string $w) => str_contains($w, 'inferred from')));
     }
 
     public function test_next_friday_at_3pm_emits_no_warning(): void

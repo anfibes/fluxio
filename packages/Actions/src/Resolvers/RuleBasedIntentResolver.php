@@ -60,6 +60,26 @@ class RuleBasedIntentResolver implements IntentResolverInterface
             $warnings[] = "Time inferred from '{$temporal->timeExpression}' as {$temporal->time}.";
         }
 
+        // Phase 6D: for scheduling intents that need both date and time, flag
+        // temporal incompleteness when exactly one of the two was extracted.
+        // Informational only — it does not change status, readiness, confidence,
+        // entities, ambiguities, refinement, or execution. No warning is emitted
+        // when both are present or both are missing.
+        if (in_array($intent, ['schedule_call', 'schedule_meeting'], true)) {
+            $hasDate = $temporal->date !== null;
+            $hasTime = $temporal->time !== null;
+
+            if ($hasDate && ! $hasTime) {
+                $warnings[] = $temporal->dateExpression !== null
+                    ? "Date resolved from '{$temporal->dateExpression}', but time is still missing."
+                    : 'Date resolved, but time is still missing.';
+            } elseif ($hasTime && ! $hasDate) {
+                $warnings[] = $temporal->timeExpression !== null
+                    ? "Time resolved from '{$temporal->timeExpression}', but date is still missing."
+                    : 'Time resolved, but date is still missing.';
+            }
+        }
+
         return new ParsedIntent($intent, $entities, $warnings);
     }
 }
