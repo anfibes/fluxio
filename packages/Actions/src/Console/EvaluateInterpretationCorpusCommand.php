@@ -3,6 +3,7 @@
 namespace Fluxio\Actions\Console;
 
 use Fluxio\Actions\Diagnostics\Evaluation\InterpretationCorpusLoader;
+use Fluxio\Actions\Diagnostics\Evaluation\InterpretationDriftAnalyzer;
 use Fluxio\Actions\Diagnostics\Evaluation\InterpretationEvaluationService;
 use Illuminate\Console\Command;
 
@@ -20,12 +21,18 @@ class EvaluateInterpretationCorpusCommand extends Command
 {
     protected $signature = 'actions:evaluate-interpretation-corpus
                             {--path= : Path to a custom corpus JSON file (defaults to the shipped corpus)}
-                            {--json : Emit the full evaluation as pretty JSON instead of the summary table}';
+                            {--json : Emit the full evaluation as pretty JSON instead of the summary table}
+                            {--metrics : Print enriched drift metrics alongside the table summary}
+                            {--fail-on-drift : Exit non-zero when provider intent agreement is below the threshold (opt-in, for CI experiments)}
+                            {--agreement-threshold=0.8 : Minimum provider intent agreement rate; only applies with --fail-on-drift}';
 
-    protected $description = 'Diagnostics: evaluate the interpretation corpus (deterministic vs. Ollama sandbox) against expected results (non-production).';
+    protected $description = 'Diagnostics: evaluate the interpretation corpus (deterministic vs. Ollama sandbox) against expected results, with optional drift metrics (non-production).';
 
-    public function handle(InterpretationCorpusLoader $loader, InterpretationEvaluationService $service): int
-    {
+    public function handle(
+        InterpretationCorpusLoader $loader,
+        InterpretationEvaluationService $service,
+        InterpretationDriftAnalyzer $analyzer,
+    ): int {
         if ($this->getLaravel()->environment('production')) {
             $this->error('actions:evaluate-interpretation-corpus is a diagnostics command and is disabled in production.');
 
@@ -36,16 +43,97 @@ class EvaluateInterpretationCorpusCommand extends Command
         $cases = $loader->load($path);
 
         $summary = $service->evaluate($cases);
+        $metrics = $analyzer->analyze($summary);
 
         if ($this->option('json')) {
-            $this->line(json_encode($summary->toArray(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            // Backward-friendly: existing summary fields stay; metrics are added.
+            $payload = $summary->toArray();
+            $payload['metrics'] = $metrics->toArray();
+            $this->line(json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        } else {
+            $this->renderSummary($summary->toArray());
 
-            return self::SUCCESS;
+            if ($this->option('metrics')) {
+                $this->renderMetrics($metrics->toArray());
+            }
         }
 
-        $this->renderSummary($summary->toArray());
+        // Drift gating is strictly opt-in; provider disagreement is otherwise
+        // diagnostic data, never a runtime/evaluation failure.
+        if ($this->option('fail-on-drift')) {
+            $threshold = (float) $this->option('agreement-threshold');
+            $agreement = $metrics->providerIntentAgreementRate;
+
+            if ($agreement < $threshold) {
+                $this->newLine();
+                $this->error(sprintf(
+                    'Provider intent agreement %.4f is below the threshold %.4f.',
+                    $agreement,
+                    $threshold,
+                ));
+
+                return self::FAILURE;
+            }
+        }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * @param  array<string, mixed>  $metrics
+     */
+    private function renderMetrics(array $metrics): void
+    {
+        $this->newLine();
+        $this->line('<info>Metrics</info>');
+        foreach ([
+            'deterministic_success_rate' => 'deterministic success rate',
+            'ollama_success_rate' => 'ollama success rate',
+            'deterministic_intent_match_rate' => 'deterministic intent match rate',
+            'ollama_intent_match_rate' => 'ollama intent match rate',
+            'deterministic_entity_match_rate' => 'deterministic entity match rate',
+            'ollama_entity_match_rate' => 'ollama entity match rate',
+            'provider_intent_agreement_rate' => 'provider intent agreement rate',
+            'provider_entity_agreement_rate' => 'provider entity agreement rate',
+            'provider_failure_rate' => 'provider failure rate',
+            'average_confidence_delta' => 'average confidence delta',
+        ] as $key => $label) {
+            $this->line(sprintf('  %-34s %s', $label.':', $this->scalar($metrics[$key])));
+        }
+
+        $avg = $metrics['average_confidence_by_provider'];
+        $this->line(sprintf('  %-34s det=%s ollama=%s', 'average confidence by provider:', $this->scalar($avg['deterministic']), $this->scalar($avg['ollama'])));
+
+        $this->newLine();
+        $this->line('<info>Divergent entity keys</info>');
+        if ($metrics['divergent_entity_keys'] === []) {
+            $this->line('  (none)');
+        } else {
+            foreach ($metrics['divergent_entity_keys'] as $key => $count) {
+                $this->line(sprintf('  %-20s %d', $key.':', $count));
+            }
+        }
+
+        $this->newLine();
+        $this->line('<info>Weak expected intents</info>');
+        if ($metrics['weak_expected_intents'] === []) {
+            $this->line('  (none)');
+        } else {
+            foreach ($metrics['weak_expected_intents'] as $intent => $stats) {
+                $this->line(sprintf(
+                    '  %-30s det=%s ollama=%s (%d cases)',
+                    $intent.':',
+                    $this->scalar($stats['deterministic_intent_match_rate']),
+                    $this->scalar($stats['ollama_intent_match_rate']),
+                    $stats['cases'],
+                ));
+            }
+        }
+    }
+
+    private function scalar(mixed $value): string
+    {
+        return $value === null ? 'n/a' : (string) $value;
     }
 
     /**
