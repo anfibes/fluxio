@@ -640,15 +640,17 @@ Frontend direction remains:
 
 # Not Yet Implemented
 
-- LLM-backed interpretation provider in the proposal runtime
-  (the transport client and structured-output validator exist as sandbox
-  infrastructure but are not wired into `ActionInterpreterService`)
+- LLM-backed interpretation as the **default** runtime provider
+  (an opt-in Ollama sandbox provider exists, but deterministic remains the
+  default and authoritative path)
+- Runtime hybrid interpretation (both providers in one request — comparison
+  is currently diagnostics-only)
 - Semantic entity search
 - Advanced resolver ranking
 - Voice workflows
 - Multi-step orchestration
 - Multi-user collaboration
-- Advanced calendar coordination
+- Advanced calendar coordination (availability, slot suggestions)
 - Realtime collaboration
 - Production deployment pipeline
 
@@ -658,29 +660,37 @@ Frontend direction remains:
 
 Fluxio is deterministic-first and validation-first.
 
-Current runtime interpretation uses:
+By default, runtime interpretation uses:
 - rule-based interpretation (`DeterministicInterpretationProvider`)
 - deterministic proposal mutations
 - structured validation (`NormalizedCommandValidator`)
 - explicit execution control
 
-Sandbox infrastructure for future LLM-backed interpretation already
-exists in `packages/Actions/src/Llm/` and is not wired into the runtime:
+An **opt-in** Ollama interpretation provider now exists as a sandbox,
+selectable via `ACTIONS_INTERPRETATION_PROVIDER=ollama`:
 
-- `LlmClientInterface` + `OllamaLlmClient` — generic LLM transport
-  abstraction (Phase 2)
-- `LlmStructuredOutputValidator` + `InvalidLlmStructuredOutputException`
-  — provider-level JSON contract validation that any future LLM provider
-  must pass before producing a `NormalizedCommand` (Phase 3)
+- `OllamaInterpretationProvider` + `InterpretationPromptBuilder` — builds a
+  strict prompt from the intent registry and produces a candidate
+  `NormalizedCommand` (Phase 4)
+- `LlmClientInterface` + `OllamaLlmClient` — generic LLM transport (Phase 2)
+- `LlmStructuredOutputValidator` — provider-level JSON contract validation,
+  fail-closed, before any `NormalizedCommand` is built (Phase 3)
 
-The deterministic provider remains authoritative. Any future LLM
-integration will:
+Development-only diagnostics compare deterministic vs. Ollama interpretation
+over a versioned corpus (`actions:compare-interpretation`,
+`actions:evaluate-interpretation-corpus`, drift metrics — Phases 5A–5C). These
+are Artisan-only, blocked in production, and never run during the proposal
+runtime.
 
-- assist interpretation only (intent / entity extraction)
-- still go through `NormalizedCommandValidator`
-- still go through `IntentCapabilityRegistry`
-- never own proposal state
-- never execute, confirm, or mutate proposals directly
+The deterministic provider remains the default and authoritative path. The
+Ollama provider is a sandbox and is not production-authoritative. Any
+LLM-assisted interpretation:
+
+- assists interpretation only (intent / entity extraction)
+- still goes through `LlmStructuredOutputValidator` and `NormalizedCommandValidator`
+- still goes through the proposal lifecycle and `IntentCapabilityRegistry`
+- never owns proposal state
+- never executes, confirms, or mutates proposals directly
 
 Core principle:
 

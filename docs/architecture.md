@@ -685,9 +685,15 @@ public function interpret(
 ): NormalizedCommand;
 ```
 
-Current providers:
-- `DeterministicInterpretationProvider`
-- `FakeLlmInterpretationProvider` (sandbox/test only)
+The active provider is selected by config
+(`actions.interpreter.provider`, env `ACTIONS_INTERPRETATION_PROVIDER`):
+- `deterministic` → `DeterministicInterpretationProvider` (default, authoritative)
+- `ollama` → `OllamaInterpretationProvider` (opt-in sandbox)
+- any other value fails fast with `InvalidArgumentException`
+
+`FakeLlmInterpretationProvider` also exists for tests/provider-swap checks
+but is not part of the config selection. Exactly one provider is active per
+request — there is no hybrid mode and no fallback chain.
 
 Providers produce ONLY:
 - `NormalizedCommand`
@@ -704,12 +710,15 @@ Providers do NOT:
 - ambiguity generation
 - lifecycle state
 
-No LLM-backed interpretation provider is wired into the runtime. The
-deterministic provider remains authoritative.
+The deterministic provider is the default and authoritative runtime path.
+An opt-in `OllamaInterpretationProvider` (sandbox) can be selected, but it is
+**not** production-authoritative: it only produces a candidate
+`NormalizedCommand` that still passes through the same validation and proposal
+lifecycle.
 
-A separate sandbox subsystem prepares the boundaries any future LLM
-provider must respect. It lives in `packages/Actions/src/Llm/` and is
-not consumed by any runtime service in the current build:
+The LLM transport and contract boundaries live in
+`packages/Actions/src/Llm/` and are consumed only when the Ollama provider (or
+the development-only diagnostics) are exercised:
 
 ```text
 packages/Actions/src/Llm/
@@ -717,6 +726,7 @@ packages/Actions/src/Llm/
   DTO/LlmRequest.php
   DTO/LlmResponse.php
   Clients/OllamaLlmClient.php
+  Prompting/InterpretationPromptBuilder.php
   Validation/LlmStructuredOutputValidator.php
   Validation/LlmStructuredOutputValidationResult.php
   Exceptions/LlmTransportException.php
@@ -735,27 +745,32 @@ Pieces:
   `IntentRegistry`, intent-aware entity-key compatibility, scalar/list
   entity values, and the `unknown` intent contract. Raises
   `InvalidLlmStructuredOutputException` on contract violations.
-- Configuration (`packages/Actions/config/actions.php`) carries the
-  transport settings (`actions.llm.provider`, `base_url`, `model`,
-  `timeout`). The active interpretation provider is **not**
-  configurable from this layer — that remains deterministic.
+- `InterpretationPromptBuilder` — builds the strict Ollama prompt from
+  `IntentRegistry` (intent list and allowed entity keys enumerated
+  dynamically, never hardcoded).
+- Configuration (`packages/Actions/config/actions.php`) carries the active
+  interpretation provider (`actions.interpreter.provider`) and the transport
+  settings (`actions.llm.*`). Selecting `ollama` opts into the sandbox
+  provider; the default stays `deterministic`.
 
-The intended future pipeline is:
+When the Ollama provider is selected, the active pipeline is:
 
 ```text
 LlmClientInterface
 → LlmResponse::parsedJson
-→ LlmStructuredOutputValidator   (provider-level contract)
-→ [future] LlmInterpretationProvider builds NormalizedCommand
+→ LlmStructuredOutputValidator   (provider-level contract, fail-closed)
+→ OllamaInterpretationProvider builds NormalizedCommand
 → NormalizedCommandValidator     (existing boundary)
 → ActionInterpreterService       (authoritative — unchanged)
 ```
 
 The phased rollout is described in
 [`.docs/llm-interpretation-contract.md`](../.docs/llm-interpretation-contract.md).
-Phases 2 and 3 (transport + structured output validation) are done as
-sandbox infrastructure; Phase 4 (`OllamaInterpretationProvider`
-sandbox, opt-in) is not implemented.
+Phases 2–3 (transport + structured-output validation), Phase 4
+(`OllamaInterpretationProvider` sandbox, opt-in) and Phases 5A–5C
+(comparison, corpus evaluation, drift metrics — development-only Artisan
+tooling) are done. Runtime hybrid interpretation remains planned; the
+runtime stays single-provider with deterministic as the default.
 
 ---
 
@@ -1126,23 +1141,29 @@ instead of direct cross-domain mutations.
 
 Fluxio is deterministic-first.
 
-Runtime interpretation today:
+Default runtime interpretation:
 - rule-based parsing (`DeterministicInterpretationProvider`)
 - explicit validation (`NormalizedCommandValidator`)
 - deterministic refinement
 - explainable proposal state
 
-LLM sandbox infrastructure (implemented, not wired into runtime):
+LLM sandbox (opt-in via `actions.interpreter.provider=ollama`; not the default):
+- candidate interpretation (`OllamaInterpretationProvider`,
+  `InterpretationPromptBuilder`)
 - generic transport boundary (`LlmClientInterface`, `OllamaLlmClient`)
 - provider-level JSON contract validation
   (`LlmStructuredOutputValidator`)
+- development-only comparison/corpus/drift diagnostics (Artisan tooling)
 
-Any future LLM-backed provider will run **after** that sandbox
-validation and **before** `NormalizedCommandValidator`. It may assist:
+When the Ollama provider is active it runs **after** that sandbox validation
+and **before** `NormalizedCommandValidator`. LLM interpretation may assist:
 - intent detection
 - entity extraction
 - ambiguity disambiguation hints
 - refinement interpretation
+
+It is not production-authoritative; the deterministic provider stays the
+default and the proposal lifecycle is unchanged either way.
 
 Possible future runtime providers:
 - Ollama
