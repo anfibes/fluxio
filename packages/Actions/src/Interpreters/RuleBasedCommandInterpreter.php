@@ -27,6 +27,7 @@ class RuleBasedCommandInterpreter implements CommandInterpreterInterface
             sourceText: $text,
             locale:     'en',
             entities:   $parsed->entities,
+            warnings:   $parsed->warnings,
         );
     }
 }

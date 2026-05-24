@@ -27,6 +27,7 @@ class DeterministicInterpretationProvider implements InterpretationProviderInter
             sourceText: $text,
             locale:     $context->locale,
             entities:   $parsed->entities,
+            warnings:   $parsed->warnings,
         );
     }
 }

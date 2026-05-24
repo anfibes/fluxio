@@ -18,19 +18,19 @@ class ActionInterpreterService
 {
     public function __construct(
         private readonly CommandInterpreterInterface $interpreter,
-        private readonly IntentRegistry             $registry,
-        private readonly EntityResolverRegistry     $resolverRegistry,
+        private readonly IntentRegistry $registry,
+        private readonly EntityResolverRegistry $resolverRegistry,
     ) {}
 
     public function interpret(string $text): ActionProposalData
     {
-        $command    = $this->interpreter->interpret($text);
+        $command = $this->interpreter->interpret($text);
         $definition = $this->registry->find($command->intent);
 
         // Pre-resolve ambiguous entity queries before dispatching to intent builders.
         // Auto-resolved queries promote to detected entities; unresolved ones carry
         // pre-built ambiguity objects so builders never touch hardcoded candidate data.
-        $entities            = $command->entities;
+        $entities = $command->entities;
         $prebuiltAmbiguities = [];
 
         if (isset($entities['lead_query'])) {
@@ -38,25 +38,26 @@ class ActionInterpreterService
         }
 
         [$status, $missing, $editableFields, $changes, $ambiguities] = match ($command->intent) {
-            'create_task'   => $this->buildCreateTask($entities, $prebuiltAmbiguities),
+            'create_task' => $this->buildCreateTask($entities, $prebuiltAmbiguities),
             'schedule_call' => $this->buildScheduleCall($entities, $prebuiltAmbiguities),
-            default         => $definition !== null
+            default => $definition !== null
                 ? $this->buildFromDefinition($definition, $entities, $prebuiltAmbiguities)
                 : ['draft', [], [], [], []],
         };
 
         return new ActionProposalData(
-            id:                 (string) Str::uuid(),
-            intent:             $command->intent,
-            status:             $status,
-            confidence:         $command->confidence,
-            source_text:        $command->sourceText,
-            entities:           $entities,
-            missing:            $missing,
-            editable_fields:    $editableFields,
-            changes:            $changes,
+            id: (string) Str::uuid(),
+            intent: $command->intent,
+            status: $status,
+            confidence: $command->confidence,
+            source_text: $command->sourceText,
+            entities: $entities,
+            missing: $missing,
+            warnings: $command->warnings,
+            editable_fields: $editableFields,
+            changes: $changes,
             needs_confirmation: true,
-            ambiguities:        $ambiguities,
+            ambiguities: $ambiguities,
         );
     }
 
@@ -73,7 +74,7 @@ class ActionInterpreterService
         $query = $entities[$queryKey];
         unset($entities[$queryKey]);
 
-        $result      = $this->resolverRegistry->resolve($query, new ResolutionContext($queryKey));
+        $result = $this->resolverRegistry->resolve($query, new ResolutionContext($queryKey));
         $ambiguities = [];
 
         if ($result->resolved) {
@@ -82,13 +83,13 @@ class ActionInterpreterService
         } elseif (! empty($result->candidates)) {
             // Multiple matches — emit a blocking ambiguity; the builder adds no missing field.
             $ambiguities[] = [
-                'key'                   => 'lead',
-                'label'                 => 'Lead',
-                'reason'                => 'multiple_matches',
-                'blocking'              => true,
-                'query'                 => $query,
+                'key' => 'lead',
+                'label' => 'Lead',
+                'reason' => 'multiple_matches',
+                'blocking' => true,
+                'query' => $query,
                 'selected_candidate_id' => null,
-                'candidates'            => array_map(
+                'candidates' => array_map(
                     fn (ResolutionCandidate $c) => $c->toArray(),
                     $result->candidates,
                 ),
@@ -103,26 +104,26 @@ class ActionInterpreterService
 
     private function buildCreateTask(array $entities, array $prebuiltAmbiguities = []): array
     {
-        $hasLead              = isset($entities['lead']);
+        $hasLead = isset($entities['lead']);
         $hasBlockingAmbiguity = collect($prebuiltAmbiguities)->contains(fn ($a) => $a['blocking'] ?? false);
-        $status               = $hasBlockingAmbiguity ? 'draft' : 'ready';
+        $status = $hasBlockingAmbiguity ? 'draft' : 'ready';
 
         $editableFields = [
             new EditableField(
-                key:      'title',
-                label:    'Title',
-                value:    'Follow-up task',
-                source:   'inferred',
+                key: 'title',
+                label: 'Title',
+                value: 'Follow-up task',
+                source: 'inferred',
                 required: true,
             ),
         ];
 
         if ($hasLead) {
             $editableFields[] = new EditableField(
-                key:      'lead',
-                label:    'Lead',
-                value:    $entities['lead'],
-                source:   'detected',
+                key: 'lead',
+                label: 'Lead',
+                value: $entities['lead'],
+                source: 'detected',
                 required: false,
             );
         }
@@ -134,9 +135,9 @@ class ActionInterpreterService
 
         $changes = [
             new ProposedChange(
-                type:    'create',
-                label:   'Create task',
-                module:  'tasks',
+                type: 'create',
+                label: 'Create task',
+                module: 'tasks',
                 payload: $payload,
             ),
         ];
@@ -148,53 +149,53 @@ class ActionInterpreterService
     {
         $missing = [
             new MissingField(
-                key:      'date',
-                label:    'Date',
-                reason:   'The command does not specify a date.',
+                key: 'date',
+                label: 'Date',
+                reason: 'The command does not specify a date.',
                 required: true,
             ),
             new MissingField(
-                key:      'time',
-                label:    'Time',
-                reason:   'The command does not specify a time.',
+                key: 'time',
+                label: 'Time',
+                reason: 'The command does not specify a time.',
                 required: true,
             ),
         ];
 
         $editableFields = [];
-        $ambiguities    = $prebuiltAmbiguities;
+        $ambiguities = $prebuiltAmbiguities;
 
         if (isset($entities['lead'])) {
             $editableFields[] = new EditableField(
-                key:      'lead',
-                label:    'Lead',
-                value:    $entities['lead'],
-                source:   'detected',
+                key: 'lead',
+                label: 'Lead',
+                value: $entities['lead'],
+                source: 'detected',
                 required: true,
             );
         }
 
         $editableFields[] = new EditableField(
-            key:      'date',
-            label:    'Date',
-            value:    null,
-            source:   'missing',
+            key: 'date',
+            label: 'Date',
+            value: null,
+            source: 'missing',
             required: true,
         );
 
         $editableFields[] = new EditableField(
-            key:      'time',
-            label:    'Time',
-            value:    null,
-            source:   'missing',
+            key: 'time',
+            label: 'Time',
+            value: null,
+            source: 'missing',
             required: true,
         );
 
         $changes = [
             new ProposedChange(
-                type:    'schedule',
-                label:   'Schedule call',
-                module:  'calendar',
+                type: 'schedule',
+                label: 'Schedule call',
+                module: 'calendar',
                 payload: [],
             ),
         ];
@@ -204,9 +205,9 @@ class ActionInterpreterService
 
     private function buildFromDefinition(IntentDefinition $definition, array $entities, array $prebuiltAmbiguities = []): array
     {
-        $missing        = [];
+        $missing = [];
         $editableFields = [];
-        $ambiguities    = $prebuiltAmbiguities;
+        $ambiguities = $prebuiltAmbiguities;
 
         // Keys already handled by pre-built ambiguities must not appear in missing.
         $ambiguousKeys = array_column($prebuiltAmbiguities, 'key');
@@ -214,26 +215,26 @@ class ActionInterpreterService
         foreach ($definition->requirements as $req) {
             if (isset($entities[$req->key])) {
                 $editableFields[] = new EditableField(
-                    key:      $req->key,
-                    label:    $req->label,
-                    value:    $entities[$req->key],
-                    source:   'detected',
+                    key: $req->key,
+                    label: $req->label,
+                    value: $entities[$req->key],
+                    source: 'detected',
                     required: $req->required,
                 );
             } elseif ($req->required && in_array($req->key, $ambiguousKeys, true)) {
                 // Handled by a pre-built blocking ambiguity — skip missing and editable field.
             } elseif ($req->required) {
                 $missing[] = new MissingField(
-                    key:      $req->key,
-                    label:    $req->label,
-                    reason:   "The command does not specify a {$req->label}.",
+                    key: $req->key,
+                    label: $req->label,
+                    reason: "The command does not specify a {$req->label}.",
                     required: true,
                 );
                 $editableFields[] = new EditableField(
-                    key:      $req->key,
-                    label:    $req->label,
-                    value:    null,
-                    source:   'missing',
+                    key: $req->key,
+                    label: $req->label,
+                    value: null,
+                    source: 'missing',
                     required: true,
                 );
             }
@@ -241,13 +242,13 @@ class ActionInterpreterService
         }
 
         $hasBlockingAmbiguity = collect($ambiguities)->contains(fn ($a) => $a['blocking'] ?? false);
-        $status               = (empty($missing) && ! $hasBlockingAmbiguity) ? 'ready' : 'draft';
+        $status = (empty($missing) && ! $hasBlockingAmbiguity) ? 'ready' : 'draft';
 
         $changes = [
             new ProposedChange(
-                type:    $definition->operation,
-                label:   $definition->label,
-                module:  $definition->module,
+                type: $definition->operation,
+                label: $definition->label,
+                module: $definition->module,
                 payload: $entities,
             ),
         ];
