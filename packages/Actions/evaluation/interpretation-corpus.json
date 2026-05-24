@@ -81,5 +81,50 @@
         "notes": [
             "Out-of-domain command; both providers should fall back to unknown."
         ]
+    },
+    {
+        "id": "schedule-call-next-friday",
+        "text": "Call Rossi next Friday at 3pm",
+        "locale": "en",
+        "expected": {
+            "intent": "schedule_call",
+            "entities": {
+                "lead": "Rossi"
+            }
+        },
+        "notes": [
+            "Phase 6A temporal expression: 'next Friday at 3pm'.",
+            "Only intent and lead are asserted; the resolved date is run-relative and intentionally not pinned."
+        ]
+    },
+    {
+        "id": "create-task-day-after-tomorrow",
+        "text": "Create a task for Rossi day after tomorrow",
+        "locale": "en",
+        "expected": {
+            "intent": "create_task",
+            "entities": {
+                "lead": "Rossi"
+            }
+        },
+        "notes": [
+            "Phase 6A temporal expression: 'day after tomorrow'.",
+            "Date is run-relative and intentionally not pinned."
+        ]
+    },
+    {
+        "id": "schedule-meeting-tomorrow-afternoon",
+        "text": "Schedule a meeting with Rossini tomorrow afternoon",
+        "locale": "en",
+        "expected": {
+            "intent": "schedule_meeting",
+            "entities": {
+                "lead": "Rossini"
+            }
+        },
+        "notes": [
+            "Phase 6A day-part expression: 'tomorrow afternoon' (→ 15:00).",
+            "Date is run-relative and intentionally not pinned."
+        ]
     }
 ]

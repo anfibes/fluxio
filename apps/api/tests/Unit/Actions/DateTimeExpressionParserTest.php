@@ -19,7 +19,7 @@ class DateTimeExpressionParserTest extends TestCase
     {
         parent::setUp();
         Carbon::setTestNow('2026-05-10 08:00:00');
-        $this->parser = new DateTimeExpressionParser();
+        $this->parser = new DateTimeExpressionParser;
     }
 
     protected function tearDown(): void
@@ -146,6 +146,107 @@ class DateTimeExpressionParserTest extends TestCase
         $result = $this->parser->parse('Tomorrow at 10:30');
         $this->assertEquals(now()->addDay()->toDateString(), $result['date']);
         $this->assertEquals('10:30', $result['time']);
+    }
+
+    // ── Phase 6A: relative days ──────────────────────────────────────────────
+
+    public function test_today_returns_current_date(): void
+    {
+        $result = $this->parser->parse('today');
+        $this->assertEquals(now()->toDateString(), $result['date']);
+    }
+
+    public function test_day_after_tomorrow_returns_plus_two_days(): void
+    {
+        $result = $this->parser->parse('day after tomorrow');
+        $this->assertEquals(now()->addDays(2)->toDateString(), $result['date']);
+    }
+
+    public function test_in_two_days_word_form_returns_plus_two_days(): void
+    {
+        $result = $this->parser->parse('in two days');
+        $this->assertEquals(now()->addDays(2)->toDateString(), $result['date']);
+    }
+
+    public function test_in_numeric_two_days_returns_plus_two_days(): void
+    {
+        $result = $this->parser->parse('in 2 days');
+        $this->assertEquals(now()->addDays(2)->toDateString(), $result['date']);
+    }
+
+    // ── Phase 6A: weekday qualifiers ──────────────────────────────────────────
+
+    public function test_next_monday_returns_next_monday(): void
+    {
+        $result = $this->parser->parse('next Monday');
+        $this->assertEquals(Carbon::parse('next monday')->toDateString(), $result['date']);
+    }
+
+    public function test_this_friday_returns_upcoming_friday(): void
+    {
+        // 'this <day>' = upcoming occurrence including today.
+        $todayIso = now()->dayOfWeekIso;        // 1=Mon … 7=Sun
+        $fridayIso = 5;
+        $diff = ($fridayIso - $todayIso + 7) % 7;
+        $expected = now()->addDays($diff)->toDateString();
+
+        $result = $this->parser->parse('this Friday');
+        $this->assertEquals($expected, $result['date']);
+    }
+
+    public function test_friday_at_10_returns_date_and_time(): void
+    {
+        $result = $this->parser->parse('Friday at 10');
+        $this->assertEquals(Carbon::parse('next friday')->toDateString(), $result['date']);
+        $this->assertEquals('10:00', $result['time']);
+    }
+
+    public function test_next_friday_at_3pm_returns_date_and_time(): void
+    {
+        $result = $this->parser->parse('next Friday at 3pm');
+        $this->assertEquals(Carbon::parse('next friday')->toDateString(), $result['date']);
+        $this->assertEquals('15:00', $result['time']);
+    }
+
+    // ── Phase 6A: day parts ───────────────────────────────────────────────────
+
+    public function test_tomorrow_afternoon_returns_date_and_1500(): void
+    {
+        $result = $this->parser->parse('tomorrow afternoon');
+        $this->assertEquals(now()->addDay()->toDateString(), $result['date']);
+        $this->assertEquals('15:00', $result['time']);
+    }
+
+    public function test_early_morning_returns_0800(): void
+    {
+        $result = $this->parser->parse('early morning');
+        $this->assertEquals('08:00', $result['time']);
+    }
+
+    public function test_evening_returns_1800(): void
+    {
+        $result = $this->parser->parse('evening');
+        $this->assertEquals('18:00', $result['time']);
+    }
+
+    public function test_tonight_returns_2000(): void
+    {
+        $result = $this->parser->parse('tonight');
+        $this->assertEquals('20:00', $result['time']);
+    }
+
+    public function test_later_today_returns_today_and_1700(): void
+    {
+        $result = $this->parser->parse('later today');
+        $this->assertEquals(now()->toDateString(), $result['date']);
+        $this->assertEquals('17:00', $result['time']);
+    }
+
+    public function test_end_of_day_returns_1800_without_date(): void
+    {
+        $result = $this->parser->parse('end of day');
+        $this->assertEquals('18:00', $result['time']);
+        $this->assertArrayNotHasKey('date', $result);
     }
 
     // ── No-expression cases ──────────────────────────────────────────────────
