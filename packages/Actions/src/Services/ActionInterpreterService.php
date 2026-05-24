@@ -147,21 +147,7 @@ class ActionInterpreterService
 
     private function buildScheduleCall(array $entities, array $prebuiltAmbiguities = []): array
     {
-        $missing = [
-            new MissingField(
-                key: 'date',
-                label: 'Date',
-                reason: 'The command does not specify a date.',
-                required: true,
-            ),
-            new MissingField(
-                key: 'time',
-                label: 'Time',
-                reason: 'The command does not specify a time.',
-                required: true,
-            ),
-        ];
-
+        $missing = [];
         $editableFields = [];
         $ambiguities = $prebuiltAmbiguities;
 
@@ -175,21 +161,34 @@ class ActionInterpreterService
             );
         }
 
-        $editableFields[] = new EditableField(
-            key: 'date',
-            label: 'Date',
-            value: null,
-            source: 'missing',
-            required: true,
-        );
-
-        $editableFields[] = new EditableField(
-            key: 'time',
-            label: 'Time',
-            value: null,
-            source: 'missing',
-            required: true,
-        );
+        // Date / Time: honour temporal entities already extracted by the parser.
+        // Only mark them missing when they were not extracted — this keeps the
+        // proposal consistent with any inferred-time warning surfaced alongside.
+        foreach (['date' => 'Date', 'time' => 'Time'] as $key => $label) {
+            if (isset($entities[$key])) {
+                $editableFields[] = new EditableField(
+                    key: $key,
+                    label: $label,
+                    value: $entities[$key],
+                    source: 'detected',
+                    required: true,
+                );
+            } else {
+                $missing[] = new MissingField(
+                    key: $key,
+                    label: $label,
+                    reason: "The command does not specify a {$label}.",
+                    required: true,
+                );
+                $editableFields[] = new EditableField(
+                    key: $key,
+                    label: $label,
+                    value: null,
+                    source: 'missing',
+                    required: true,
+                );
+            }
+        }
 
         $changes = [
             new ProposedChange(
@@ -200,7 +199,12 @@ class ActionInterpreterService
             ),
         ];
 
-        return ['draft', $missing, $editableFields, $changes, $ambiguities];
+        // Readiness mirrors buildFromDefinition: ready only when nothing is
+        // missing and no blocking ambiguity remains (e.g. unresolved lead).
+        $hasBlockingAmbiguity = collect($ambiguities)->contains(fn ($a) => $a['blocking'] ?? false);
+        $status = (empty($missing) && ! $hasBlockingAmbiguity) ? 'ready' : 'draft';
+
+        return [$status, $missing, $editableFields, $changes, $ambiguities];
     }
 
     private function buildFromDefinition(IntentDefinition $definition, array $entities, array $prebuiltAmbiguities = []): array
