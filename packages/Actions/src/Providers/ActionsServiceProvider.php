@@ -2,9 +2,11 @@
 
 namespace Fluxio\Actions\Providers;
 
+use Fluxio\Actions\Console\CompareInterpretationCommand;
 use Fluxio\Actions\Contracts\CommandInterpreterInterface;
 use Fluxio\Actions\Contracts\IntentResolverInterface;
 use Fluxio\Actions\Contracts\RefinementInterpreterInterface;
+use Fluxio\Actions\Diagnostics\InterpretationComparisonService;
 use Fluxio\Actions\DTO\EntityRequirement;
 use Fluxio\Actions\DTO\IntentDefinition;
 use Fluxio\Actions\EntityResolution\Registry\EntityResolverRegistry;
@@ -192,6 +194,17 @@ class ActionsServiceProvider extends ServiceProvider
         $this->app->bind(CommandInterpreterInterface::class, InterpretationProviderAdapter::class);
 
         $this->app->bind(RefinementInterpreterInterface::class, RuleBasedRefinementInterpreter::class);
+
+        // Diagnostics-only (Phase 5A): compares deterministic vs. Ollama sandbox
+        // interpretation. Both concrete providers are passed explicitly so the
+        // service never resolves InterpretationProviderInterface (which would
+        // return only the configured runtime provider). Not runtime hybrid mode.
+        $this->app->bind(InterpretationComparisonService::class, function ($app) {
+            return new InterpretationComparisonService(
+                deterministicProvider: $app->make(DeterministicInterpretationProvider::class),
+                ollamaProvider: $app->make(OllamaInterpretationProvider::class),
+            );
+        });
     }
 
     public function boot(): void
@@ -202,5 +215,11 @@ class ActionsServiceProvider extends ServiceProvider
 
         $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
         $this->loadTranslationsFrom(__DIR__.'/../../lang', 'actions');
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                CompareInterpretationCommand::class,
+            ]);
+        }
     }
 }
