@@ -733,7 +733,7 @@ notes and working documents live in `.docs/`.
 
 ## Requirements
 
-- PHP 8.3+
+- PHP 8.2+
 - Composer
 - Node.js 20+
 - PostgreSQL

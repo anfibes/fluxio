@@ -144,7 +144,7 @@ Recommended environment:
 
 | Tool | Version |
 |---|---|
-| PHP | 8.3+ |
+| PHP | 8.2+ |
 | Composer | 2+ |
 | Node.js | 20+ |
 | npm | 10+ |
@@ -603,7 +603,7 @@ Current prototype limitations:
 - limited ERP modules
 - no semantic search yet
 - no voice workflows yet
-- no real LLM providers yet
+- no production-authoritative LLM runtime provider yet (an opt-in Ollama sandbox provider exists; deterministic interpretation remains the default authoritative path)
 
 Current focus intentionally remains:
 - proposal continuity
