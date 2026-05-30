@@ -3,11 +3,15 @@
 namespace Fluxio\Actions\Services;
 
 use Fluxio\Actions\Contracts\RefinementInterpreterInterface;
+use Fluxio\Actions\DTO\EditableFieldExplanation;
 use Fluxio\Actions\DTO\NormalizedMutation;
 use Fluxio\Actions\DTO\ProposalRuntimeContext;
+use Fluxio\Actions\Enums\SemanticMutationType;
 use Fluxio\Actions\Models\ActionProposal;
 use Fluxio\Actions\Registry\IntentCapabilityRegistry;
+use Fluxio\Actions\Support\DateTimeExpressionParser;
 use Fluxio\Actions\Support\ProposalRuntimeContextFactory;
+use Fluxio\Actions\Support\TemporalParseResult;
 use Illuminate\Validation\ValidationException;
 
 class ActionProposalRefinementService
@@ -18,6 +22,7 @@ class ActionProposalRefinementService
         private readonly RefinementInterpreterInterface $interpreter,
         private readonly IntentCapabilityRegistry $capabilityRegistry,
         private readonly ProposalRuntimeContextFactory $contextFactory,
+        private readonly DateTimeExpressionParser $parser,
     ) {}
 
     public function refine(ActionProposal $proposal, string $text): ActionProposal
@@ -264,6 +269,63 @@ class ActionProposalRefinementService
         );
     }
 
+    // ── Temporal explanation refresh (Phase 7C.1) ───────────────────────────
+    // Keeps editable_fields[date|time].explanation coherent with the refined
+    // value. Reuses the existing DateTimeExpressionParser provenance and the
+    // EditableFieldExplanation DTO — no new explanation engine. Returns null when
+    // a coherent explanation cannot be built, so the caller drops the stale one.
+
+    private function refreshedTemporalExplanation(
+        NormalizedMutation $mutation,
+        TemporalParseResult $temporal,
+        mixed $newValue,
+        string $effectiveText,
+    ): ?EditableFieldExplanation {
+        if (! is_string($newValue) || $newValue === '') {
+            return null;
+        }
+
+        return match ($mutation->semanticType()) {
+            SemanticMutationType::ShiftTime => $this->shiftTimeExplanation($mutation, $newValue, $effectiveText),
+            SemanticMutationType::ReplaceTime => $this->replaceTimeExplanation($temporal, $newValue, $effectiveText),
+            SemanticMutationType::ReplaceDate => $this->replaceDateExplanation($temporal, $newValue, $effectiveText),
+            default => null,
+        };
+    }
+
+    private function shiftTimeExplanation(NormalizedMutation $mutation, string $newValue, string $effectiveText): EditableFieldExplanation
+    {
+        $amount = (int) ($mutation->metadata['amount'] ?? 0);
+        $direction = ($mutation->metadata['direction'] ?? 'later') === 'earlier' ? 'earlier' : 'later';
+
+        return new EditableFieldExplanation(
+            source: 'computed',
+            expression: trim($effectiveText),
+            confidence: 1.0,
+            message: "Time shifted {$direction} by {$amount} minutes to {$newValue}.",
+        );
+    }
+
+    private function replaceTimeExplanation(TemporalParseResult $temporal, string $newValue, string $effectiveText): EditableFieldExplanation
+    {
+        return new EditableFieldExplanation(
+            source: $temporal->timeSource !== 'none' ? $temporal->timeSource : 'explicit',
+            expression: $temporal->timeExpression ?? trim($effectiveText),
+            confidence: $temporal->timeConfidence > 0.0 ? $temporal->timeConfidence : 1.0,
+            message: "Time updated from refinement to {$newValue}.",
+        );
+    }
+
+    private function replaceDateExplanation(TemporalParseResult $temporal, string $newValue, string $effectiveText): EditableFieldExplanation
+    {
+        return new EditableFieldExplanation(
+            source: $temporal->dateSource !== 'none' ? $temporal->dateSource : 'relative',
+            expression: $temporal->dateExpression ?? trim($effectiveText),
+            confidence: $temporal->dateConfidence > 0.0 ? $temporal->dateConfidence : 0.9,
+            message: "Date updated from refinement to {$newValue}.",
+        );
+    }
+
     private function intentSupportsAmbiguityResolution(string $intent): bool
     {
         $capability = $this->capabilityRegistry->find($intent);
@@ -325,6 +387,11 @@ class ActionProposalRefinementService
         $confidence = $proposal->confidence;
         $changes = [];
 
+        // Phase 7C.1: parser-local provenance of the refinement text, used to
+        // refresh temporal field explanations so they describe the new value
+        // rather than the original command. Deterministic; explainability only.
+        $temporal = $this->parser->explain($effectiveText);
+
         $currentFieldValues = collect($editableFields)
             ->keyBy('key')
             ->map(fn (array $f) => $f['value'])
@@ -362,12 +429,28 @@ class ActionProposalRefinementService
                 // Scalar replace: set or overwrite a scalar field value.
                 $newValue = $mutation->value;
 
+                // Phase 7C.1: for date/time fields, refresh the explanation so it
+                // describes the new value. A null result means we cannot build a
+                // coherent explanation → drop the stale one rather than keep it.
+                $isTemporalField = in_array($field, ['date', 'time'], true);
+                $refreshedExplanation = $isTemporalField
+                    ? $this->refreshedTemporalExplanation($mutation, $temporal, $newValue, $effectiveText)
+                    : null;
+
                 if (collect($editableFields)->contains('key', $field)) {
                     $editableFields = array_map(
-                        function (array $f) use ($field, $newValue, $mutation): array {
+                        function (array $f) use ($field, $newValue, $mutation, $isTemporalField, $refreshedExplanation): array {
                             if ($f['key'] === $field) {
                                 $f['value'] = $newValue;
                                 $f['source'] = $mutation->source;
+
+                                if ($isTemporalField) {
+                                    if ($refreshedExplanation !== null) {
+                                        $f['explanation'] = $refreshedExplanation->toArray();
+                                    } else {
+                                        unset($f['explanation']);
+                                    }
+                                }
                             }
 
                             return $f;
@@ -375,13 +458,19 @@ class ActionProposalRefinementService
                         $editableFields
                     );
                 } else {
-                    $editableFields[] = [
+                    $newField = [
                         'key' => $field,
                         'label' => $label,
                         'value' => $newValue,
                         'source' => $mutation->source,
-                        'required' => in_array($field, ['date', 'time'], true),
+                        'required' => $isTemporalField,
                     ];
+
+                    if ($isTemporalField && $refreshedExplanation !== null) {
+                        $newField['explanation'] = $refreshedExplanation->toArray();
+                    }
+
+                    $editableFields[] = $newField;
                 }
 
                 // Keep authoritative proposal state consistent with the edited
