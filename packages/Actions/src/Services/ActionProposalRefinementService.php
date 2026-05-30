@@ -4,8 +4,10 @@ namespace Fluxio\Actions\Services;
 
 use Fluxio\Actions\Contracts\RefinementInterpreterInterface;
 use Fluxio\Actions\DTO\NormalizedMutation;
+use Fluxio\Actions\DTO\ProposalRuntimeContext;
 use Fluxio\Actions\Models\ActionProposal;
 use Fluxio\Actions\Registry\IntentCapabilityRegistry;
+use Fluxio\Actions\Support\ProposalRuntimeContextFactory;
 use Illuminate\Validation\ValidationException;
 
 class ActionProposalRefinementService
@@ -15,6 +17,7 @@ class ActionProposalRefinementService
     public function __construct(
         private readonly RefinementInterpreterInterface $interpreter,
         private readonly IntentCapabilityRegistry $capabilityRegistry,
+        private readonly ProposalRuntimeContextFactory $contextFactory,
     ) {}
 
     public function refine(ActionProposal $proposal, string $text): ActionProposal
@@ -24,6 +27,12 @@ class ActionProposalRefinementService
                 'proposal' => [__('actions::actions.cannot_refine')],
             ]);
         }
+
+        // Phase 7A: deterministic, proposal-scoped runtime context derived from the
+        // current proposal state. Read-only and non-persisted; used internally below
+        // (e.g. blocking-ambiguity detection) and available for future context-aware
+        // refinement. It does not change public behavior or the proposal payload.
+        $context = $this->contextFactory->fromProposal($proposal);
 
         $effectiveText = $this->effectiveText($text, $proposal->source_text);
 
@@ -44,10 +53,10 @@ class ActionProposalRefinementService
         // If ALL mutations were rejected and there is nothing else to process, bail early.
         if (! empty($rejectedMutations) && empty($fieldMutations)) {
             $proposal->last_refinement = [
-                'text'           => $text,
+                'text' => $text,
                 'effective_text' => $effectiveText,
-                'summary'        => 'No changes applied.',
-                'changes'        => [],
+                'summary' => 'No changes applied.',
+                'changes' => [],
             ];
             $proposal->save();
 
@@ -58,7 +67,7 @@ class ActionProposalRefinementService
         // Check capability first — if the intent does not support ambiguity resolution,
         // skip the attempt entirely.
         $ambiguityResolution = null;
-        if ($this->hasUnresolvedBlockingAmbiguity($proposal)) {
+        if ($this->hasUnresolvedBlockingAmbiguity($context)) {
             if ($this->intentSupportsAmbiguityResolution($proposal->intent)) {
                 $ambiguityResolution = $this->tryClassifyAmbiguityResolution($proposal, $effectiveText);
 
@@ -68,10 +77,10 @@ class ActionProposalRefinementService
                         __('actions::actions.ambiguity_still_unresolved'),
                     );
                     $proposal->last_refinement = [
-                        'text'           => $text,
+                        'text' => $text,
                         'effective_text' => $effectiveText,
-                        'summary'        => 'No changes applied.',
-                        'changes'        => [],
+                        'summary' => 'No changes applied.',
+                        'changes' => [],
                     ];
                     $proposal->save();
 
@@ -95,10 +104,10 @@ class ActionProposalRefinementService
                 __('actions::actions.refinement_not_recognized'),
             );
             $proposal->last_refinement = [
-                'text'           => $text,
+                'text' => $text,
                 'effective_text' => $effectiveText,
-                'summary'        => 'No changes applied.',
-                'changes'        => [],
+                'summary' => 'No changes applied.',
+                'changes' => [],
             ];
             $proposal->save();
 
@@ -116,12 +125,12 @@ class ActionProposalRefinementService
      * If no capability is registered for the intent, all mutations are rejected
      * (conservative default — unlisted intents have no explicit mutation contract).
      *
-     * @param NormalizedMutation[] $mutations
+     * @param  NormalizedMutation[]  $mutations
      * @return array{0: NormalizedMutation[], 1: NormalizedMutation[]}
      */
     private function partitionByCapability(string $intent, array $mutations): array
     {
-        $allowed  = [];
+        $allowed = [];
         $rejected = [];
 
         foreach ($mutations as $mutation) {
@@ -139,7 +148,7 @@ class ActionProposalRefinementService
      * Append a warning to the list only if it is not already present.
      * Repeated refinements must not duplicate the same warning message.
      *
-     * @param  list<string> $warnings
+     * @param  list<string>  $warnings
      * @return list<string>
      */
     private function addWarning(array $warnings, string $warning): array
@@ -180,9 +189,9 @@ class ActionProposalRefinementService
 
             if ($candidate !== null) {
                 return [
-                    'ambiguity_key'   => $ambiguity['key'],
+                    'ambiguity_key' => $ambiguity['key'],
                     'ambiguity_label' => $ambiguity['label'],
-                    'candidate'       => $candidate,
+                    'candidate' => $candidate,
                 ];
             }
 
@@ -196,7 +205,7 @@ class ActionProposalRefinementService
     // ── Unified mutation application ─────────────────────────────────────────
 
     /**
-     * @param NormalizedMutation[] $fieldMutations
+     * @param  NormalizedMutation[]  $fieldMutations
      */
     private function applyAll(
         ActionProposal $proposal,
@@ -206,12 +215,12 @@ class ActionProposalRefinementService
         string $effectiveText,
     ): ActionProposal {
         $editableFields = $proposal->editable_fields ?? [];
-        $missing        = $proposal->missing ?? [];
-        $ambiguities    = $proposal->ambiguities ?? [];
-        $entities       = $proposal->entities ?? [];
+        $missing = $proposal->missing ?? [];
+        $ambiguities = $proposal->ambiguities ?? [];
+        $entities = $proposal->entities ?? [];
         $previousStatus = $proposal->status;
-        $confidence     = $proposal->confidence;
-        $changes        = [];
+        $confidence = $proposal->confidence;
+        $changes = [];
 
         $currentFieldValues = collect($editableFields)
             ->keyBy('key')
@@ -222,13 +231,13 @@ class ActionProposalRefinementService
         $mutatedFieldKeys = [];
 
         foreach ($fieldMutations as $mutation) {
-            $field     = $mutation->field;
-            $label     = $mutation->label;
+            $field = $mutation->field;
+            $label = $mutation->label;
             $prevValue = $currentFieldValues[$field] ?? null;
 
             if ($mutation->operation === 'replace' && $mutation->target !== null) {
                 // Collection replace: swap a specific item within an array field.
-                $current       = is_array($prevValue) ? $prevValue : [];
+                $current = is_array($prevValue) ? $prevValue : [];
                 $newCollection = array_map(
                     fn ($item) => $item === $mutation->target ? $mutation->value : $item,
                     $current
@@ -236,13 +245,13 @@ class ActionProposalRefinementService
 
                 if ($newCollection !== $current) {
                     $editableFields = $this->upsertCollectionField($editableFields, $field, $label, $newCollection, $mutation->source);
-                    $changes[]      = [
-                        'field'     => $field,
-                        'label'     => $label,
+                    $changes[] = [
+                        'field' => $field,
+                        'label' => $label,
                         'operation' => 'replace',
-                        'target'    => $mutation->target,
-                        'from'      => $current,
-                        'to'        => $newCollection,
+                        'target' => $mutation->target,
+                        'from' => $current,
+                        'to' => $newCollection,
                     ];
                 }
 
@@ -254,7 +263,7 @@ class ActionProposalRefinementService
                     $editableFields = array_map(
                         function (array $f) use ($field, $newValue, $mutation): array {
                             if ($f['key'] === $field) {
-                                $f['value']  = $newValue;
+                                $f['value'] = $newValue;
                                 $f['source'] = $mutation->source;
                             }
 
@@ -264,10 +273,10 @@ class ActionProposalRefinementService
                     );
                 } else {
                     $editableFields[] = [
-                        'key'      => $field,
-                        'label'    => $label,
-                        'value'    => $newValue,
-                        'source'   => $mutation->source,
+                        'key' => $field,
+                        'label' => $label,
+                        'value' => $newValue,
+                        'source' => $mutation->source,
                         'required' => in_array($field, ['date', 'time'], true),
                     ];
                 }
@@ -294,30 +303,30 @@ class ActionProposalRefinementService
                 $current = is_array($prevValue) ? $prevValue : ($prevValue !== null ? [$prevValue] : []);
 
                 if (! in_array($mutation->value, $current, true)) {
-                    $newCollection  = [...$current, $mutation->value];
+                    $newCollection = [...$current, $mutation->value];
                     $editableFields = $this->upsertCollectionField($editableFields, $field, $label, $newCollection, $mutation->source);
-                    $changes[]      = [
-                        'field'     => $field,
-                        'label'     => $label,
+                    $changes[] = [
+                        'field' => $field,
+                        'label' => $label,
                         'operation' => 'append',
-                        'from'      => $current,
-                        'to'        => $newCollection,
+                        'from' => $current,
+                        'to' => $newCollection,
                     ];
                 }
 
             } elseif ($mutation->operation === 'remove') {
                 // Remove a specific item from a collection field.
-                $current       = is_array($prevValue) ? $prevValue : [];
+                $current = is_array($prevValue) ? $prevValue : [];
                 $newCollection = array_values(array_filter($current, fn ($item) => $item !== $mutation->target));
 
                 if (count($newCollection) !== count($current)) {
                     $editableFields = $this->upsertCollectionField($editableFields, $field, $label, $newCollection, $mutation->source);
-                    $changes[]      = [
-                        'field'     => $field,
-                        'label'     => $label,
+                    $changes[] = [
+                        'field' => $field,
+                        'label' => $label,
                         'operation' => 'remove',
-                        'from'      => $current,
-                        'to'        => $newCollection,
+                        'from' => $current,
+                        'to' => $newCollection,
                     ];
                 }
             }
@@ -334,10 +343,10 @@ class ActionProposalRefinementService
 
         // Apply ambiguity resolution
         if ($ambiguityResolution !== null) {
-            $fieldKey   = $ambiguityResolution['ambiguity_key'];
+            $fieldKey = $ambiguityResolution['ambiguity_key'];
             $fieldLabel = $ambiguityResolution['ambiguity_label'];
-            $candidate  = $ambiguityResolution['candidate'];
-            $prevValue  = $currentFieldValues[$fieldKey] ?? null;
+            $candidate = $ambiguityResolution['candidate'];
+            $prevValue = $currentFieldValues[$fieldKey] ?? null;
 
             $ambiguities = array_map(function (array $a) use ($fieldKey, $candidate): array {
                 if ($a['key'] === $fieldKey && $a['selected_candidate_id'] === null) {
@@ -352,7 +361,7 @@ class ActionProposalRefinementService
             if (collect($editableFields)->contains('key', $fieldKey)) {
                 $editableFields = array_map(function (array $f) use ($fieldKey, $candidate): array {
                     if ($f['key'] === $fieldKey) {
-                        $f['value']  = $candidate['label'];
+                        $f['value'] = $candidate['label'];
                         $f['source'] = 'detected';
                     }
 
@@ -360,10 +369,10 @@ class ActionProposalRefinementService
                 }, $editableFields);
             } else {
                 $editableFields[] = [
-                    'key'      => $fieldKey,
-                    'label'    => $fieldLabel,
-                    'value'    => $candidate['label'],
-                    'source'   => 'detected',
+                    'key' => $fieldKey,
+                    'label' => $fieldLabel,
+                    'value' => $candidate['label'],
+                    'source' => 'detected',
                     'required' => true,
                 ];
             }
@@ -372,8 +381,8 @@ class ActionProposalRefinementService
                 $changes[] = [
                     'field' => $fieldKey,
                     'label' => $fieldLabel,
-                    'from'  => $prevValue,
-                    'to'    => $candidate['label'],
+                    'from' => $prevValue,
+                    'to' => $candidate['label'],
                 ];
             }
         }
@@ -388,16 +397,16 @@ class ActionProposalRefinementService
         }
 
         $proposal->editable_fields = $editableFields;
-        $proposal->missing         = $missing;
-        $proposal->ambiguities     = $ambiguities;
-        $proposal->entities        = $entities;
-        $proposal->status          = $status;
-        $proposal->confidence      = $confidence;
+        $proposal->missing = $missing;
+        $proposal->ambiguities = $ambiguities;
+        $proposal->entities = $entities;
+        $proposal->status = $status;
+        $proposal->confidence = $confidence;
         $proposal->last_refinement = [
-            'text'           => $text,
+            'text' => $text,
             'effective_text' => $effectiveText,
-            'summary'        => $this->buildSummary($changes),
-            'changes'        => $changes,
+            'summary' => $this->buildSummary($changes),
+            'changes' => $changes,
         ];
         $proposal->save();
 
@@ -407,7 +416,7 @@ class ActionProposalRefinementService
     /**
      * Upsert an array value into editable_fields for collection mutations.
      *
-     * @param array<int, array<string, mixed>> $editableFields
+     * @param  array<int, array<string, mixed>>  $editableFields
      * @return array<int, array<string, mixed>>
      */
     private function upsertCollectionField(array $editableFields, string $field, string $label, array $value, string $source): array
@@ -416,7 +425,7 @@ class ActionProposalRefinementService
             return array_map(
                 function (array $f) use ($field, $value, $source): array {
                     if ($f['key'] === $field) {
-                        $f['value']  = $value;
+                        $f['value'] = $value;
                         $f['source'] = $source;
                     }
 
@@ -427,10 +436,10 @@ class ActionProposalRefinementService
         }
 
         $editableFields[] = [
-            'key'      => $field,
-            'label'    => $label,
-            'value'    => $value,
-            'source'   => $source,
+            'key' => $field,
+            'label' => $label,
+            'value' => $value,
+            'source' => $source,
             'required' => false,
         ];
 
@@ -443,7 +452,7 @@ class ActionProposalRefinementService
             return 'No changes applied.';
         }
 
-        $byField    = collect($changes)->keyBy('field');
+        $byField = collect($changes)->keyBy('field');
         $dataFields = array_values(array_diff($byField->keys()->all(), ['status']));
 
         if (in_array('lead', $dataFields, true) && count($dataFields) === 1) {
@@ -475,10 +484,10 @@ class ActionProposalRefinementService
         }
 
         if (in_array('participants', $dataFields, true)) {
-            $from      = $byField->get('participants')['from'] ?? [];
-            $to        = $byField->get('participants')['to'] ?? [];
+            $from = $byField->get('participants')['from'] ?? [];
+            $to = $byField->get('participants')['to'] ?? [];
             $fromCount = is_array($from) ? count($from) : 0;
-            $toCount   = is_array($to)   ? count($to)   : 0;
+            $toCount = is_array($to) ? count($to) : 0;
 
             if ($toCount > $fromCount) {
                 return 'Participant added.';
@@ -498,7 +507,7 @@ class ActionProposalRefinementService
 
     private function effectiveText(string $text, string $sourceText): string
     {
-        $text       = trim($text);
+        $text = trim($text);
         $sourceText = trim($sourceText);
 
         if ($sourceText !== '' && str_starts_with($text, $sourceText)) {
@@ -508,15 +517,20 @@ class ActionProposalRefinementService
         return $text;
     }
 
-    private function hasUnresolvedBlockingAmbiguity(ActionProposal $proposal): bool
+    /**
+     * Behaviour-identical to the previous proposal-based check, now reading the
+     * runtime context's pre-derived blocking ambiguities (already filtered to
+     * blocking === true) and keeping only those still unresolved.
+     */
+    private function hasUnresolvedBlockingAmbiguity(ProposalRuntimeContext $context): bool
     {
-        return collect($proposal->ambiguities ?? [])
-            ->contains(fn (array $a) => ($a['blocking'] ?? false) && $a['selected_candidate_id'] === null);
+        return collect($context->blockingAmbiguities)
+            ->contains(fn (array $a) => ($a['selected_candidate_id'] ?? null) === null);
     }
 
     private function hasBlockingConditions(ActionProposal $proposal, array $updatedMissing, array $updatedAmbiguities): bool
     {
-        $requiredMissingRemain    = collect($updatedMissing)->contains('required', true);
+        $requiredMissingRemain = collect($updatedMissing)->contains('required', true);
         $blockingAmbiguityRemains = collect($updatedAmbiguities)
             ->contains(fn (array $a) => ($a['blocking'] ?? false) && $a['selected_candidate_id'] === null);
 
@@ -526,7 +540,7 @@ class ActionProposalRefinementService
     private function resolveCandidate(array $ambiguity, string $text): ?array
     {
         $candidates = $ambiguity['candidates'] ?? [];
-        $lower      = mb_strtolower(trim($text));
+        $lower = mb_strtolower(trim($text));
 
         $ordinal = $this->parseOrdinal($lower);
         if ($ordinal !== null && isset($candidates[$ordinal])) {
@@ -572,9 +586,9 @@ class ActionProposalRefinementService
     private function parseOrdinal(string $text): ?int
     {
         return match (true) {
-            str_contains($text, 'first')  || str_contains($text, '1st') => 0,
+            str_contains($text, 'first') || str_contains($text, '1st') => 0,
             str_contains($text, 'second') || str_contains($text, '2nd') => 1,
-            str_contains($text, 'third')  || str_contains($text, '3rd') => 2,
+            str_contains($text, 'third') || str_contains($text, '3rd') => 2,
             default => null,
         };
     }
