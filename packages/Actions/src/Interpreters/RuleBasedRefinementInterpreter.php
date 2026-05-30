@@ -44,22 +44,31 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
             return [$collectionAppend];
         }
 
+        // Relative temporal shift (e.g. "push it by 30 minutes", "move it one hour
+        // earlier"). Detected here but NOT resolved: the interpreter stays stateless
+        // and emits a metadata-only mutation. ActionProposalRefinementService resolves
+        // it against the proposal's current time via ProposalRuntimeContext.
+        $temporalShift = $this->extractTemporalShift($text);
+        if ($temporalShift !== null) {
+            return [$temporalShift];
+        }
+
         $mutations = [];
 
         $temporal = $this->parser->parse($text);
         if (isset($temporal['date'])) {
             $mutations[] = new NormalizedMutation(
-                field:     'date',
-                label:     'Date',
-                value:     $temporal['date'],
+                field: 'date',
+                label: 'Date',
+                value: $temporal['date'],
                 operation: 'replace',
             );
         }
         if (isset($temporal['time'])) {
             $mutations[] = new NormalizedMutation(
-                field:     'time',
-                label:     'Time',
-                value:     $temporal['time'],
+                field: 'time',
+                label: 'Time',
+                value: $temporal['time'],
                 operation: 'replace',
             );
         }
@@ -67,9 +76,9 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
         $priority = $this->extractPriority($text);
         if ($priority !== null) {
             $mutations[] = new NormalizedMutation(
-                field:     'priority',
-                label:     'Priority',
-                value:     $priority,
+                field: 'priority',
+                label: 'Priority',
+                value: $priority,
                 operation: 'replace',
             );
         }
@@ -87,11 +96,11 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
         // "Replace Luca with Marco" / "Replace Luca Bianchi with Marco Rossi"
         if ((bool) preg_match('/\breplace\s+(.+?)\s+with\s+(.+)\s*$/i', $text, $m)) {
             return new NormalizedMutation(
-                field:     'participants',
-                label:     'Participants',
-                value:     trim($m[2]),
+                field: 'participants',
+                label: 'Participants',
+                value: trim($m[2]),
                 operation: 'replace',
-                target:    trim($m[1]),
+                target: trim($m[1]),
             );
         }
 
@@ -104,11 +113,11 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
         // Note: "Remove priority" is caught by extractClearMutation before this runs.
         if ((bool) preg_match('/\bremove\s+(\w+(?:\s+\w+)*)\s*$/i', $text, $m)) {
             return new NormalizedMutation(
-                field:     'participants',
-                label:     'Participants',
-                value:     null,
+                field: 'participants',
+                label: 'Participants',
+                value: null,
                 operation: 'remove',
-                target:    trim($m[1]),
+                target: trim($m[1]),
             );
         }
 
@@ -120,23 +129,84 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
         // "Add Mario too" or "Also add Mario"
         if ((bool) preg_match('/\badd\s+(.+?)\s+too\b/i', $text, $m)) {
             return new NormalizedMutation(
-                field:     'participants',
-                label:     'Participants',
-                value:     trim($m[1]),
+                field: 'participants',
+                label: 'Participants',
+                value: trim($m[1]),
                 operation: 'append',
             );
         }
 
         if ((bool) preg_match('/\balso\s+add\s+(.+)/i', $text, $m)) {
             return new NormalizedMutation(
-                field:     'participants',
-                label:     'Participants',
-                value:     trim($m[1]),
+                field: 'participants',
+                label: 'Participants',
+                value: trim($m[1]),
                 operation: 'append',
             );
         }
 
         return null;
+    }
+
+    // ── Relative temporal shift (Phase 7B) ──────────────────────────────────
+    // Narrow, explicit, deterministic detection only. No vague expressions
+    // ("later", "soon", "after lunch", …) and no day/week shifts. The value is
+    // left null; the concrete time is computed by the service from the proposal's
+    // current time. Returns a metadata-only mutation describing the requested shift.
+
+    /** @var array<string, int> Word → number for the small supported quantity set. */
+    private const NUMBER_WORDS = [
+        'one' => 1, 'two' => 2, 'three' => 3, 'four' => 4, 'five' => 5,
+        'six' => 6, 'seven' => 7, 'eight' => 8, 'nine' => 9, 'ten' => 10,
+        'eleven' => 11, 'twelve' => 12,
+    ];
+
+    private function extractTemporalShift(string $text): ?NormalizedMutation
+    {
+        // Require an explicit "push/move/make it" trigger to stay narrow.
+        if (! (bool) preg_match('/\b(?:push|move|make)\s+it\b/i', $text)) {
+            return null;
+        }
+
+        // Require an explicit quantity + unit (minutes / hours).
+        if (! (bool) preg_match('/\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(hours?|minutes?|mins?)\b/i', $text, $m)) {
+            return null;
+        }
+
+        $amount = $this->wordToNumber($m[1]);
+        if ($amount <= 0) {
+            return null;
+        }
+
+        $isHours = str_starts_with(mb_strtolower($m[2]), 'hour');
+        $minutes = $isHours ? $amount * 60 : $amount;
+
+        // Direction: "earlier" shifts backward; everything else (including
+        // "later" and the bare "push it by …") shifts forward.
+        $direction = (bool) preg_match('/\bearlier\b/i', $text) ? 'earlier' : 'later';
+
+        return new NormalizedMutation(
+            field: 'time',
+            label: 'Time',
+            value: null,
+            operation: 'replace',
+            source: 'inferred',
+            metadata: [
+                'contextual_operation' => 'temporal_shift',
+                'unit' => 'minutes',
+                'amount' => $minutes,
+                'direction' => $direction,
+            ],
+        );
+    }
+
+    private function wordToNumber(string $word): int
+    {
+        if (is_numeric($word)) {
+            return (int) $word;
+        }
+
+        return self::NUMBER_WORDS[mb_strtolower($word)] ?? 0;
     }
 
     // ── Clear operations ─────────────────────────────────────────────────────
@@ -147,13 +217,13 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
 
         if (
             str_contains($lower, 'remove priority') ||
-            str_contains($lower, 'clear priority')  ||
+            str_contains($lower, 'clear priority') ||
             str_contains($lower, 'no priority')
         ) {
             return new NormalizedMutation(
-                field:     'priority',
-                label:     'Priority',
-                value:     null,
+                field: 'priority',
+                label: 'Priority',
+                value: null,
                 operation: 'clear',
             );
         }

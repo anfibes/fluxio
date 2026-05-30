@@ -63,6 +63,16 @@ class ActionProposalRefinementService
             return $proposal;
         }
 
+        // Phase 7B: resolve contextual mutations (e.g. relative temporal shifts)
+        // against the read-only ProposalRuntimeContext, turning them into concrete
+        // mutations before application. Unresolvable ones are dropped with a warning.
+        [$fieldMutations, $contextualWarnings] = $this->resolveContextualMutations($fieldMutations, $context);
+        $hadContextualWarning = ! empty($contextualWarnings);
+
+        foreach ($contextualWarnings as $warning) {
+            $proposal->warnings = $this->addWarning($proposal->warnings ?? [], $warning);
+        }
+
         // Try ambiguity resolution when a blocking ambiguity exists.
         // Check capability first — if the intent does not support ambiguity resolution,
         // skip the attempt entirely.
@@ -99,10 +109,15 @@ class ActionProposalRefinementService
 
         // Nothing recognized at all
         if (empty($fieldMutations) && $ambiguityResolution === null) {
-            $proposal->warnings = $this->addWarning(
-                $proposal->warnings ?? [],
-                __('actions::actions.refinement_not_recognized'),
-            );
+            // A contextual mutation that was understood but could not be resolved
+            // (e.g. a temporal shift with no current time) already produced its own
+            // specific warning — don't add the generic "not recognized" on top.
+            if (! $hadContextualWarning) {
+                $proposal->warnings = $this->addWarning(
+                    $proposal->warnings ?? [],
+                    __('actions::actions.refinement_not_recognized'),
+                );
+            }
             $proposal->last_refinement = [
                 'text' => $text,
                 'effective_text' => $effectiveText,
@@ -162,6 +177,90 @@ class ActionProposalRefinementService
         return array_values($warnings);
     }
 
+    // ── Contextual mutation resolution (Phase 7B) ───────────────────────────
+    // Turns interpreter-detected contextual mutations into concrete ones using the
+    // read-only ProposalRuntimeContext. Deterministic; no NL reasoning, no LLM.
+    // Capability validation has already run, so a temporal_shift reaching here is
+    // an allowed time replace for this intent.
+
+    /**
+     * Resolve contextual mutations against the proposal runtime context.
+     *
+     * Non-contextual mutations pass through unchanged. A contextual mutation that
+     * cannot be resolved (e.g. a temporal shift with no current time) is dropped
+     * and contributes a warning instead of being applied.
+     *
+     * @param  NormalizedMutation[]  $mutations
+     * @return array{0: NormalizedMutation[], 1: list<string>}
+     */
+    private function resolveContextualMutations(array $mutations, ProposalRuntimeContext $context): array
+    {
+        $resolved = [];
+        $warnings = [];
+
+        foreach ($mutations as $mutation) {
+            $operation = $mutation->metadata['contextual_operation'] ?? null;
+
+            if ($operation !== 'temporal_shift') {
+                $resolved[] = $mutation;
+
+                continue;
+            }
+
+            $shifted = $this->resolveTemporalShift($mutation, $context);
+
+            if ($shifted === null) {
+                $warnings[] = __('actions::actions.cannot_shift_time_no_current_time');
+
+                continue;
+            }
+
+            $resolved[] = $shifted;
+        }
+
+        return [$resolved, $warnings];
+    }
+
+    /**
+     * Compute a concrete time-replace mutation by shifting the proposal's current
+     * time by a signed minute offset. Returns null when there is no valid current
+     * time (HH:MM) to shift — the caller must not invent a time. Time-of-day
+     * arithmetic wraps within a single day and never touches the date field.
+     */
+    private function resolveTemporalShift(NormalizedMutation $mutation, ProposalRuntimeContext $context): ?NormalizedMutation
+    {
+        $current = $context->temporalValue('time');
+
+        if (! is_string($current) || ! (bool) preg_match('/^(\d{1,2}):(\d{2})$/', $current, $m)) {
+            return null;
+        }
+
+        $hours = (int) $m[1];
+        $minutes = (int) $m[2];
+
+        if ($hours > 23 || $minutes > 59) {
+            return null;
+        }
+
+        $amount = (int) ($mutation->metadata['amount'] ?? 0);
+        if ($amount <= 0) {
+            return null;
+        }
+
+        $delta = ($mutation->metadata['direction'] ?? 'later') === 'earlier' ? -$amount : $amount;
+        $total = ((($hours * 60 + $minutes + $delta) % 1440) + 1440) % 1440;
+
+        return new NormalizedMutation(
+            field: 'time',
+            label: 'Time',
+            value: sprintf('%02d:%02d', intdiv($total, 60), $total % 60),
+            operation: 'replace',
+            source: 'computed',
+            confidence: $mutation->confidence,
+            metadata: $mutation->metadata,
+        );
+    }
+
     private function intentSupportsAmbiguityResolution(string $intent): bool
     {
         $capability = $this->capabilityRegistry->find($intent);
@@ -218,6 +317,7 @@ class ActionProposalRefinementService
         $missing = $proposal->missing ?? [];
         $ambiguities = $proposal->ambiguities ?? [];
         $entities = $proposal->entities ?? [];
+        $proposedChanges = $proposal->changes ?? [];
         $previousStatus = $proposal->status;
         $confidence = $proposal->confidence;
         $changes = [];
@@ -280,6 +380,14 @@ class ActionProposalRefinementService
                         'required' => in_array($field, ['date', 'time'], true),
                     ];
                 }
+
+                // Keep authoritative proposal state consistent with the edited
+                // field: a scalar replace makes the field part of the operational
+                // proposal, so mirror it into entities and into any existing change
+                // payload that already declares the field. This applies to every
+                // scalar replace (date, time, lead, priority, …), not just temporal.
+                $entities[$field] = $newValue;
+                $proposedChanges = $this->syncChangePayloads($proposedChanges, $field, $newValue);
 
                 if ($prevValue !== $newValue) {
                     $changes[] = ['field' => $field, 'label' => $label, 'from' => $prevValue, 'to' => $newValue];
@@ -400,6 +508,7 @@ class ActionProposalRefinementService
         $proposal->missing = $missing;
         $proposal->ambiguities = $ambiguities;
         $proposal->entities = $entities;
+        $proposal->changes = $proposedChanges;
         $proposal->status = $status;
         $proposal->confidence = $confidence;
         $proposal->last_refinement = [
@@ -411,6 +520,33 @@ class ActionProposalRefinementService
         $proposal->save();
 
         return $proposal;
+    }
+
+    /**
+     * Sync a scalar value into any ProposedChange payload that already declares
+     * the field, keeping change payloads aligned with entities/editable fields
+     * after a scalar replace. Payloads that do not already contain the key are
+     * left untouched — no unrelated keys are created. Collection/array payload
+     * values for the key are skipped (this slice only syncs scalar replaces).
+     *
+     * @param  array<int, mixed>  $changes
+     * @return array<int, mixed>
+     */
+    private function syncChangePayloads(array $changes, string $field, mixed $value): array
+    {
+        return array_map(function ($change) use ($field, $value) {
+            if (
+                is_array($change)
+                && isset($change['payload'])
+                && is_array($change['payload'])
+                && array_key_exists($field, $change['payload'])
+                && ! is_array($change['payload'][$field])
+            ) {
+                $change['payload'][$field] = $value;
+            }
+
+            return $change;
+        }, $changes);
     }
 
     /**

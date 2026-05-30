@@ -358,4 +358,71 @@ class NormalizedRefinementInterpreterTest extends TestCase
         $this->assertEquals('Luca Bianchi', $mutations[0]->target);
         $this->assertEquals('Marco Rossi', $mutations[0]->value);
     }
+
+    // ── Relative temporal shift (Phase 7B) ──────────────────────────────────
+    // The interpreter only DETECTS the shift; it never reads proposal state.
+    // The concrete time is computed later by the service from the current time.
+
+    public function test_push_it_by_30_minutes_produces_temporal_shift_mutation(): void
+    {
+        $mutations = $this->interpreter->interpret('Push it by 30 minutes');
+
+        $this->assertCount(1, $mutations);
+        $this->assertSame('time', $mutations[0]->field);
+        $this->assertSame('replace', $mutations[0]->operation);
+        $this->assertNull($mutations[0]->value);   // value computed later by the service
+        $this->assertSame('inferred', $mutations[0]->source);
+        $this->assertSame('temporal_shift', $mutations[0]->metadata['contextual_operation']);
+        $this->assertSame('minutes', $mutations[0]->metadata['unit']);
+        $this->assertSame(30, $mutations[0]->metadata['amount']);
+        $this->assertSame('later', $mutations[0]->metadata['direction']);
+    }
+
+    public function test_move_it_one_hour_later_converts_hours_to_minutes(): void
+    {
+        $mutations = $this->interpreter->interpret('Move it one hour later');
+
+        $this->assertCount(1, $mutations);
+        $this->assertSame(60, $mutations[0]->metadata['amount']);
+        $this->assertSame('later', $mutations[0]->metadata['direction']);
+    }
+
+    public function test_move_it_2_hours_earlier_is_negative_direction(): void
+    {
+        $mutations = $this->interpreter->interpret('Move it 2 hours earlier');
+
+        $this->assertCount(1, $mutations);
+        $this->assertSame(120, $mutations[0]->metadata['amount']);
+        $this->assertSame('earlier', $mutations[0]->metadata['direction']);
+    }
+
+    public function test_make_it_30_minutes_earlier_detected(): void
+    {
+        $mutations = $this->interpreter->interpret('Make it 30 minutes earlier');
+
+        $this->assertCount(1, $mutations);
+        $this->assertSame('temporal_shift', $mutations[0]->metadata['contextual_operation']);
+        $this->assertSame(30, $mutations[0]->metadata['amount']);
+        $this->assertSame('earlier', $mutations[0]->metadata['direction']);
+    }
+
+    public function test_vague_shift_without_quantity_is_not_detected(): void
+    {
+        // "make it later" / "move it earlier" are intentionally NOT supported:
+        // no explicit quantity → no mutation at all.
+        $this->assertEmpty($this->interpreter->interpret('Make it later'));
+        $this->assertEmpty($this->interpreter->interpret('Move it earlier'));
+        $this->assertEmpty($this->interpreter->interpret('Push it back a bit'));
+    }
+
+    public function test_move_it_to_friday_is_a_date_replace_not_a_temporal_shift(): void
+    {
+        // Regression: "Move it to Friday" has no quantity+unit, so it must remain a
+        // normal absolute date replace (no contextual temporal_shift metadata).
+        $mutations = $this->interpreter->interpret('Move it to Friday');
+
+        $this->assertCount(1, $mutations);
+        $this->assertSame('date', $mutations[0]->field);
+        $this->assertArrayNotHasKey('contextual_operation', $mutations[0]->metadata);
+    }
 }

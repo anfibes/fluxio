@@ -39,14 +39,14 @@ class ProposalMutationIntelligenceTest extends TestCase
     private function readyScheduleCallProposal(User $user, array $overrides = []): ActionProposal
     {
         return ActionProposal::create(array_merge([
-            'user_id'    => $user->id,
-            'intent'     => 'schedule_call',
-            'status'     => 'ready',
+            'user_id' => $user->id,
+            'intent' => 'schedule_call',
+            'status' => 'ready',
             'confidence' => 0.85,
             'source_text' => 'Call Rossini',
-            'entities'   => ['lead' => 'Rossini'],
-            'missing'    => [],
-            'warnings'   => [],
+            'entities' => ['lead' => 'Rossini'],
+            'missing' => [],
+            'warnings' => [],
             'editable_fields' => [
                 ['key' => 'lead',  'label' => 'Lead',  'value' => 'Rossini',                           'source' => 'detected', 'required' => true],
                 ['key' => 'date',  'label' => 'Date',  'value' => now()->addDay()->toDateString(),      'source' => 'detected', 'required' => true],
@@ -186,7 +186,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_friday_instead_replaces_date_only(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user);
 
         $expectedFriday = Carbon::parse('next friday')->toDateString();
@@ -203,7 +203,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_friday_instead_last_refinement_contains_only_date_change(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Friday instead']);
@@ -216,7 +216,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_tomorrow_replaces_date_preserves_time(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user, [
             'editable_fields' => [
                 ['key' => 'lead', 'label' => 'Lead', 'value' => 'Rossini',                         'source' => 'detected', 'required' => true],
@@ -240,7 +240,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_date_replacement_summary_says_date_updated(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user, [
             'editable_fields' => [
                 ['key' => 'lead', 'label' => 'Lead', 'value' => 'Rossini',                         'source' => 'detected', 'required' => true],
@@ -281,7 +281,7 @@ class ProposalMutationIntelligenceTest extends TestCase
     {
         $user = $this->actingAsUser();
 
-        $r1         = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossini']);
+        $r1 = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossini']);
         $proposalId = $r1->json('data.id');
 
         $response = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'Tomorrow at 9']);
@@ -307,7 +307,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_at_time_updates_only_time(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'At 10:30']);
@@ -322,7 +322,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_at_time_last_refinement_contains_only_time_change(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'At 14:00']);
@@ -335,7 +335,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_time_update_summary_says_time_updated(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'At 10:30']);
@@ -345,7 +345,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_at_time_status_remains_ready(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user);
 
         $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'At 10:30'])
@@ -354,7 +354,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_at_time_pm_is_parsed_correctly(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'At 3pm']);
@@ -370,7 +370,7 @@ class ProposalMutationIntelligenceTest extends TestCase
         $user = $this->actingAsUser();
 
         // Interpret "Call Rossi" → resolve → fill date → update time
-        $r1         = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
+        $r1 = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
         $proposalId = $r1->json('data.id');
 
         $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'Rossi SRL']);
@@ -394,24 +394,32 @@ class ProposalMutationIntelligenceTest extends TestCase
         $this->assertNotContains('date', $changeFields);
     }
 
-    public function test_date_mutation_does_not_affect_entities(): void
+    public function test_date_mutation_syncs_entities_consistently(): void
     {
-        $user     = $this->actingAsUser();
+        // A scalar replace must keep the authoritative proposal state consistent:
+        // entities[date] is now updated to match the edited field (previously the
+        // refinement only touched editable_fields, leaving entities stale).
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user);
-
-        $originalEntities = $proposal->entities;
 
         $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Tomorrow']);
 
         $proposal->refresh();
-        $this->assertEquals($originalEntities, $proposal->entities);
+
+        $expectedDate = now()->addDay()->toDateString();
+        $editableDate = collect($proposal->editable_fields)->firstWhere('key', 'date')['value'];
+
+        $this->assertEquals($expectedDate, $proposal->entities['date']);
+        $this->assertEquals($editableDate, $proposal->entities['date']);
+        // Unrelated entities are left untouched.
+        $this->assertEquals('Rossini', $proposal->entities['lead']);
     }
 
     // ── 7. Priority mutation ─────────────────────────────────────────────────
 
     public function test_high_priority_adds_priority_editable_field(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'High priority']);
@@ -425,7 +433,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_priority_mutation_preserves_all_other_fields(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'High priority']);
@@ -438,7 +446,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_priority_mutation_summary_says_priority_set(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'High priority']);
@@ -448,7 +456,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_urgent_also_sets_high_priority(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Urgent']);
@@ -461,7 +469,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_tomorrow_standalone_fills_date_without_touching_time(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user, [
             'editable_fields' => [
                 ['key' => 'lead', 'label' => 'Lead', 'value' => 'Rossini',                         'source' => 'detected', 'required' => true],
@@ -479,7 +487,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_next_friday_fills_date_correctly(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Next Friday']);
@@ -492,7 +500,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_refine_rejected_for_confirmed_proposal(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user, ['status' => 'confirmed']);
 
         $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'At 10:00'])
@@ -504,7 +512,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_refine_rejected_for_executed_proposal(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user, ['status' => 'executed']);
 
         $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'At 10:00'])
@@ -516,7 +524,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_refine_rejected_for_failed_proposal(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user, ['status' => 'failed']);
 
         $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'At 10:00'])
@@ -530,7 +538,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_dot_time_format_parsed_as_colon_time(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'At 10.30']);
@@ -551,7 +559,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_second_time_refinement_updates_single_time_field(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user);
 
         // First refinement: 09:00 → 10:30
@@ -563,13 +571,13 @@ class ProposalMutationIntelligenceTest extends TestCase
 
         $response->assertStatus(200);
 
-        $fields         = $response->json('data.editable_fields');
-        $timeFields     = array_values(array_filter($fields, fn (array $f) => $f['key'] === 'time'));
+        $fields = $response->json('data.editable_fields');
+        $timeFields = array_values(array_filter($fields, fn (array $f) => $f['key'] === 'time'));
 
         $this->assertCount(1, $timeFields, 'editable_fields must contain exactly one time entry');
         $this->assertEquals('11:00', $timeFields[0]['value']);
 
-        $changes    = $response->json('data.last_refinement.changes');
+        $changes = $response->json('data.last_refinement.changes');
         $timeChange = collect($changes)->firstWhere('field', 'time');
         $this->assertNotNull($timeChange);
         $this->assertEquals('10:30', $timeChange['from']);
@@ -592,7 +600,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_remove_priority_clears_priority_from_editable_fields(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposalWithHighPriority($user);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Remove priority']);
@@ -605,7 +613,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_clear_priority_preserves_all_other_fields(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposalWithHighPriority($user);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Remove priority']);
@@ -618,7 +626,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_clear_priority_summary_says_priority_cleared(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposalWithHighPriority($user);
 
         $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Remove priority'])
@@ -627,7 +635,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_clear_priority_last_refinement_change_has_null_to(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposalWithHighPriority($user);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Remove priority']);
@@ -640,7 +648,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_clear_priority_status_remains_ready(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposalWithHighPriority($user);
 
         $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Remove priority'])
@@ -649,7 +657,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_clear_on_absent_priority_produces_no_change_record(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user); // no priority field
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Remove priority']);
@@ -662,7 +670,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_clear_priority_is_persisted_to_database(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposalWithHighPriority($user);
 
         $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Clear priority'])
@@ -693,7 +701,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_move_it_to_friday_changes_date_preserves_other_fields(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Move it to Friday']);
@@ -708,7 +716,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_move_it_to_friday_last_refinement_contains_only_date_change(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Move it to Friday']);
@@ -721,7 +729,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_add_participant_appends_to_participants_list(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca']);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Mario too']);
@@ -734,7 +742,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_add_participant_summary_says_participant_added(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca']);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Mario too']);
@@ -744,7 +752,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_add_participant_change_record_shows_from_and_to_arrays(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca']);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Mario too']);
@@ -758,7 +766,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_add_existing_participant_is_idempotent(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca']);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Luca too']);
@@ -773,7 +781,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_remove_participant_removes_from_list(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca', 'Marco']);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Remove Marco']);
@@ -786,7 +794,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_remove_participant_summary_says_participant_removed(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca', 'Marco']);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Remove Marco']);
@@ -796,7 +804,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_remove_participant_change_record_shows_from_and_to_arrays(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca', 'Marco']);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Remove Marco']);
@@ -810,7 +818,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_remove_nonexistent_participant_produces_no_change(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca', 'Marco']);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Remove Giovanni']);
@@ -822,7 +830,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_replace_participant_replaces_specific_item(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca', 'Marco']);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Replace Luca with Giovanni']);
@@ -835,7 +843,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_replace_participant_summary_says_participants_updated(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca', 'Marco']);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Replace Luca with Giovanni']);
@@ -845,7 +853,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_replace_participant_change_record_shows_target(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca', 'Marco']);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Replace Luca with Giovanni']);
@@ -859,7 +867,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_collection_mutation_preserves_unrelated_scalar_fields(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca']);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Mario too']);
@@ -872,7 +880,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_collection_mutation_status_remains_ready(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca']);
 
         $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Mario too'])
@@ -881,7 +889,7 @@ class ProposalMutationIntelligenceTest extends TestCase
 
     public function test_add_participant_is_persisted_to_database(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposalWithParticipants($user, ['Luca']);
 
         $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Mario too'])
@@ -894,11 +902,9 @@ class ProposalMutationIntelligenceTest extends TestCase
         $this->assertEquals('Participant added.', $proposal->last_refinement['summary']);
     }
 
-
-
     public function test_time_mutation_is_fully_persisted_to_database(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->readyScheduleCallProposal($user);
 
         $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'At 14:00'])
