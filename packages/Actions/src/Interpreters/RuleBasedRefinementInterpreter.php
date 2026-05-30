@@ -4,6 +4,7 @@ namespace Fluxio\Actions\Interpreters;
 
 use Fluxio\Actions\Contracts\RefinementInterpreterInterface;
 use Fluxio\Actions\DTO\NormalizedMutation;
+use Fluxio\Actions\Enums\SemanticMutationType;
 use Fluxio\Actions\Support\DateTimeExpressionParser;
 
 class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
@@ -62,6 +63,7 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
                 label: 'Date',
                 value: $temporal['date'],
                 operation: 'replace',
+                semanticType: SemanticMutationType::ReplaceDate,
             );
         }
         if (isset($temporal['time'])) {
@@ -70,6 +72,7 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
                 label: 'Time',
                 value: $temporal['time'],
                 operation: 'replace',
+                semanticType: SemanticMutationType::ReplaceTime,
             );
         }
 
@@ -197,6 +200,7 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
                 'amount' => $minutes,
                 'direction' => $direction,
             ],
+            semanticType: SemanticMutationType::ShiftTime,
         );
     }
 

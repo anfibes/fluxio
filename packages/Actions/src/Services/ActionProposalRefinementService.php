@@ -258,6 +258,9 @@ class ActionProposalRefinementService
             source: 'computed',
             confidence: $mutation->confidence,
             metadata: $mutation->metadata,
+            // Preserve the original semantic intent: this concrete time replace
+            // came from a contextual shift, so it stays shift_time (not replace_time).
+            semanticType: $mutation->semanticType,
         );
     }
 
@@ -390,7 +393,15 @@ class ActionProposalRefinementService
                 $proposedChanges = $this->syncChangePayloads($proposedChanges, $field, $newValue);
 
                 if ($prevValue !== $newValue) {
-                    $changes[] = ['field' => $field, 'label' => $label, 'from' => $prevValue, 'to' => $newValue];
+                    // Phase 7C: surface the descriptive semantic type alongside the
+                    // existing change metadata (e.g. shift_time vs replace_time).
+                    $changes[] = [
+                        'field' => $field,
+                        'label' => $label,
+                        'from' => $prevValue,
+                        'to' => $newValue,
+                        'semantic_type' => $mutation->semanticType()->value,
+                    ];
                 }
 
                 if (in_array($field, ['date', 'time'], true)) {

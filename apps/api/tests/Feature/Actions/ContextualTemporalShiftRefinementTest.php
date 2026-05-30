@@ -115,6 +115,34 @@ class ContextualTemporalShiftRefinementTest extends TestCase
         $timeChange = collect($changes)->firstWhere('field', 'time');
         $this->assertSame('10:00', $timeChange['from']);
         $this->assertSame('10:30', $timeChange['to']);
+        // Phase 7C: the change keeps the shift intent, not a plain replace.
+        $this->assertSame('shift_time', $timeChange['semantic_type']);
+    }
+
+    // ── Phase 7C: semantic mutation type surfaced in change metadata ──────────
+
+    public function test_absolute_time_refinement_is_classified_replace_time(): void
+    {
+        $user = $this->actingAsUser();
+        $proposal = $this->readyScheduleCall($user, '10:00');
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'At 14:30']);
+
+        $timeChange = collect($response->json('data.last_refinement.changes'))->firstWhere('field', 'time');
+        $this->assertSame('14:30', $timeChange['to']);
+        $this->assertSame('replace_time', $timeChange['semantic_type']);
+    }
+
+    public function test_date_refinement_is_classified_replace_date(): void
+    {
+        $user = $this->actingAsUser();
+        $proposal = $this->readyScheduleCall($user, '10:00');
+
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Friday instead']);
+
+        $dateChange = collect($response->json('data.last_refinement.changes'))->firstWhere('field', 'date');
+        $this->assertNotNull($dateChange);
+        $this->assertSame('replace_date', $dateChange['semantic_type']);
     }
 
     // ── No current time: never invent one ───────────────────────────────────────
