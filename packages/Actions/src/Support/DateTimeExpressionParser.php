@@ -110,6 +110,8 @@ class DateTimeExpressionParser
             timeExpression: $time['expression'] ?? null,
             explanations: $explanations,
             confidence: $confidence,
+            dateConfidence: $date !== null ? self::CONFIDENCE[$date['source']] : 0.0,
+            timeConfidence: $time !== null ? self::CONFIDENCE[$time['source']] : 0.0,
         );
     }
 

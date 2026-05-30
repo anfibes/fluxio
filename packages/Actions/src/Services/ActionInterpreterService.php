@@ -5,6 +5,7 @@ namespace Fluxio\Actions\Services;
 use Fluxio\Actions\Contracts\CommandInterpreterInterface;
 use Fluxio\Actions\DTO\ActionProposalData;
 use Fluxio\Actions\DTO\EditableField;
+use Fluxio\Actions\DTO\EditableFieldExplanation;
 use Fluxio\Actions\DTO\IntentDefinition;
 use Fluxio\Actions\DTO\MissingField;
 use Fluxio\Actions\DTO\ProposedChange;
@@ -12,6 +13,8 @@ use Fluxio\Actions\EntityResolution\DTO\ResolutionCandidate;
 use Fluxio\Actions\EntityResolution\DTO\ResolutionContext;
 use Fluxio\Actions\EntityResolution\Registry\EntityResolverRegistry;
 use Fluxio\Actions\Registry\IntentRegistry;
+use Fluxio\Actions\Support\DateTimeExpressionParser;
+use Fluxio\Actions\Support\TemporalParseResult;
 use Illuminate\Support\Str;
 
 class ActionInterpreterService
@@ -20,6 +23,7 @@ class ActionInterpreterService
         private readonly CommandInterpreterInterface $interpreter,
         private readonly IntentRegistry $registry,
         private readonly EntityResolverRegistry $resolverRegistry,
+        private readonly DateTimeExpressionParser $temporalParser,
     ) {}
 
     public function interpret(string $text): ActionProposalData
@@ -37,11 +41,16 @@ class ActionInterpreterService
             [$entities, $prebuiltAmbiguities] = $this->resolveEntityQuery('lead_query', $entities);
         }
 
+        // Parser-local temporal provenance, derived once from the source text and
+        // used only to attach explainability metadata to date/time editable fields.
+        // It does not affect entities, status, readiness, confidence, or execution.
+        $temporal = $this->temporalParser->explain($command->sourceText);
+
         [$status, $missing, $editableFields, $changes, $ambiguities] = match ($command->intent) {
             'create_task' => $this->buildCreateTask($entities, $prebuiltAmbiguities),
-            'schedule_call' => $this->buildScheduleCall($entities, $prebuiltAmbiguities),
+            'schedule_call' => $this->buildScheduleCall($entities, $temporal, $prebuiltAmbiguities),
             default => $definition !== null
-                ? $this->buildFromDefinition($definition, $entities, $prebuiltAmbiguities)
+                ? $this->buildFromDefinition($definition, $entities, $temporal, $prebuiltAmbiguities)
                 : ['draft', [], [], [], []],
         };
 
@@ -145,7 +154,7 @@ class ActionInterpreterService
         return [$status, [], $editableFields, $changes, $prebuiltAmbiguities];
     }
 
-    private function buildScheduleCall(array $entities, array $prebuiltAmbiguities = []): array
+    private function buildScheduleCall(array $entities, TemporalParseResult $temporal, array $prebuiltAmbiguities = []): array
     {
         $missing = [];
         $editableFields = [];
@@ -172,6 +181,7 @@ class ActionInterpreterService
                     value: $entities[$key],
                     source: 'detected',
                     required: true,
+                    explanation: $this->temporalExplanationFor($key, $entities[$key], $temporal),
                 );
             } else {
                 $missing[] = new MissingField(
@@ -207,7 +217,7 @@ class ActionInterpreterService
         return [$status, $missing, $editableFields, $changes, $ambiguities];
     }
 
-    private function buildFromDefinition(IntentDefinition $definition, array $entities, array $prebuiltAmbiguities = []): array
+    private function buildFromDefinition(IntentDefinition $definition, array $entities, TemporalParseResult $temporal, array $prebuiltAmbiguities = []): array
     {
         $missing = [];
         $editableFields = [];
@@ -224,6 +234,7 @@ class ActionInterpreterService
                     value: $entities[$req->key],
                     source: 'detected',
                     required: $req->required,
+                    explanation: $this->temporalExplanationFor($req->key, $entities[$req->key], $temporal),
                 );
             } elseif ($req->required && in_array($req->key, $ambiguousKeys, true)) {
                 // Handled by a pre-built blocking ambiguity — skip missing and editable field.
@@ -258,5 +269,44 @@ class ActionInterpreterService
         ];
 
         return [$status, $missing, $editableFields, $changes, $ambiguities];
+    }
+
+    // ── Field explainability ───────────────────────────────────────────────────
+
+    /**
+     * Build optional parser-local explainability for a temporal editable field.
+     *
+     * Returns an explanation only for the 'date'/'time' keys, only when the
+     * parser produced meaningful provenance, AND only when the parsed value
+     * matches the field value. The value guard keeps the note accurate when the
+     * entity originated elsewhere (e.g. a non-deterministic provider or a prior
+     * refinement) rather than from this source text. Any other key — or no match
+     * — yields null, so no empty explanation object is ever attached.
+     *
+     * This is parser-local explainability only: it never affects entities,
+     * status, readiness, confidence, ambiguity handling, or execution.
+     */
+    private function temporalExplanationFor(string $key, mixed $value, TemporalParseResult $temporal): ?EditableFieldExplanation
+    {
+        $data = match ($key) {
+            'date' => $temporal->date !== null && (string) $temporal->date === (string) $value
+                ? $temporal->dateExplanation()
+                : null,
+            'time' => $temporal->time !== null && (string) $temporal->time === (string) $value
+                ? $temporal->timeExplanation()
+                : null,
+            default => null,
+        };
+
+        if ($data === null) {
+            return null;
+        }
+
+        return new EditableFieldExplanation(
+            source: $data['source'],
+            expression: $data['expression'],
+            confidence: $data['confidence'],
+            message: $data['message'],
+        );
     }
 }

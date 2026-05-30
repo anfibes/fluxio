@@ -25,6 +25,13 @@ const sourceBadge: Record<EditableFieldSource, { text: string; cls: string }> = 
       >
         {{ field.value !== null && field.value !== undefined ? field.value : '—' }}
       </span>
+      <!-- Parser-local explainability: how the value entered the proposal. Subtle and informational only. -->
+      <span
+        v-if="field.explanation?.message"
+        class="text-xs leading-snug text-muted"
+      >
+        {{ field.explanation.message }}
+      </span>
     </div>
     <span
       class="mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-xs"

@@ -39,6 +39,10 @@ final class TemporalParseResult
         public readonly ?string $timeExpression,
         public readonly array $explanations,
         public readonly float $confidence,
+        // Per-component parser-local confidence (same scope caveat as $confidence).
+        // Defaulted so existing call sites stay valid; explain() always sets them.
+        public readonly float $dateConfidence = 0.0,
+        public readonly float $timeConfidence = 0.0,
     ) {}
 
     public function hasDate(): bool
@@ -55,6 +59,57 @@ final class TemporalParseResult
     public function isTimeInferred(): bool
     {
         return $this->timeSource === 'day_part';
+    }
+
+    /**
+     * Field-centric provenance for the date value, shaped for an editable field
+     * explanation. Returns null when no date was recognised — callers must never
+     * attach an empty explanation.
+     *
+     * @return array{source: string, expression: ?string, confidence: float, message: string}|null
+     */
+    public function dateExplanation(): ?array
+    {
+        if ($this->date === null || $this->dateSource === 'none') {
+            return null;
+        }
+
+        $message = $this->dateSource === 'weekday'
+            ? "Date resolved from weekday '{$this->dateExpression}'."
+            : "Date resolved from '{$this->dateExpression}'.";
+
+        return [
+            'source' => $this->dateSource,
+            'expression' => $this->dateExpression,
+            'confidence' => $this->dateConfidence,
+            'message' => $message,
+        ];
+    }
+
+    /**
+     * Field-centric provenance for the time value, shaped for an editable field
+     * explanation. The day-part message matches the Phase 6C inferred-time
+     * warning verbatim so the field note and the warning stay consistent.
+     * Returns null when no time was recognised.
+     *
+     * @return array{source: string, expression: ?string, confidence: float, message: string}|null
+     */
+    public function timeExplanation(): ?array
+    {
+        if ($this->time === null || $this->timeSource === 'none') {
+            return null;
+        }
+
+        $message = $this->timeSource === 'day_part'
+            ? "Time inferred from '{$this->timeExpression}' as {$this->time}."
+            : "Time set from '{$this->timeExpression}' as {$this->time}.";
+
+        return [
+            'source' => $this->timeSource,
+            'expression' => $this->timeExpression,
+            'confidence' => $this->timeConfidence,
+            'message' => $message,
+        ];
     }
 
     /**

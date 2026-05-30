@@ -54,12 +54,28 @@ export interface ProposalAmbiguity {
 
 export type EditableFieldSource = 'detected' | 'inferred' | 'guessed' | 'computed' | 'edited' | 'missing'
 
+/**
+ * Optional, parser-local explainability for a field — explains HOW the value
+ * entered the proposal (e.g. a date resolved from "tomorrow", a time inferred
+ * from "afternoon"). `confidence` is temporal parse confidence only: it does
+ * not imply execution safety and never bypasses validation, readiness,
+ * confirmation, or ambiguity handling. `source` carries parser-local
+ * provenance (e.g. 'explicit' | 'relative' | 'weekday' | 'day_part').
+ */
+export interface EditableFieldExplanation {
+  source: string
+  expression?: string | null
+  confidence?: number | null
+  message: string
+}
+
 export interface EditableField {
   key: string
   label: string
   value: unknown
   source: EditableFieldSource
   required: boolean
+  explanation?: EditableFieldExplanation | null
 }
 
 export interface ProposedChange {
