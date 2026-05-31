@@ -13,22 +13,28 @@ use Fluxio\Actions\Exceptions\CannotLowerSemanticRefinementException;
  *
  *   semantic mutation → lower → NormalizedMutation → existing capability/applyAll flow
  *
- * This is the one explicit bridge between the two boundaries (Phase 8B). It is:
+ * This is the one explicit bridge between the two boundaries and is LIVE on the
+ * mutation refinement path (Phase 8D.2/8D.4): RuleBasedRefinementInterpreter emits
+ * SemanticRefinementMutation and ActionProposalRefinementService lowers each one
+ * here before capability validation and applyAll(). It is:
  *
  *  - total over the supported, well-formed semantic types and partial ONLY by
  *    explicit rejection — an unsupported type or a malformed payload throws
  *    CannotLowerSemanticRefinementException; it never silently falls back, so an
  *    un-lowerable semantic operation can never reach the application boundary;
- *  - context-free — it produces the SAME structural shapes the rule-based
- *    interpreter produces today. In particular ShiftTime lowers to a
- *    metadata-only `replace time = null` mutation (value intentionally absent):
+ *  - context-free — it reads no proposal state. In particular ShiftTime lowers to
+ *    a metadata-only `replace time = null` mutation (value intentionally absent):
  *    the concrete time is still computed later by
  *    ActionProposalRefinementService against ProposalRuntimeContext. The lowerer
- *    classifies/normalizes; the runtime computes/validates/applies.
+ *    classifies/normalizes; the runtime computes/validates/applies;
+ *  - provider-blind — it NEVER copies the semantic mutation's opaque `metadata`
+ *    into the NormalizedMutation. Any runtime metadata (e.g. a temporal shift's
+ *    contextual_operation/unit/amount/direction) is built deterministically here
+ *    from the validated payload, so provider/provenance/confidence can never cross
+ *    the lowering boundary into the authority input.
  *
- * It does NOT change runtime behavior in this phase: nothing wires it into the
- * live refinement endpoint yet. It is the foundation a future LLM provider will
- * target (emit semantic IR → lower → run through the unchanged runtime).
+ * It is also the contract a future LLM/voice provider targets: emit semantic IR →
+ * lower here → run through the same unchanged deterministic runtime.
  */
 class SemanticRefinementLowerer
 {
@@ -41,10 +47,25 @@ class SemanticRefinementLowerer
             SemanticMutationType::AddParticipant => $this->addParticipant($mutation),
             SemanticMutationType::RemoveParticipant => $this->removeParticipant($mutation),
             SemanticMutationType::ReplaceParticipant => $this->replaceParticipant($mutation),
+            SemanticMutationType::ReplacePriority => $this->scalarReplace($mutation, 'priority', 'Priority'),
+            SemanticMutationType::ClearPriority => $this->clearPriority($mutation),
             SemanticMutationType::Unknown => throw new CannotLowerSemanticRefinementException(
                 'Cannot lower an Unknown semantic refinement mutation; the interpretation is not recognized.',
             ),
         };
+    }
+
+    private function clearPriority(SemanticRefinementMutation $mutation): NormalizedMutation
+    {
+        return new NormalizedMutation(
+            field: 'priority',
+            label: 'Priority',
+            value: null,
+            operation: 'clear',
+            source: $mutation->source,
+            target: null,
+            semanticType: SemanticMutationType::ClearPriority,
+        );
     }
 
     private function scalarReplace(SemanticRefinementMutation $mutation, string $field, string $label): NormalizedMutation
@@ -58,7 +79,8 @@ class SemanticRefinementLowerer
             operation: 'replace',
             source: $mutation->source,
             target: null,
-            metadata: $mutation->metadata,
+            // No metadata passthrough: provider metadata must not cross into the
+            // authority input. A scalar replace needs no runtime metadata.
             semanticType: $mutation->type,
         );
     }
@@ -90,9 +112,10 @@ class SemanticRefinementLowerer
 
         $minutes = $unit === 'hours' ? $amount * 60 : $amount;
 
-        // Same metadata-only contract as RuleBasedRefinementInterpreter::extractTemporalShift:
         // value stays null; the service resolves the concrete time from the
-        // proposal's current time. Always normalized to minutes.
+        // proposal's current time. Metadata is built DETERMINISTICALLY from the
+        // validated payload here — provider metadata is NOT merged in, so it can
+        // never cross into the authority input.
         return new NormalizedMutation(
             field: 'time',
             label: 'Time',
@@ -100,12 +123,12 @@ class SemanticRefinementLowerer
             operation: 'replace',
             source: $mutation->source,
             target: null,
-            metadata: array_merge($mutation->metadata, [
+            metadata: [
                 'contextual_operation' => 'temporal_shift',
                 'unit' => 'minutes',
                 'amount' => $minutes,
                 'direction' => $direction,
-            ]),
+            ],
             semanticType: SemanticMutationType::ShiftTime,
         );
     }
@@ -121,7 +144,6 @@ class SemanticRefinementLowerer
             operation: 'append',
             source: $mutation->source,
             target: null,
-            metadata: $mutation->metadata,
             semanticType: SemanticMutationType::AddParticipant,
         );
     }
@@ -137,7 +159,6 @@ class SemanticRefinementLowerer
             operation: 'remove',
             source: $mutation->source,
             target: $target,
-            metadata: $mutation->metadata,
             semanticType: SemanticMutationType::RemoveParticipant,
         );
     }
@@ -154,7 +175,6 @@ class SemanticRefinementLowerer
             operation: 'replace',
             source: $mutation->source,
             target: $target,
-            metadata: $mutation->metadata,
             semanticType: SemanticMutationType::ReplaceParticipant,
         );
     }

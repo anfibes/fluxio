@@ -2,6 +2,8 @@
 
 namespace Fluxio\Actions\DTO\Ambiguity;
 
+use Fluxio\Actions\DTO\SemanticOperation;
+
 /**
  * Ambiguity Clarification IR — the interpretation boundary for resolving a
  * blocking ambiguity (Phase 8C). It is the ambiguity-side parallel of
@@ -18,10 +20,15 @@ namespace Fluxio\Actions\DTO\Ambiguity;
  * AmbiguityResolver computes the outcome. The provider does not decide
  * resolve-vs-narrow; the runtime does, from the current candidate set.
  */
-final class SemanticAmbiguityClarification
+final class SemanticAmbiguityClarification implements SemanticOperation
 {
     /**
-     * @param  array<string, mixed>  $metadata  Opaque provider metadata, passed through to the directive
+     * `source`/`metadata` are provider-side only: they live LEFT of the lowering
+     * boundary and are NOT passed into the AmbiguityDirective, which carries only
+     * `ambiguityKey` + `selector`. This keeps provider/provenance/confidence out of
+     * the resolver authority input.
+     *
+     * @param  array<string, mixed>  $metadata  Opaque provider-side metadata (not lowered)
      */
     public function __construct(
         public readonly string $ambiguityKey,

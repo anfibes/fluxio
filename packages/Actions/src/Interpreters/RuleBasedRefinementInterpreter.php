@@ -8,7 +8,7 @@ use Fluxio\Actions\DTO\Ambiguity\AttributeSelector;
 use Fluxio\Actions\DTO\Ambiguity\LabelSelector;
 use Fluxio\Actions\DTO\Ambiguity\OrdinalSelector;
 use Fluxio\Actions\DTO\Ambiguity\SemanticAmbiguityClarification;
-use Fluxio\Actions\DTO\NormalizedMutation;
+use Fluxio\Actions\DTO\SemanticOperation;
 use Fluxio\Actions\DTO\SemanticRefinementMutation;
 use Fluxio\Actions\Enums\SemanticMutationType;
 use Fluxio\Actions\Support\DateTimeExpressionParser;
@@ -20,12 +20,12 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
     /**
      * Extract refinement operations from a refinement text.
      *
-     * Phase 8D.2/8D.3: a stateless semantic extractor. It emits
-     * SemanticRefinementMutation for the migrated mutation families (date/time,
-     * temporal shift, participant add/remove/replace) and SemanticAmbiguityClarification
-     * for ambiguity clarifications; the service lowers/resolves them. Priority
-     * replace/clear are not yet migrated and stay structural NormalizedMutation.
-     * The interpreter never constructs the structural shape for migrated families,
+     * Phase 8D.4: a stateless semantic extractor that emits ONLY Semantic
+     * Refinement IR — never a structural NormalizedMutation. It produces
+     * SemanticRefinementMutation for field mutations (date/time, temporal shift,
+     * participant add/remove/replace, priority replace, priority clear) and
+     * SemanticAmbiguityClarification for ambiguity clarifications; the service
+     * lowers/resolves them. The interpreter never constructs the structural shape,
      * never resolves anything (the temporal shift stays value-less), never reads
      * proposal state, and never selects a candidate.
      *
@@ -39,7 +39,7 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
      * Future implementations (Italian, German, LLM-assisted) can implement
      * RefinementInterpreterInterface without touching the orchestration layer.
      *
-     * @return array<SemanticRefinementMutation|SemanticAmbiguityClarification|NormalizedMutation>
+     * @return array<SemanticOperation>
      */
     public function interpret(string $text): array
     {
@@ -91,16 +91,11 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
             );
         }
 
-        // Priority replace is NOT yet migrated to the semantic IR (no priority
-        // semantic type / lowering), so it stays structural and passes through
-        // the service seam unchanged.
         $priority = $this->extractPriority($text);
         if ($priority !== null) {
-            $mutations[] = new NormalizedMutation(
-                field: 'priority',
-                label: 'Priority',
-                value: $priority,
-                operation: 'replace',
+            $mutations[] = new SemanticRefinementMutation(
+                type: SemanticMutationType::ReplacePriority,
+                payload: ['value' => $priority],
             );
         }
 
@@ -315,7 +310,7 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
 
     // ── Clear operations ─────────────────────────────────────────────────────
 
-    private function extractClearMutation(string $text): ?NormalizedMutation
+    private function extractClearMutation(string $text): ?SemanticRefinementMutation
     {
         $lower = mb_strtolower($text);
 
@@ -324,11 +319,8 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
             str_contains($lower, 'clear priority') ||
             str_contains($lower, 'no priority')
         ) {
-            return new NormalizedMutation(
-                field: 'priority',
-                label: 'Priority',
-                value: null,
-                operation: 'clear',
+            return new SemanticRefinementMutation(
+                type: SemanticMutationType::ClearPriority,
             );
         }
 

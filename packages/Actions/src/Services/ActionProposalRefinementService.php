@@ -9,6 +9,7 @@ use Fluxio\Actions\DTO\Ambiguity\SemanticAmbiguityClarification;
 use Fluxio\Actions\DTO\EditableFieldExplanation;
 use Fluxio\Actions\DTO\NormalizedMutation;
 use Fluxio\Actions\DTO\ProposalRuntimeContext;
+use Fluxio\Actions\DTO\SemanticOperation;
 use Fluxio\Actions\DTO\SemanticRefinementMutation;
 use Fluxio\Actions\Enums\SemanticMutationType;
 use Fluxio\Actions\Models\ActionProposal;
@@ -221,52 +222,51 @@ class ActionProposalRefinementService
     }
 
     /**
-     * Lower the interpreter's Semantic Refinement IR into the structural
-     * NormalizedMutation the rest of the pipeline (capability validation,
-     * contextual resolution, applyAll) consumes unchanged (Phase 8D.2).
+     * Lower the interpreter's Semantic Refinement IR field mutations into the
+     * structural NormalizedMutation the rest of the pipeline (capability validation,
+     * contextual resolution, applyAll) consumes unchanged.
      *
-     * Migrated mutation families arrive as SemanticRefinementMutation and are
-     * lowered (carrying their semantic type as input — no reliance on classify()).
-     * Not-yet-migrated families (priority replace/clear) arrive already structural
-     * and pass through untouched. This passthrough branch is transitional and
-     * disappears once those families are migrated too.
+     * Phase 8D.4: every field mutation now arrives as SemanticRefinementMutation
+     * (the interpreter emits no structural mutations), so there is no passthrough
+     * branch — each carries its semantic type as input, with no reliance on
+     * classify(). Structural NormalizedMutation exists only as lowering output.
      *
-     * @param  array<SemanticRefinementMutation|NormalizedMutation>  $operations
+     * @param  SemanticRefinementMutation[]  $mutations
      * @return NormalizedMutation[]
      */
-    private function lowerSemanticMutations(array $operations): array
+    private function lowerFieldMutations(array $mutations): array
     {
         return array_map(
-            fn ($operation) => $operation instanceof SemanticRefinementMutation
-                ? $this->lowerer->lower($operation)
-                : $operation,
-            $operations,
+            fn (SemanticRefinementMutation $mutation): NormalizedMutation => $this->lowerer->lower($mutation),
+            $mutations,
         );
     }
 
     /**
      * Split the interpreter's semantic operation stream into lowered field
-     * mutations and an at-most-one ambiguity clarification (Phase 8D.3 coordinator
-     * step). Field operations are lowered to NormalizedMutation; the first
-     * ambiguity clarification (if any) is returned for resolver-driven handling.
+     * mutations and an at-most-one ambiguity clarification (coordinator step).
+     * Field mutations (SemanticRefinementMutation) are lowered to NormalizedMutation;
+     * the first ambiguity clarification (if any) is returned for resolver-driven
+     * handling. Phase 8D.4: the stream is semantic-IR only — no structural
+     * NormalizedMutation enters here.
      *
-     * @param  array<SemanticRefinementMutation|SemanticAmbiguityClarification|NormalizedMutation>  $operations
+     * @param  array<SemanticOperation>  $operations
      * @return array{0: NormalizedMutation[], 1: SemanticAmbiguityClarification|null}
      */
     private function partitionSemanticOperations(array $operations): array
     {
-        $fieldOperations = [];
+        $fieldMutations = [];
         $clarification = null;
 
         foreach ($operations as $operation) {
             if ($operation instanceof SemanticAmbiguityClarification) {
                 $clarification ??= $operation; // at most one per refinement; first wins
-            } else {
-                $fieldOperations[] = $operation;
+            } elseif ($operation instanceof SemanticRefinementMutation) {
+                $fieldMutations[] = $operation;
             }
         }
 
-        return [$this->lowerSemanticMutations($fieldOperations), $clarification];
+        return [$this->lowerFieldMutations($fieldMutations), $clarification];
     }
 
     /**
@@ -396,7 +396,6 @@ class ActionProposalRefinementService
             value: sprintf('%02d:%02d', intdiv($total, 60), $total % 60),
             operation: 'replace',
             source: 'computed',
-            confidence: $mutation->confidence,
             metadata: $mutation->metadata,
             // Preserve the original semantic intent: this concrete time replace
             // came from a contextual shift, so it stays shift_time (not replace_time).
@@ -654,7 +653,15 @@ class ActionProposalRefinementService
                 );
 
                 if ($prevValue !== null) {
-                    $changes[] = ['field' => $field, 'label' => $label, 'from' => $prevValue, 'to' => null];
+                    // Phase 8D.4: surface the descriptive semantic type, consistent
+                    // with the replace/append/remove change entries.
+                    $changes[] = [
+                        'field' => $field,
+                        'label' => $label,
+                        'from' => $prevValue,
+                        'to' => null,
+                        'semantic_type' => $mutation->semanticType()->value,
+                    ];
                 }
 
             } elseif ($mutation->operation === 'append') {

@@ -41,6 +41,33 @@
         ]
     },
     {
+        "id": "priority-replace",
+        "description": "Setting priority produces replace_priority.",
+        "initial_command": "Create a task for Rossini tomorrow at 10",
+        "refinement_text": "High priority",
+        "expected": {
+            "semantic_types": ["replace_priority"],
+            "changed_fields": ["priority"]
+        },
+        "notes": [
+            "Phase 8D.4: priority replace migrated from a structural mutation to semantic IR."
+        ]
+    },
+    {
+        "id": "priority-clear",
+        "description": "Clearing priority produces clear_priority.",
+        "initial_command": "Create a task for Rossini tomorrow at 10",
+        "setup_refinements": ["High priority"],
+        "refinement_text": "Remove priority",
+        "expected": {
+            "semantic_types": ["clear_priority"],
+            "changed_fields": ["priority"]
+        },
+        "notes": [
+            "Context-dependent: priority must be set first (setup refinement). Phase 8D.4: clear migrated to semantic IR; the clear change entry now carries semantic_type."
+        ]
+    },
+    {
         "id": "participant-add",
         "description": "Appending a participant produces add_participant.",
         "initial_command": "Schedule a meeting with Rossini tomorrow at 10",

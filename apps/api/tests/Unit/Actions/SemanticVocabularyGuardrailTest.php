@@ -46,6 +46,24 @@ class SemanticVocabularyGuardrailTest extends TestCase
         SemanticMutationType::AddParticipant,
         SemanticMutationType::RemoveParticipant,
         SemanticMutationType::ReplaceParticipant,
+        SemanticMutationType::ReplacePriority,
+        SemanticMutationType::ClearPriority,
+    ];
+
+    /**
+     * Lowerable types the frontend renders with a SPECIAL semantic summary/badge
+     * (the rest — e.g. priority — render via the fallback field → value path, so
+     * the frontend need not reference them).
+     *
+     * @var list<SemanticMutationType>
+     */
+    private const FRONTEND_RENDERED = [
+        SemanticMutationType::ReplaceTime,
+        SemanticMutationType::ReplaceDate,
+        SemanticMutationType::ShiftTime,
+        SemanticMutationType::AddParticipant,
+        SemanticMutationType::RemoveParticipant,
+        SemanticMutationType::ReplaceParticipant,
     ];
 
     /**
@@ -71,6 +89,8 @@ class SemanticVocabularyGuardrailTest extends TestCase
             SemanticMutationType::AddParticipant => new SemanticRefinementMutation($type, ['value' => 'Marco']),
             SemanticMutationType::RemoveParticipant => new SemanticRefinementMutation($type, target: 'Mario'),
             SemanticMutationType::ReplaceParticipant => new SemanticRefinementMutation($type, ['value' => 'Mario'], target: 'Marco'),
+            SemanticMutationType::ReplacePriority => new SemanticRefinementMutation($type, ['value' => 'high']),
+            SemanticMutationType::ClearPriority => new SemanticRefinementMutation($type),
             SemanticMutationType::Unknown => new SemanticRefinementMutation($type),
         };
     }
@@ -249,7 +269,7 @@ class SemanticVocabularyGuardrailTest extends TestCase
 
         $source = (string) file_get_contents($panel);
 
-        foreach (self::LOWERABLE as $type) {
+        foreach (self::FRONTEND_RENDERED as $type) {
             $this->assertStringContainsString(
                 $type->value,
                 $source,

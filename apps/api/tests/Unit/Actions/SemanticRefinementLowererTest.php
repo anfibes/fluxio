@@ -149,6 +149,38 @@ class SemanticRefinementLowererTest extends TestCase
         $this->assertSame(SemanticMutationType::ReplaceParticipant, $mutation->semanticType());
     }
 
+    public function test_lowers_replace_priority_into_structural_priority_replace(): void
+    {
+        $mutation = $this->lowerer->lower(new SemanticRefinementMutation(
+            type: SemanticMutationType::ReplacePriority,
+            payload: ['value' => 'high'],
+        ));
+
+        $this->assertSame('priority', $mutation->field);
+        $this->assertSame('replace', $mutation->operation);
+        $this->assertSame('high', $mutation->value);
+        $this->assertNull($mutation->target);
+        $this->assertSame(SemanticMutationType::ReplacePriority, $mutation->semanticType());
+    }
+
+    public function test_lowers_clear_priority_into_structural_priority_clear(): void
+    {
+        $mutation = $this->lowerer->lower(new SemanticRefinementMutation(
+            type: SemanticMutationType::ClearPriority,
+        ));
+
+        $this->assertSame('priority', $mutation->field);
+        $this->assertSame('clear', $mutation->operation);
+        $this->assertNull($mutation->value);
+        $this->assertSame(SemanticMutationType::ClearPriority, $mutation->semanticType());
+    }
+
+    public function test_replace_priority_without_value_is_rejected(): void
+    {
+        $this->expectException(CannotLowerSemanticRefinementException::class);
+        $this->lowerer->lower(new SemanticRefinementMutation(type: SemanticMutationType::ReplacePriority));
+    }
+
     public function test_unknown_semantic_type_is_rejected(): void
     {
         $this->expectException(CannotLowerSemanticRefinementException::class);

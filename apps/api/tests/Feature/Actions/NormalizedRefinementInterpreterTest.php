@@ -211,12 +211,8 @@ class NormalizedRefinementInterpreterTest extends TestCase
         $this->assertEquals('detected', $mutations[0]->source);
     }
 
-    public function test_mutation_confidence_defaults_to_one(): void
-    {
-        $mutations = $this->interpretStructural('At 10:30');
-
-        $this->assertEquals(1.0, $mutations[0]->confidence);
-    }
+    // (Phase 8D.4: NormalizedMutation no longer exposes a `confidence` field —
+    // provider-blind authority input — so there is no confidence default to assert.)
 
     // ── Mutation operations ───────────────────────────────────────────────────
 

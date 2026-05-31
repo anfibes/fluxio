@@ -151,16 +151,45 @@ class SemanticRefinementParityTest extends TestCase
         $this->assertSame(SemanticMutationType::RemoveParticipant, $lowered->semanticType());
     }
 
-    public function test_priority_remains_structural_not_yet_migrated(): void
+    public function test_priority_replace_is_emitted_as_semantic_ir(): void
     {
-        // Priority replace is not part of Phase 8D.2; the interpreter still emits it
-        // as a structural NormalizedMutation that passes through the seam unchanged.
+        // Phase 8D.4: priority replace is now semantic IR (no structural emission).
         $operations = $this->interpreter->interpret('High priority');
 
         $this->assertCount(1, $operations);
-        $this->assertInstanceOf(NormalizedMutation::class, $operations[0]);
-        $this->assertSame('priority', $operations[0]->field);
-        $this->assertSame('replace', $operations[0]->operation);
-        $this->assertSame('high', $operations[0]->value);
+        $this->assertInstanceOf(SemanticRefinementMutation::class, $operations[0]);
+        $this->assertSame(SemanticMutationType::ReplacePriority, $operations[0]->type);
+        $this->assertSame('high', $operations[0]->payload['value']);
+
+        $lowered = $this->lowerer->lower($operations[0]);
+        $this->assertSame('priority', $lowered->field);
+        $this->assertSame('replace', $lowered->operation);
+        $this->assertSame('high', $lowered->value);
+        $this->assertSame(SemanticMutationType::ReplacePriority, $lowered->semanticType());
+    }
+
+    public function test_clear_priority_is_emitted_as_semantic_ir(): void
+    {
+        $operations = $this->interpreter->interpret('Remove priority');
+
+        $this->assertCount(1, $operations);
+        $this->assertInstanceOf(SemanticRefinementMutation::class, $operations[0]);
+        $this->assertSame(SemanticMutationType::ClearPriority, $operations[0]->type);
+
+        $lowered = $this->lowerer->lower($operations[0]);
+        $this->assertSame('priority', $lowered->field);
+        $this->assertSame('clear', $lowered->operation);
+        $this->assertNull($lowered->value);
+        $this->assertSame(SemanticMutationType::ClearPriority, $lowered->semanticType());
+    }
+
+    public function test_interpreter_emits_no_structural_normalized_mutation(): void
+    {
+        // Phase 8D.4 contract: interpret() returns SemanticOperation only.
+        foreach (['At 11:00', 'Move it to Friday', 'Push it by 30 minutes', 'Add Marco too', 'High priority', 'Remove priority', 'The company', 'Rossi SRL', 'gibberish xyz'] as $text) {
+            foreach ($this->interpreter->interpret($text) as $op) {
+                $this->assertNotInstanceOf(NormalizedMutation::class, $op, "[{$text}] must not emit a structural NormalizedMutation.");
+            }
+        }
     }
 }

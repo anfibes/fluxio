@@ -2,24 +2,21 @@
 
 namespace Fluxio\Actions\Contracts;
 
-use Fluxio\Actions\DTO\NormalizedMutation;
-use Fluxio\Actions\DTO\SemanticRefinementMutation;
+use Fluxio\Actions\DTO\SemanticOperation;
 
 interface RefinementInterpreterInterface
 {
     /**
      * Extract refinement operations from a refinement text.
      *
-     * Phase 8D.2 (mutation arrow flip): the interpreter is a semantic extractor.
-     * Migrated mutation families (date/time/temporal-shift and participant
-     * add/remove/replace) are emitted as Semantic Refinement IR
-     * (SemanticRefinementMutation); ActionProposalRefinementService lowers them
-     * into structural NormalizedMutation at the refinement seam. Not-yet-migrated
-     * families (priority replace/clear) are still emitted as NormalizedMutation
-     * directly — hence the transitional union element type. Ambiguity is not part
-     * of this contract; it remains in the service for now.
+     * Phase 8D.4: the interpreter is a pure semantic extractor and returns ONLY
+     * Semantic Refinement IR — `SemanticRefinementMutation` (field mutations,
+     * lowered to NormalizedMutation by the service) and
+     * `Ambiguity\SemanticAmbiguityClarification` (routed through the
+     * AmbiguityResolver authority). It never emits a structural NormalizedMutation;
+     * structural mutations exist only as lowering output.
      *
-     * @return array<SemanticRefinementMutation|NormalizedMutation>
+     * @return array<SemanticOperation>
      */
     public function interpret(string $text): array;
 }

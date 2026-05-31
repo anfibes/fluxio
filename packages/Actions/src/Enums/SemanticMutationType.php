@@ -5,30 +5,27 @@ namespace Fluxio\Actions\Enums;
 use Fluxio\Actions\DTO\NormalizedMutation;
 
 /**
- * Descriptive operational meaning of a refinement mutation (Phase 7C / 7D).
+ * The semantic mutation vocabulary of the Semantic Refinement IR — the
+ * interpretation boundary (see SemanticRefinementMutation).
  *
- * This is explainability metadata, NOT a second mutation engine: it never
- * changes lifecycle, execution, capability legality, or persistence. It makes
- * the *intent* of a structurally-described mutation explicit — e.g. a
- * `replace time = 10:30` that originated from "push it by 30 minutes" is a
- * `shift_time`, not a plain `replace_time`; and an `append participants = Marco`
- * is an `add_participant`.
+ * As of the Phase 8D arrow flip this enum is the AUTHORITATIVE interpretation
+ * output the interpreter emits, and the runtime flow is one-directional:
  *
- * Only the narrow classified cases are recognized; everything else is Unknown.
+ *   semantic mutation (this enum) → SemanticRefinementLowerer → NormalizedMutation → applyAll
  *
- * ARCHITECTURAL DIRECTION (Phase 8B): this enum is the vocabulary of the
- * Semantic Refinement IR (the interpretation boundary, see
- * SemanticRefinementMutation). The intended flow is now one-directional:
- *
- *   semantic mutation (this enum) → SemanticRefinementLowerer → NormalizedMutation
+ * Migrated runtime paths carry the semantic type THROUGH lowering (the lowered
+ * NormalizedMutation holds it explicitly); the runtime never re-derives meaning
+ * from structure. It still never changes lifecycle, execution, capability
+ * legality, or persistence — it names the *intent* of a mutation (e.g. a
+ * `replace time = 10:30` from "push it by 30 minutes" is a `shift_time`, not a
+ * plain `replace_time`).
  *
  * `classify()` below derives the semantic type FROM an already-built structural
- * NormalizedMutation. That reverse arrow is TRANSITIONAL / backward-compatible
- * support for Phase 7C/7D (it powers `NormalizedMutation::semanticType()` and the
- * descriptive `last_refinement.changes[].semantic_type` rendering). It is NOT the
- * long-term direction. A future provider (LLM/voice) emits the semantic type as
- * authoritative interpretation output and the lowerer produces structure from it;
- * the runtime must not depend on re-deriving meaning from structure.
+ * NormalizedMutation — the REVERSE arrow. It is TRANSITIONAL / backward-compatible
+ * support only (Phase 7C/7D): it backs `NormalizedMutation::semanticType()` as a
+ * fallback when no explicit type is set, and descriptive rendering. It must NOT be
+ * broadened or treated as the primary path, and migrated paths do not depend on it.
+ * Only the narrow classified cases are recognized there; everything else is Unknown.
  */
 enum SemanticMutationType: string
 {
@@ -38,6 +35,8 @@ enum SemanticMutationType: string
     case AddParticipant = 'add_participant';
     case RemoveParticipant = 'remove_participant';
     case ReplaceParticipant = 'replace_participant';
+    case ReplacePriority = 'replace_priority';
+    case ClearPriority = 'clear_priority';
     case Unknown = 'unknown';
 
     /**
