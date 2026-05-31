@@ -4,6 +4,7 @@ namespace Fluxio\Actions\Interpreters;
 
 use Fluxio\Actions\Contracts\RefinementInterpreterInterface;
 use Fluxio\Actions\DTO\NormalizedMutation;
+use Fluxio\Actions\DTO\SemanticRefinementMutation;
 use Fluxio\Actions\Enums\SemanticMutationType;
 use Fluxio\Actions\Support\DateTimeExpressionParser;
 
@@ -12,13 +13,20 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
     public function __construct(private readonly DateTimeExpressionParser $parser) {}
 
     /**
-     * Extract normalized mutations from a refinement text.
+     * Extract refinement operations from a refinement text.
+     *
+     * Phase 8D.2: a semantic extractor for the migrated mutation families — it
+     * emits SemanticRefinementMutation for date/time, temporal shift, and
+     * participant add/remove/replace, and the service lowers them. Priority
+     * replace/clear are not yet migrated and stay structural NormalizedMutation.
+     * The interpreter never constructs the structural shape for migrated families
+     * and never resolves anything (the temporal shift stays value-less).
      *
      * The interpreter is intentionally locale-fixed to English for now.
      * Future implementations (Italian, German, LLM-assisted) can implement
      * RefinementInterpreterInterface without touching the orchestration layer.
      *
-     * @return NormalizedMutation[]
+     * @return array<SemanticRefinementMutation|NormalizedMutation>
      */
     public function interpret(string $text): array
     {
@@ -58,24 +66,21 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
 
         $temporal = $this->parser->parse($text);
         if (isset($temporal['date'])) {
-            $mutations[] = new NormalizedMutation(
-                field: 'date',
-                label: 'Date',
-                value: $temporal['date'],
-                operation: 'replace',
-                semanticType: SemanticMutationType::ReplaceDate,
+            $mutations[] = new SemanticRefinementMutation(
+                type: SemanticMutationType::ReplaceDate,
+                payload: ['value' => $temporal['date']],
             );
         }
         if (isset($temporal['time'])) {
-            $mutations[] = new NormalizedMutation(
-                field: 'time',
-                label: 'Time',
-                value: $temporal['time'],
-                operation: 'replace',
-                semanticType: SemanticMutationType::ReplaceTime,
+            $mutations[] = new SemanticRefinementMutation(
+                type: SemanticMutationType::ReplaceTime,
+                payload: ['value' => $temporal['time']],
             );
         }
 
+        // Priority replace is NOT yet migrated to the semantic IR (no priority
+        // semantic type / lowering), so it stays structural and passes through
+        // the service seam unchanged.
         $priority = $this->extractPriority($text);
         if ($priority !== null) {
             $mutations[] = new NormalizedMutation(
@@ -94,15 +99,13 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
     // The interpreter is stateless: it does not inspect the proposal.
     // The service applies the mutation and handles missing-item no-ops.
 
-    private function extractCollectionReplace(string $text): ?NormalizedMutation
+    private function extractCollectionReplace(string $text): ?SemanticRefinementMutation
     {
         // "Replace Luca with Marco" / "Replace Luca Bianchi with Marco Rossi"
         if ((bool) preg_match('/\breplace\s+(.+?)\s+with\s+(.+)\s*$/i', $text, $m)) {
-            return new NormalizedMutation(
-                field: 'participants',
-                label: 'Participants',
-                value: trim($m[2]),
-                operation: 'replace',
+            return new SemanticRefinementMutation(
+                type: SemanticMutationType::ReplaceParticipant,
+                payload: ['value' => trim($m[2])],
                 target: trim($m[1]),
             );
         }
@@ -110,16 +113,13 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
         return null;
     }
 
-    private function extractCollectionRemove(string $text): ?NormalizedMutation
+    private function extractCollectionRemove(string $text): ?SemanticRefinementMutation
     {
         // "Remove Marco" / "Remove Marco Polo"
         // Note: "Remove priority" is caught by extractClearMutation before this runs.
         if ((bool) preg_match('/\bremove\s+(\w+(?:\s+\w+)*)\s*$/i', $text, $m)) {
-            return new NormalizedMutation(
-                field: 'participants',
-                label: 'Participants',
-                value: null,
-                operation: 'remove',
+            return new SemanticRefinementMutation(
+                type: SemanticMutationType::RemoveParticipant,
                 target: trim($m[1]),
             );
         }
@@ -127,24 +127,20 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
         return null;
     }
 
-    private function extractCollectionAppend(string $text): ?NormalizedMutation
+    private function extractCollectionAppend(string $text): ?SemanticRefinementMutation
     {
         // "Add Mario too" or "Also add Mario"
         if ((bool) preg_match('/\badd\s+(.+?)\s+too\b/i', $text, $m)) {
-            return new NormalizedMutation(
-                field: 'participants',
-                label: 'Participants',
-                value: trim($m[1]),
-                operation: 'append',
+            return new SemanticRefinementMutation(
+                type: SemanticMutationType::AddParticipant,
+                payload: ['value' => trim($m[1])],
             );
         }
 
         if ((bool) preg_match('/\balso\s+add\s+(.+)/i', $text, $m)) {
-            return new NormalizedMutation(
-                field: 'participants',
-                label: 'Participants',
-                value: trim($m[1]),
-                operation: 'append',
+            return new SemanticRefinementMutation(
+                type: SemanticMutationType::AddParticipant,
+                payload: ['value' => trim($m[1])],
             );
         }
 
@@ -164,7 +160,7 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
         'eleven' => 11, 'twelve' => 12,
     ];
 
-    private function extractTemporalShift(string $text): ?NormalizedMutation
+    private function extractTemporalShift(string $text): ?SemanticRefinementMutation
     {
         // Require an explicit "push/move/make it" trigger to stay narrow.
         if (! (bool) preg_match('/\b(?:push|move|make)\s+it\b/i', $text)) {
@@ -181,26 +177,22 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
             return null;
         }
 
-        $isHours = str_starts_with(mb_strtolower($m[2]), 'hour');
-        $minutes = $isHours ? $amount * 60 : $amount;
-
         // Direction: "earlier" shifts backward; everything else (including
         // "later" and the bare "push it by …") shifts forward.
         $direction = (bool) preg_match('/\bearlier\b/i', $text) ? 'earlier' : 'later';
 
-        return new NormalizedMutation(
-            field: 'time',
-            label: 'Time',
-            value: null,
-            operation: 'replace',
-            source: 'inferred',
-            metadata: [
-                'contextual_operation' => 'temporal_shift',
-                'unit' => 'minutes',
-                'amount' => $minutes,
+        // Pure extraction: emit the surface amount + unit. Normalizing hours→minutes
+        // and computing the concrete time are NOT the interpreter's job — the
+        // lowerer normalizes to minutes and the service resolves the time against
+        // ProposalRuntimeContext. value stays absent.
+        return new SemanticRefinementMutation(
+            type: SemanticMutationType::ShiftTime,
+            payload: [
+                'amount' => $amount,
+                'unit' => str_starts_with(mb_strtolower($m[2]), 'hour') ? 'hours' : 'minutes',
                 'direction' => $direction,
             ],
-            semanticType: SemanticMutationType::ShiftTime,
+            source: 'inferred',
         );
     }
 

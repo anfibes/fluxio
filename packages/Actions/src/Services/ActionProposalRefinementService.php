@@ -6,11 +6,13 @@ use Fluxio\Actions\Contracts\RefinementInterpreterInterface;
 use Fluxio\Actions\DTO\EditableFieldExplanation;
 use Fluxio\Actions\DTO\NormalizedMutation;
 use Fluxio\Actions\DTO\ProposalRuntimeContext;
+use Fluxio\Actions\DTO\SemanticRefinementMutation;
 use Fluxio\Actions\Enums\SemanticMutationType;
 use Fluxio\Actions\Models\ActionProposal;
 use Fluxio\Actions\Registry\IntentCapabilityRegistry;
 use Fluxio\Actions\Support\DateTimeExpressionParser;
 use Fluxio\Actions\Support\ProposalRuntimeContextFactory;
+use Fluxio\Actions\Support\SemanticRefinementLowerer;
 use Fluxio\Actions\Support\TemporalParseResult;
 use Illuminate\Validation\ValidationException;
 
@@ -23,6 +25,7 @@ class ActionProposalRefinementService
         private readonly IntentCapabilityRegistry $capabilityRegistry,
         private readonly ProposalRuntimeContextFactory $contextFactory,
         private readonly DateTimeExpressionParser $parser,
+        private readonly SemanticRefinementLowerer $lowerer,
     ) {}
 
     public function refine(ActionProposal $proposal, string $text): ActionProposal
@@ -41,8 +44,10 @@ class ActionProposalRefinementService
 
         $effectiveText = $this->effectiveText($text, $proposal->source_text);
 
-        // Delegate NL → mutation extraction to the interpreter
-        $fieldMutations = $this->interpreter->interpret($effectiveText);
+        // Delegate NL → semantic interpretation to the interpreter, then lower the
+        // Semantic Refinement IR into the structural NormalizedMutation the rest of
+        // the pipeline consumes (Phase 8D.2 — mutation arrow flip).
+        $fieldMutations = $this->lowerSemanticMutations($this->interpreter->interpret($effectiveText));
 
         // Capability validation: filter out mutations that are not permitted for this intent.
         // Disallowed mutations produce a warning; the proposal is left unchanged for that field.
@@ -181,6 +186,30 @@ class ActionProposalRefinementService
         }
 
         return [$allowed, $rejected];
+    }
+
+    /**
+     * Lower the interpreter's Semantic Refinement IR into the structural
+     * NormalizedMutation the rest of the pipeline (capability validation,
+     * contextual resolution, applyAll) consumes unchanged (Phase 8D.2).
+     *
+     * Migrated mutation families arrive as SemanticRefinementMutation and are
+     * lowered (carrying their semantic type as input — no reliance on classify()).
+     * Not-yet-migrated families (priority replace/clear) arrive already structural
+     * and pass through untouched. This passthrough branch is transitional and
+     * disappears once those families are migrated too.
+     *
+     * @param  array<SemanticRefinementMutation|NormalizedMutation>  $operations
+     * @return NormalizedMutation[]
+     */
+    private function lowerSemanticMutations(array $operations): array
+    {
+        return array_map(
+            fn ($operation) => $operation instanceof SemanticRefinementMutation
+                ? $this->lowerer->lower($operation)
+                : $operation,
+            $operations,
+        );
     }
 
     /**

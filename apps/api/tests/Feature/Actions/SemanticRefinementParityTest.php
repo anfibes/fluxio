@@ -10,14 +10,14 @@ use Fluxio\Actions\Support\SemanticRefinementLowerer;
 use Tests\TestCase;
 
 /**
- * Phase 8B: prove the Semantic Refinement IR is a faithful representation of
- * what the current rule-based interpreter already produces. For equivalent
- * inputs, lowering a SemanticRefinementMutation yields a structural
- * NormalizedMutation equal (in the fields the application boundary consumes) to
- * the one the interpreter emits today.
+ * Phase 8D.2: the arrow is flipped. The rule-based interpreter now EMITS Semantic
+ * Refinement IR for the migrated mutation families, and lowering produces the
+ * structural NormalizedMutation the runtime applies. These tests pin that the
+ * interpreter emits the expected semantic operation (type + selector payload) and
+ * that lowering yields the expected structural shape carrying the semantic type.
  *
- * This is a contained equivalence proof: it wires nothing into the live
- * refinement endpoint and changes no runtime behavior.
+ * Contained: it exercises interpret() + the lowerer directly, the same two steps
+ * the live refinement seam runs.
  */
 class SemanticRefinementParityTest extends TestCase
 {
@@ -32,101 +32,135 @@ class SemanticRefinementParityTest extends TestCase
         $this->interpreter = $this->app->make(RefinementInterpreterInterface::class);
     }
 
-    private function onlyMutation(string $text): NormalizedMutation
+    private function onlySemantic(string $text): SemanticRefinementMutation
     {
-        $mutations = $this->interpreter->interpret($text);
-        $this->assertCount(1, $mutations, "Expected exactly one mutation for [{$text}].");
-
-        return $mutations[0];
-    }
-
-    private function assertStructurallyEqual(NormalizedMutation $a, NormalizedMutation $b): void
-    {
-        $this->assertSame($a->field, $b->field, 'field');
-        $this->assertSame($a->operation, $b->operation, 'operation');
-        $this->assertSame($a->value, $b->value, 'value');
-        $this->assertSame($a->target, $b->target, 'target');
-        $this->assertSame($a->semanticType(), $b->semanticType(), 'semanticType');
-        $this->assertSame(
-            $a->metadata['contextual_operation'] ?? null,
-            $b->metadata['contextual_operation'] ?? null,
-            'contextual_operation',
+        $operations = $this->interpreter->interpret($text);
+        $this->assertCount(1, $operations, "Expected exactly one operation for [{$text}].");
+        $this->assertInstanceOf(
+            SemanticRefinementMutation::class,
+            $operations[0],
+            "Migrated mutation [{$text}] must now be emitted as Semantic Refinement IR.",
         );
+
+        return $operations[0];
     }
 
-    public function test_shift_time_lowering_matches_interpreter_output(): void
+    public function test_shift_time_is_emitted_as_semantic_ir_and_lowers_to_metadata_only_mutation(): void
     {
-        $fromText = $this->onlyMutation('Push it by 30 minutes');
+        $semantic = $this->onlySemantic('Push it by 30 minutes');
 
-        $lowered = $this->lowerer->lower(new SemanticRefinementMutation(
-            type: SemanticMutationType::ShiftTime,
-            payload: ['amount' => 30, 'unit' => 'minutes', 'direction' => 'later'],
-            source: 'inferred',
-        ));
+        $this->assertSame(SemanticMutationType::ShiftTime, $semantic->type);
+        $this->assertSame(30, $semantic->payload['amount']);
+        $this->assertSame('minutes', $semantic->payload['unit']);
+        $this->assertSame('later', $semantic->payload['direction']);
 
-        $this->assertStructurallyEqual($fromText, $lowered);
-        $this->assertSame($fromText->metadata['amount'], $lowered->metadata['amount']);
-        $this->assertSame($fromText->metadata['direction'], $lowered->metadata['direction']);
+        $lowered = $this->lowerer->lower($semantic);
+        $this->assertInstanceOf(NormalizedMutation::class, $lowered);
+        $this->assertSame('time', $lowered->field);
+        $this->assertSame('replace', $lowered->operation);
+        $this->assertNull($lowered->value); // computed later by the service
+        $this->assertSame('temporal_shift', $lowered->metadata['contextual_operation']);
+        $this->assertSame(30, $lowered->metadata['amount']);
+        $this->assertSame('later', $lowered->metadata['direction']);
+        $this->assertSame(SemanticMutationType::ShiftTime, $lowered->semanticType());
     }
 
-    public function test_replace_time_lowering_matches_interpreter_output(): void
+    public function test_shift_time_hours_extracted_as_hours_and_normalized_by_lowering(): void
     {
-        $fromText = $this->onlyMutation('At 11:00');
+        $semantic = $this->onlySemantic('Move it one hour earlier');
 
-        $lowered = $this->lowerer->lower(new SemanticRefinementMutation(
-            type: SemanticMutationType::ReplaceTime,
-            payload: ['value' => $fromText->value],
-        ));
+        // The interpreter extracts the surface unit; the lowerer normalizes to minutes.
+        $this->assertSame(1, $semantic->payload['amount']);
+        $this->assertSame('hours', $semantic->payload['unit']);
 
-        $this->assertStructurallyEqual($fromText, $lowered);
+        $lowered = $this->lowerer->lower($semantic);
+        $this->assertSame(60, $lowered->metadata['amount']);
+        $this->assertSame('earlier', $lowered->metadata['direction']);
     }
 
-    public function test_replace_date_lowering_matches_interpreter_output(): void
+    public function test_replace_time_is_emitted_as_semantic_ir(): void
     {
-        $fromText = $this->onlyMutation('Move it to Friday');
+        $semantic = $this->onlySemantic('At 11:00');
 
-        $lowered = $this->lowerer->lower(new SemanticRefinementMutation(
-            type: SemanticMutationType::ReplaceDate,
-            payload: ['value' => $fromText->value],
-        ));
+        $this->assertSame(SemanticMutationType::ReplaceTime, $semantic->type);
+        $this->assertSame('11:00', $semantic->payload['value']);
 
-        $this->assertStructurallyEqual($fromText, $lowered);
+        $lowered = $this->lowerer->lower($semantic);
+        $this->assertSame('time', $lowered->field);
+        $this->assertSame('replace', $lowered->operation);
+        $this->assertSame('11:00', $lowered->value);
+        $this->assertSame(SemanticMutationType::ReplaceTime, $lowered->semanticType());
     }
 
-    public function test_add_participant_lowering_matches_interpreter_output(): void
+    public function test_replace_date_is_emitted_as_semantic_ir(): void
     {
-        $fromText = $this->onlyMutation('Add Marco too');
+        $semantic = $this->onlySemantic('Move it to Friday');
 
-        $lowered = $this->lowerer->lower(new SemanticRefinementMutation(
-            type: SemanticMutationType::AddParticipant,
-            payload: ['value' => $fromText->value],
-        ));
+        $this->assertSame(SemanticMutationType::ReplaceDate, $semantic->type);
 
-        $this->assertStructurallyEqual($fromText, $lowered);
+        $lowered = $this->lowerer->lower($semantic);
+        $this->assertSame('date', $lowered->field);
+        $this->assertSame('replace', $lowered->operation);
+        $this->assertSame($semantic->payload['value'], $lowered->value);
+        $this->assertSame(SemanticMutationType::ReplaceDate, $lowered->semanticType());
     }
 
-    public function test_replace_participant_lowering_matches_interpreter_output(): void
+    public function test_add_participant_is_emitted_as_semantic_ir(): void
     {
-        $fromText = $this->onlyMutation('Replace Marco with Mario');
+        $semantic = $this->onlySemantic('Add Marco too');
 
-        $lowered = $this->lowerer->lower(new SemanticRefinementMutation(
-            type: SemanticMutationType::ReplaceParticipant,
-            payload: ['value' => $fromText->value],
-            target: $fromText->target,
-        ));
+        $this->assertSame(SemanticMutationType::AddParticipant, $semantic->type);
+        $this->assertSame('Marco', $semantic->payload['value']);
 
-        $this->assertStructurallyEqual($fromText, $lowered);
+        $lowered = $this->lowerer->lower($semantic);
+        $this->assertSame('participants', $lowered->field);
+        $this->assertSame('append', $lowered->operation);
+        $this->assertSame('Marco', $lowered->value);
+        $this->assertNull($lowered->target);
+        $this->assertSame(SemanticMutationType::AddParticipant, $lowered->semanticType());
     }
 
-    public function test_remove_participant_lowering_matches_interpreter_output(): void
+    public function test_replace_participant_is_emitted_as_semantic_ir(): void
     {
-        $fromText = $this->onlyMutation('Remove Mario');
+        $semantic = $this->onlySemantic('Replace Marco with Mario');
 
-        $lowered = $this->lowerer->lower(new SemanticRefinementMutation(
-            type: SemanticMutationType::RemoveParticipant,
-            target: $fromText->target,
-        ));
+        $this->assertSame(SemanticMutationType::ReplaceParticipant, $semantic->type);
+        $this->assertSame('Marco', $semantic->target);
+        $this->assertSame('Mario', $semantic->payload['value']);
 
-        $this->assertStructurallyEqual($fromText, $lowered);
+        $lowered = $this->lowerer->lower($semantic);
+        $this->assertSame('participants', $lowered->field);
+        $this->assertSame('replace', $lowered->operation);
+        $this->assertSame('Mario', $lowered->value);
+        $this->assertSame('Marco', $lowered->target);
+        $this->assertSame(SemanticMutationType::ReplaceParticipant, $lowered->semanticType());
+    }
+
+    public function test_remove_participant_is_emitted_as_semantic_ir(): void
+    {
+        $semantic = $this->onlySemantic('Remove Mario');
+
+        $this->assertSame(SemanticMutationType::RemoveParticipant, $semantic->type);
+        $this->assertSame('Mario', $semantic->target);
+
+        $lowered = $this->lowerer->lower($semantic);
+        $this->assertSame('participants', $lowered->field);
+        $this->assertSame('remove', $lowered->operation);
+        $this->assertNull($lowered->value);
+        $this->assertSame('Mario', $lowered->target);
+        $this->assertSame(SemanticMutationType::RemoveParticipant, $lowered->semanticType());
+    }
+
+    public function test_priority_remains_structural_not_yet_migrated(): void
+    {
+        // Priority replace is not part of Phase 8D.2; the interpreter still emits it
+        // as a structural NormalizedMutation that passes through the seam unchanged.
+        $operations = $this->interpreter->interpret('High priority');
+
+        $this->assertCount(1, $operations);
+        $this->assertInstanceOf(NormalizedMutation::class, $operations[0]);
+        $this->assertSame('priority', $operations[0]->field);
+        $this->assertSame('replace', $operations[0]->operation);
+        $this->assertSame('high', $operations[0]->value);
     }
 }
