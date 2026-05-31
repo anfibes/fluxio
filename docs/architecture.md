@@ -138,12 +138,29 @@ Add Mario too
 Replace Luca with Marco
 ```
 
-Current mutation operations:
+Current mutation operations (the structural `operation` stored on a mutation):
 - replace
 - append
 - remove
 - clear
-- replace + target
+
+A collection item swap is a `replace` carrying a `target` (the item to replace).
+
+Each recorded change can also carry a descriptive `semantic_type` that names the
+operational meaning of the mutation — `replace_time`, `replace_date`,
+`shift_time`, `add_participant`, `remove_participant`, `replace_participant`, or
+`unknown`. This is explainability metadata surfaced in
+`last_refinement.changes[].semantic_type`; it never affects lifecycle,
+execution, capability legality, or persistence. See the Proposal Lifecycle doc
+for the full taxonomy.
+
+Relative temporal refinements ("push it by 30 minutes", "one hour earlier") are
+resolved deterministically against a read-only, proposal-scoped
+`ProposalRuntimeContext` derived from the current proposal. The interpreter stays
+stateless; the refinement service resolves the shift into a concrete time replace
+using that context, and never invents a time when none is present. The runtime
+context is a deterministic snapshot of one proposal — not conversational or
+assistant memory, never persisted separately.
 
 Key principle:
 
@@ -213,6 +230,14 @@ Expected behavior:
 - refinement updates the SAME proposal
 
 Ambiguity is part of the proposal lifecycle.
+
+Refinement against a blocking ambiguity resolves it (single match), progressively
+narrows it (a type clarification like "the company" that still matches several
+candidates replaces the active candidate set but keeps it blocking, with a
+warning naming what remains), or leaves it unchanged. Narrowing is deterministic
+and idempotent and changes only the active candidate set and the warning — never
+resolver scoring, candidate generation, or the ambiguity payload shape. The
+detailed outcomes are in the Proposal Lifecycle doc.
 
 ---
 

@@ -606,12 +606,18 @@ Example:
                 "field": "date",
                 "label": "Date",
                 "from": null,
-                "to": "2026-05-10"
+                "to": "2026-05-10",
+                "semantic_type": "replace_date"
             }
         ]
     }
 }
 ```
+
+`semantic_type` is an optional, additive field that names the operational
+meaning of a change (`replace_time`, `replace_date`, `shift_time`,
+`add_participant`, `remove_participant`, `replace_participant`, `unknown`).
+Consumers must treat it as optional — changes without it stay valid.
 
 Purpose:
 - explainability

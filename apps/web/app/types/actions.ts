@@ -97,6 +97,17 @@ export interface ActionProposalRefinementChange {
   label: string
   from: unknown
   to: unknown
+  /**
+   * Descriptive operational meaning of the change (backend Phase 7C–7D), e.g.
+   * 'shift_time' | 'replace_time' | 'replace_date' | 'add_participant' |
+   * 'remove_participant' | 'replace_participant' | 'unknown'. Optional and kept
+   * as a plain string: the backend can add more types without a frontend change.
+   */
+  semantic_type?: string
+  /** Structural collection operation when present (e.g. 'append' | 'remove' | 'replace'). */
+  operation?: string
+  /** Targeted collection item for a targeted replace/remove. */
+  target?: unknown
 }
 
 export interface ActionProposalRefinement {

@@ -269,6 +269,22 @@ Mutation visibility is critical for:
 - explainability
 - operational clarity
 
+### Semantic refinement rendering
+
+When the backend tags a change with a `semantic_type`
+(`shift_time`, `replace_time`, `replace_date`, `add_participant`,
+`remove_participant`, `replace_participant`), `LastRefinementPanel` renders an
+operationally-meaningful summary instead of a raw field → value pair — e.g.
+"Time shifted from 09:00 to 10:30", "Participant added: Marco",
+"Participant replaced: Marco → Mario". A subtle category badge accompanies the
+line. Changes without a recognized `semantic_type` fall back to the original
+field → value rendering, so older payloads stay stable.
+
+Temporal editable fields additionally render their `explanation.message` (when
+present) as a subtle note under the field via `EditableProposalField`, so the
+user can see HOW a date/time value was derived. This is frontend rendering of
+backend-provided metadata only — the frontend adds no interpretation of its own.
+
 ---
 
 # Ambiguity-Aware UX

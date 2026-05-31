@@ -165,10 +165,19 @@ Examples:
 ```text id="h2q8tm"
 Move it to Friday
 At 10:30
+Push it by 30 minutes
 Add Mario too
 Remove Luca
 Replace Mario with Marco
 ```
+
+Relative temporal refinements ("push it by 30 minutes") are resolved
+deterministically against the proposal's current time — never invented.
+
+Each tracked change can also carry a descriptive `semantic_type`
+(`shift_time`, `replace_time`, `replace_date`, `add_participant`,
+`remove_participant`, `replace_participant`) — explainability metadata only,
+surfaced in `last_refinement.changes` and rendered in the proposal rail.
 
 Fluxio tracks:
 - what changed
@@ -213,6 +222,8 @@ Instead of hallucinating certainty, Fluxio:
 - blocks execution
 - preserves proposal continuity
 - supports refinement
+- progressively narrows candidates (a clarification like "the company" that
+  still matches several keeps the ambiguity blocking and reports what remains)
 
 Example refinement flow:
 
@@ -372,9 +383,13 @@ Responsibilities:
 Current capabilities:
 - proposal continuity
 - contextual refinements
+- relative temporal refinements (resolved against a read-only, proposal-scoped runtime context)
 - collection mutations
 - proposal-local references
 - mutation summaries
+- semantic mutation types (descriptive change metadata)
+- temporal field explanations (refreshed after refinement)
+- progressive ambiguity narrowing
 - operational intent registry
 - deterministic execution flows
 - interpretation provider abstraction
@@ -618,6 +633,8 @@ Implemented frontend capabilities:
 - command composer
 - proposal rail
 - mutation rendering
+- semantic refinement rendering (semantic_type → operational summaries)
+- temporal field explanations (how a date/time value was derived)
 - ambiguity rendering
 - confidence-aware UX
 - proposal continuity UX

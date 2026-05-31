@@ -335,6 +335,34 @@ Editable fields support:
 - explainability
 - operational transparency
 
+### Temporal field explanations
+
+Date and time editable fields may carry an optional `explanation` object that
+records HOW the value entered the proposal — e.g. a date resolved from
+"tomorrow" or a time set from "at 10". This is parser-local explainability
+metadata only:
+
+```json id="e3v7tq"
+{
+    "key": "time",
+    "label": "Time",
+    "value": "10:30",
+    "source": "computed",
+    "explanation": {
+        "source": "computed",
+        "expression": "Push it by 30 minutes",
+        "confidence": 1.0,
+        "message": "Time shifted later by 30 minutes to 10:30."
+    }
+}
+```
+
+`explanation.confidence` is temporal parse confidence only — it is not proposal
+confidence and does not imply execution safety. After a refinement that changes
+a date/time value, the explanation is refreshed to describe the new value (or
+dropped if a coherent one cannot be built), so it never references a stale
+command.
+
 ---
 
 ## Field Provenance
@@ -442,6 +470,35 @@ These operations remain:
 - explainable
 - inspectable
 
+The `replace_target` row is not a distinct operation at the data level: it is a
+`replace` carrying a `target` (the collection item to swap). The operation set
+stored on a mutation is `replace | append | remove | clear`.
+
+## Semantic mutation types
+
+Alongside the structural operation, each recorded change can carry a descriptive
+`semantic_type` that names the operational meaning of the mutation. This is
+explainability metadata only — it never changes lifecycle, execution, capability
+legality, or persistence; it makes a structurally-described mutation easier to
+render, audit, and reason about.
+
+Current semantic types:
+
+| Semantic type | Meaning |
+|---|---|
+| `replace_time` | a direct time replace (e.g. "at 11:00") |
+| `replace_date` | a direct date replace (e.g. "move it to Friday") |
+| `shift_time` | a relative time shift resolved against the proposal's current time (e.g. "push it by 30 minutes") |
+| `add_participant` | a participant appended to the collection |
+| `remove_participant` | a participant removed from the collection |
+| `replace_participant` | a targeted participant swap |
+| `unknown` | no recognized semantic meaning (default) |
+
+A `shift_time` is still a concrete `replace` on the `time` field — the semantic
+type preserves the fact that it originated from a relative shift rather than an
+absolute value. The type is surfaced in `last_refinement.changes[].semantic_type`
+(see Proposal Mutation Transparency below).
+
 ---
 
 # Proposal Continuity & Refinement
@@ -529,9 +586,24 @@ Examples:
 Move it to Friday
 The second one
 Add Mario too
+Push it by 30 minutes
+Move it one hour earlier
 ```
 
 These references operate ONLY within proposal scope.
+
+Relative temporal refinements ("push it by 30 minutes", "one hour earlier") are
+resolved deterministically against the proposal's current time. The refinement
+service derives a read-only, proposal-scoped `ProposalRuntimeContext` from the
+current proposal state (entities, editable fields, temporal values, blocking
+ambiguities) and uses it to turn a relative shift into a concrete time replace.
+If the proposal has no current time, the shift is rejected with a warning — the
+system never invents a value.
+
+`ProposalRuntimeContext` is explicitly NOT conversational or assistant memory:
+it is a deterministic snapshot derived from the single proposal under refinement,
+never persisted separately, and it never queries the database, parses natural
+language, or resolves ambiguities on its own.
 
 Fluxio intentionally avoids:
 - hidden global memory
@@ -557,12 +629,20 @@ Example:
             {
                 "field": "time",
                 "from": "09:00",
-                "to": "10:30"
+                "to": "10:30",
+                "semantic_type": "replace_time"
             }
         ]
     }
 }
 ```
+
+Each change may carry the optional `semantic_type` described above
+(temporal and participant mutations populate it; other changes default to
+`unknown` or omit it). The frontend's `LastRefinementPanel` uses it to render
+operationally-meaningful summaries (e.g. "Time shifted from 09:00 to 10:30",
+"Participant added: Marco") and falls back to the plain field → value rendering
+when no recognized type is present.
 
 Purpose:
 - explainability
@@ -628,14 +708,17 @@ Example ambiguity structure:
             "label": "Lead",
             "reason": "multiple_matches",
             "blocking": true,
+            "selected_candidate_id": null,
             "candidates": [
                 {
                     "id": 1,
-                    "label": "Mario Rossi"
+                    "label": "Mario Rossi",
+                    "type": "person"
                 },
                 {
                     "id": 7,
-                    "label": "Rossi SRL"
+                    "label": "Rossi SRL",
+                    "type": "company"
                 }
             ]
         }
@@ -644,6 +727,27 @@ Example ambiguity structure:
 ```
 
 Ambiguity resolution is part of the proposal lifecycle itself.
+
+## Progressive narrowing
+
+A refinement against a blocking ambiguity has three deterministic outcomes:
+
+1. **Resolve** — the clarification matches exactly one candidate (an exact label,
+   an ordinal like "the first one", or a type clarification that leaves a single
+   match). `selected_candidate_id` is set and the ambiguity stops blocking.
+2. **Narrow but stay blocking** — a type clarification ("the company") matches
+   more than one candidate. The active `candidates` list is replaced with the
+   matching subset (order preserved), `selected_candidate_id` stays `null`, the
+   ambiguity stays blocking, and a warning names the remaining candidates
+   (e.g. "Multiple company candidates still match: Rossi SRL, Studio Rossi.").
+   A later ordinal/exact refinement then operates on the narrowed set.
+3. **No change** — the clarification names nothing recognizable; the candidate
+   list is left untouched and a generic "be more specific" warning is added.
+
+Narrowing is deterministic and idempotent (re-narrowing an already-narrowed set
+yields the same candidates and a single deduplicated warning). It changes only
+the active candidate set and the warning — it never alters resolver scoring,
+candidate generation, or the ambiguity payload shape.
 
 ## Capability gating
 
@@ -769,14 +873,21 @@ Fluxio currently uses:
 - deterministic refinement semantics
 
 Current interpretation architecture includes:
-- interpretation provider abstraction
-- deterministic provider
-- fake LLM provider sandbox
-- provider validation layer
+- interpretation provider abstraction (`InterpretationProviderInterface`)
+- deterministic provider (`DeterministicInterpretationProvider`, default and
+  authoritative)
+- an opt-in Ollama sandbox provider (`OllamaInterpretationProvider`, selected
+  via `ACTIONS_INTERPRETATION_PROVIDER=ollama`; not production-authoritative)
+- a `FakeLlmInterpretationProvider` used for tests/provider-swap checks
+- provider validation layer (`NormalizedCommandValidator`, plus a provider-level
+  `LlmStructuredOutputValidator` for LLM output)
+
+Exactly one provider is active per request — there is no runtime hybrid mode and
+no fallback chain. Deterministic vs. Ollama comparison exists only as
+development-only Artisan diagnostics.
 
 Future providers may include:
 - local LLMs
-- Ollama
 - Qwen
 - semantic interpretation providers
 
