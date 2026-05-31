@@ -1,0 +1,154 @@
+[
+    {
+        "id": "temporal-replace-time",
+        "description": "Absolute time refinement replaces the time field.",
+        "initial_command": "Schedule a meeting with Rossini tomorrow at 10",
+        "refinement_text": "At 11:00",
+        "expected": {
+            "semantic_types": ["replace_time"],
+            "changed_fields": ["time"],
+            "status": "ready"
+        },
+        "notes": [
+            "Rossini is an unambiguous lead, so the proposal is ready before refinement."
+        ]
+    },
+    {
+        "id": "temporal-replace-date",
+        "description": "Relative date refinement replaces the date field.",
+        "initial_command": "Schedule a meeting with Rossini tomorrow at 10",
+        "refinement_text": "Move it to Friday",
+        "expected": {
+            "semantic_types": ["replace_date"],
+            "changed_fields": ["date"]
+        },
+        "notes": [
+            "Date is run-relative; only the semantic type and changed field are asserted."
+        ]
+    },
+    {
+        "id": "temporal-shift-time",
+        "description": "Relative temporal shift resolves against the current time and stays shift_time.",
+        "initial_command": "Schedule a meeting with Rossini tomorrow at 10",
+        "refinement_text": "Push it by 30 minutes",
+        "expected": {
+            "semantic_types": ["shift_time"],
+            "changed_fields": ["time"],
+            "status": "ready"
+        },
+        "notes": [
+            "Phase 7B: the shift is computed deterministically; the semantic type stays shift_time, not replace_time."
+        ]
+    },
+    {
+        "id": "participant-add",
+        "description": "Appending a participant produces add_participant.",
+        "initial_command": "Schedule a meeting with Rossini tomorrow at 10",
+        "refinement_text": "Add Marco too",
+        "expected": {
+            "semantic_types": ["add_participant"],
+            "changed_fields": ["participants"],
+            "status": "ready"
+        },
+        "notes": [
+            "schedule_meeting permits participant collection mutations."
+        ]
+    },
+    {
+        "id": "participant-replace",
+        "description": "A targeted participant swap produces replace_participant.",
+        "initial_command": "Schedule a meeting with Rossini tomorrow at 10",
+        "setup_refinements": ["Add Marco too"],
+        "refinement_text": "Replace Marco with Mario",
+        "expected": {
+            "semantic_types": ["replace_participant"],
+            "changed_fields": ["participants"]
+        },
+        "notes": [
+            "Context-dependent: Marco must already be a participant, added by the setup refinement (not measured)."
+        ]
+    },
+    {
+        "id": "participant-remove",
+        "description": "Removing an existing participant produces remove_participant.",
+        "initial_command": "Schedule a meeting with Rossini tomorrow at 10",
+        "setup_refinements": ["Add Mario too"],
+        "refinement_text": "Remove Mario",
+        "expected": {
+            "semantic_types": ["remove_participant"],
+            "changed_fields": ["participants"]
+        },
+        "notes": [
+            "Context-dependent: Mario must already be a participant, added by the setup refinement (not measured)."
+        ]
+    },
+    {
+        "id": "ambiguity-narrow-company",
+        "description": "Type clarification narrows the lead ambiguity to companies but stays blocking.",
+        "initial_command": "Schedule a meeting with Rossi tomorrow at 10",
+        "refinement_text": "The company",
+        "expected": {
+            "expect_no_changes": true,
+            "status": "draft",
+            "warnings_contain": ["still match"],
+            "ambiguity": {
+                "key": "lead",
+                "resolved": false,
+                "blocking": true,
+                "remaining_candidate_types": ["company"],
+                "remaining_candidate_labels": ["Rossi SRL", "Studio Rossi"]
+            }
+        },
+        "notes": [
+            "Phase 7C.2/7C.3: progressive narrowing removes the person candidate; the ambiguity stays blocking."
+        ]
+    },
+    {
+        "id": "ambiguity-resolve-person",
+        "description": "Type clarification resolves the ambiguity when one person candidate remains.",
+        "initial_command": "Schedule a meeting with Rossi tomorrow at 10",
+        "refinement_text": "The person",
+        "expected": {
+            "changed_fields": ["lead"],
+            "status": "ready",
+            "ambiguity": {
+                "key": "lead",
+                "resolved": true
+            }
+        },
+        "notes": [
+            "Only one person candidate (Mario Rossi) exists, so the ambiguity resolves and the proposal becomes ready."
+        ]
+    },
+    {
+        "id": "ambiguity-resolve-ordinal",
+        "description": "Ordinal clarification resolves the lead ambiguity to the first candidate.",
+        "initial_command": "Schedule a meeting with Rossi tomorrow at 10",
+        "refinement_text": "The first one",
+        "expected": {
+            "changed_fields": ["lead"],
+            "status": "ready",
+            "ambiguity": {
+                "key": "lead",
+                "resolved": true
+            }
+        },
+        "notes": [
+            "Ordinal resolution selects the highest-confidence candidate (Rossi SRL)."
+        ]
+    },
+    {
+        "id": "unsupported-vague-text",
+        "description": "Vague text the interpreter does not recognize leaves the proposal unchanged.",
+        "initial_command": "Schedule a meeting with Rossini tomorrow at 10",
+        "refinement_text": "looks good to me",
+        "expected": {
+            "expect_no_changes": true,
+            "status": "ready",
+            "warnings_contain": ["could not be applied"]
+        },
+        "notes": [
+            "Documents an intentional rule-based limitation: unrecognized refinements are a safe no-op with a warning, not a failure."
+        ]
+    }
+]

@@ -4,6 +4,7 @@ namespace Fluxio\Actions\Providers;
 
 use Fluxio\Actions\Console\CompareInterpretationCommand;
 use Fluxio\Actions\Console\EvaluateInterpretationCorpusCommand;
+use Fluxio\Actions\Console\EvaluateRefinementCorpusCommand;
 use Fluxio\Actions\Contracts\CommandInterpreterInterface;
 use Fluxio\Actions\Contracts\IntentResolverInterface;
 use Fluxio\Actions\Contracts\RefinementInterpreterInterface;
@@ -221,6 +222,7 @@ class ActionsServiceProvider extends ServiceProvider
             $this->commands([
                 CompareInterpretationCommand::class,
                 EvaluateInterpretationCorpusCommand::class,
+                EvaluateRefinementCorpusCommand::class,
             ]);
         }
     }
