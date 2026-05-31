@@ -537,6 +537,8 @@ class ActionProposalRefinementService
                         'target' => $mutation->target,
                         'from' => $current,
                         'to' => $newCollection,
+                        // Phase 7D: descriptive semantic type (e.g. replace_participant).
+                        'semantic_type' => $mutation->semanticType()->value,
                     ];
                 }
 
@@ -634,6 +636,8 @@ class ActionProposalRefinementService
                         'operation' => 'append',
                         'from' => $current,
                         'to' => $newCollection,
+                        // Phase 7D: descriptive semantic type (e.g. add_participant).
+                        'semantic_type' => $mutation->semanticType()->value,
                     ];
                 }
 
@@ -650,6 +654,8 @@ class ActionProposalRefinementService
                         'operation' => 'remove',
                         'from' => $current,
                         'to' => $newCollection,
+                        // Phase 7D: descriptive semantic type (e.g. remove_participant).
+                        'semantic_type' => $mutation->semanticType()->value,
                     ];
                 }
             }

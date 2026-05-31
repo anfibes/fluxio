@@ -762,6 +762,8 @@ class ProposalMutationIntelligenceTest extends TestCase
         $this->assertEquals(['Luca'], $change['from']);
         $this->assertEquals(['Luca', 'Mario'], $change['to']);
         $this->assertEquals('append', $change['operation']);
+        // Phase 7D: descriptive semantic type on the existing change entry.
+        $this->assertEquals('add_participant', $change['semantic_type']);
     }
 
     public function test_add_existing_participant_is_idempotent(): void
@@ -814,6 +816,8 @@ class ProposalMutationIntelligenceTest extends TestCase
         $this->assertEquals(['Luca', 'Marco'], $change['from']);
         $this->assertEquals(['Luca'], $change['to']);
         $this->assertEquals('remove', $change['operation']);
+        // Phase 7D: descriptive semantic type on the existing change entry.
+        $this->assertEquals('remove_participant', $change['semantic_type']);
     }
 
     public function test_remove_nonexistent_participant_produces_no_change(): void
@@ -863,6 +867,8 @@ class ProposalMutationIntelligenceTest extends TestCase
         $this->assertEquals('Luca', $change['target']);
         $this->assertEquals(['Luca', 'Marco'], $change['from']);
         $this->assertEquals(['Giovanni', 'Marco'], $change['to']);
+        // Phase 7D: descriptive semantic type on the existing change entry.
+        $this->assertEquals('replace_participant', $change['semantic_type']);
     }
 
     public function test_collection_mutation_preserves_unrelated_scalar_fields(): void

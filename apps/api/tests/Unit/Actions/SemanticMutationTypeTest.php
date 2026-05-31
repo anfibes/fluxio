@@ -62,15 +62,46 @@ class SemanticMutationTypeTest extends TestCase
         $this->assertSame(SemanticMutationType::Unknown, $mutation->semanticType());
     }
 
-    public function test_collection_and_non_replace_operations_are_unknown(): void
+    public function test_clear_and_unrelated_collection_operations_are_unknown(): void
     {
-        $append = new NormalizedMutation(field: 'participants', label: 'Participants', value: 'Mario', operation: 'append');
         $clear = new NormalizedMutation(field: 'priority', label: 'Priority', value: null, operation: 'clear');
-        $targetedReplace = new NormalizedMutation(field: 'participants', label: 'Participants', value: 'Marco', operation: 'replace', target: 'Luca');
+        // append on a non-participant field has no participant meaning.
+        $otherAppend = new NormalizedMutation(field: 'tags', label: 'Tags', value: 'urgent', operation: 'append');
 
-        $this->assertSame(SemanticMutationType::Unknown, $append->semanticType());
         $this->assertSame(SemanticMutationType::Unknown, $clear->semanticType());
-        $this->assertSame(SemanticMutationType::Unknown, $targetedReplace->semanticType());
+        $this->assertSame(SemanticMutationType::Unknown, $otherAppend->semanticType());
+    }
+
+    // ── Phase 7D: participant collection mutations ──────────────────────────
+
+    public function test_participant_append_is_add_participant(): void
+    {
+        $mutation = new NormalizedMutation(field: 'participants', label: 'Participants', value: 'Marco', operation: 'append');
+
+        $this->assertSame(SemanticMutationType::AddParticipant, $mutation->semanticType());
+    }
+
+    public function test_participant_remove_is_remove_participant(): void
+    {
+        $mutation = new NormalizedMutation(field: 'participants', label: 'Participants', value: null, operation: 'remove', target: 'Mario');
+
+        $this->assertSame(SemanticMutationType::RemoveParticipant, $mutation->semanticType());
+    }
+
+    public function test_targeted_participant_replace_is_replace_participant(): void
+    {
+        $mutation = new NormalizedMutation(field: 'participants', label: 'Participants', value: 'Marco', operation: 'replace', target: 'Luca');
+
+        $this->assertSame(SemanticMutationType::ReplaceParticipant, $mutation->semanticType());
+    }
+
+    public function test_untargeted_participant_replace_is_not_replace_participant(): void
+    {
+        // A participants replace with no target is not an item swap; it must not
+        // be classified as replace_participant.
+        $mutation = new NormalizedMutation(field: 'participants', label: 'Participants', value: 'Marco', operation: 'replace');
+
+        $this->assertSame(SemanticMutationType::Unknown, $mutation->semanticType());
     }
 
     public function test_default_stored_semantic_type_is_null_for_backward_compatibility(): void
