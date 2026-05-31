@@ -11,6 +11,11 @@ return [
     'cannot_refine' => 'Questa proposta di azione non può essere affinata.',
     'refinement_not_recognized' => 'L\'affinamento non è stato applicato. La proposta è rimasta invariata.',
     'ambiguity_still_unresolved' => 'Il chiarimento corrisponde a più candidati. Sii più specifico.',
+    'ambiguity_narrowed_type' => 'Ci sono ancora più :type corrispondenti: :candidates. Selezionane una.',
+    'candidate_types' => [
+        'company' => 'aziende',
+        'person' => 'persone',
+    ],
     'mutation_not_allowed' => 'Una o più modifiche richieste non sono supportate per questo tipo di azione.',
     'ambiguity_resolution_not_supported' => 'Questo tipo di azione non supporta la risoluzione delle ambiguità.',
     'cannot_shift_time_no_current_time' => 'Impossibile spostare l\'orario perché la proposta non ha un orario attuale.',

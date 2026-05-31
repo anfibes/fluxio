@@ -11,6 +11,11 @@ return [
     'cannot_refine' => 'This action proposal cannot be refined.',
     'refinement_not_recognized' => 'The refinement could not be applied. The proposal was left unchanged.',
     'ambiguity_still_unresolved' => 'The clarification matches multiple candidates. Please be more specific.',
+    'ambiguity_narrowed_type' => 'Multiple :type candidates still match: :candidates. Please choose one.',
+    'candidate_types' => [
+        'company' => 'company',
+        'person' => 'person',
+    ],
     'mutation_not_allowed' => 'One or more requested changes are not supported for this action type.',
     'ambiguity_resolution_not_supported' => 'This action type does not support ambiguity resolution.',
     'cannot_shift_time_no_current_time' => 'Cannot shift the time because the proposal has no current time.',

@@ -3,7 +3,6 @@
 namespace Tests\Feature\Actions;
 
 use App\Models\User;
-use Fluxio\Actions\Models\ActionProposal;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -160,7 +159,7 @@ class AmbiguousProposalTest extends TestCase
     {
         $user = $this->actingAsUser();
 
-        $interpret  = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
+        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
         $proposalId = $interpret->json('data.id');
 
         // Candidates are sorted by confidence desc: [Rossi SRL (0.8), Mario Rossi (0.65), Studio Rossi (0.65)]
@@ -178,7 +177,7 @@ class AmbiguousProposalTest extends TestCase
     {
         $user = $this->actingAsUser();
 
-        $interpret  = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
+        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
         $proposalId = $interpret->json('data.id');
 
         // Candidates are sorted by confidence desc: [Rossi SRL (0.8), Mario Rossi (0.65), Studio Rossi (0.65)]
@@ -227,6 +226,87 @@ class AmbiguousProposalTest extends TestCase
 
         $warnings = $response->json('data.warnings');
         $this->assertNotEmpty($warnings);
+    }
+
+    public function test_refinement_the_company_warning_lists_remaining_companies(): void
+    {
+        $this->actingAsUser();
+
+        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
+        $proposalId = $interpret->json('data.id');
+
+        $response = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The company']);
+
+        $response->assertStatus(200);
+
+        // Narrowed-but-still-ambiguous: both companies are named, the person is not.
+        $warnings = $response->json('data.warnings');
+        $narrowed = collect($warnings)->first(fn (string $w) => str_contains($w, 'still match'));
+
+        $this->assertNotNull($narrowed);
+        $this->assertStringContainsString('Rossi SRL', $narrowed);
+        $this->assertStringContainsString('Studio Rossi', $narrowed);
+        $this->assertStringNotContainsString('Mario Rossi', $narrowed);
+        $this->assertStringContainsString('company', $narrowed);
+    }
+
+    public function test_refinement_the_company_does_not_duplicate_narrowed_warning(): void
+    {
+        $this->actingAsUser();
+
+        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
+        $proposalId = $interpret->json('data.id');
+
+        $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The company'])
+            ->assertStatus(200);
+
+        $response = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The company'])
+            ->assertStatus(200);
+
+        $warnings = $response->json('data.warnings');
+        $narrowed = array_values(array_filter($warnings, fn (string $w) => str_contains($w, 'still match')));
+
+        $this->assertCount(1, $narrowed);
+    }
+
+    public function test_refinement_unmatched_clarification_keeps_generic_warning(): void
+    {
+        $this->actingAsUser();
+
+        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
+        $proposalId = $interpret->json('data.id');
+
+        // No type keyword and no label match → no nameable narrowing → generic warning.
+        $response = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The blue one'])
+            ->assertStatus(200);
+
+        $response->assertJsonPath('data.ambiguities.0.selected_candidate_id', null);
+
+        $warnings = $response->json('data.warnings');
+        $generic = collect($warnings)->first(fn (string $w) => str_contains($w, 'be more specific'));
+        $this->assertNotNull($generic);
+
+        $narrowed = collect($warnings)->first(fn (string $w) => str_contains($w, 'still match'));
+        $this->assertNull($narrowed);
+    }
+
+    public function test_refinement_unique_company_still_resolves(): void
+    {
+        $this->actingAsUser();
+
+        // "Call Bianchi" yields a single company among the matches, so "the company"
+        // resolves as before — the narrowed-feedback path must not interfere.
+        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
+        $proposalId = $interpret->json('data.id');
+
+        // An ordinal still resolves uniquely even though two companies exist.
+        $response = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The first one'])
+            ->assertStatus(200);
+
+        $response->assertJsonPath('data.ambiguities.0.selected_candidate_id', 7);
+
+        $fields = collect($response->json('data.editable_fields'))->keyBy('key');
+        $this->assertEquals('Rossi SRL', $fields['lead']['value']);
     }
 
     // --- status after resolution ---

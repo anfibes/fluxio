@@ -87,9 +87,15 @@ class ActionProposalRefinementService
                 $ambiguityResolution = $this->tryClassifyAmbiguityResolution($proposal, $effectiveText);
 
                 if ($ambiguityResolution === null && empty($fieldMutations)) {
+                    // When the clarification narrowed the ambiguity by candidate
+                    // type but still matches more than one candidate, report the
+                    // remaining candidates instead of the generic message. Falls
+                    // back to the generic warning when no narrowing can be named.
+                    $warning = $this->narrowedAmbiguityWarning($context, $effectiveText)
+                        ?? __('actions::actions.ambiguity_still_unresolved');
                     $proposal->warnings = $this->addWarning(
                         $proposal->warnings ?? [],
-                        __('actions::actions.ambiguity_still_unresolved'),
+                        $warning,
                     );
                     $proposal->last_refinement = [
                         'text' => $text,
@@ -364,6 +370,66 @@ class ActionProposalRefinementService
         }
 
         return null;
+    }
+
+    /**
+     * Build a more helpful warning when a clarification narrowed a blocking
+     * ambiguity by candidate type (e.g. "the company") but still matches more
+     * than one candidate. Returns null when no nameable narrowing applies, so the
+     * caller falls back to the generic "be more specific" warning.
+     *
+     * Feedback only: this mirrors resolveCandidate()'s type predicates to DESCRIBE
+     * what remains ambiguous. It never changes which candidates match, candidate
+     * scoring, the ambiguity payload, or resolution semantics.
+     */
+    private function narrowedAmbiguityWarning(ProposalRuntimeContext $context, string $effectiveText): ?string
+    {
+        foreach ($context->blockingAmbiguities as $ambiguity) {
+            if (($ambiguity['selected_candidate_id'] ?? null) !== null) {
+                continue;
+            }
+
+            // Only the first unresolved blocking ambiguity is considered per
+            // refinement call, matching tryClassifyAmbiguityResolution().
+            return $this->buildTypeNarrowedWarning($ambiguity, $effectiveText);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $ambiguity
+     */
+    private function buildTypeNarrowedWarning(array $ambiguity, string $text): ?string
+    {
+        $type = match (true) {
+            (bool) preg_match('/\bcompan(y|ies)\b/i', $text) => 'company',
+            (bool) preg_match('/\bperson\b|\bindividual\b/i', $text) => 'person',
+            default => null,
+        };
+
+        if ($type === null) {
+            return null;
+        }
+
+        $matches = array_values(array_filter(
+            $ambiguity['candidates'] ?? [],
+            fn (array $c) => ($c['type'] ?? null) === $type,
+        ));
+
+        // Fewer than two matches is not a narrowed-but-still-ambiguous situation:
+        // a single match resolves, zero matches falls through to the generic
+        // warning. Only describe the remaining set when it is genuinely > 1.
+        if (count($matches) < 2) {
+            return null;
+        }
+
+        $labels = implode(', ', array_map(fn (array $c) => $c['label'], $matches));
+
+        return __('actions::actions.ambiguity_narrowed_type', [
+            'type' => __('actions::actions.candidate_types.'.$type),
+            'candidates' => $labels,
+        ]);
     }
 
     // ── Unified mutation application ─────────────────────────────────────────
