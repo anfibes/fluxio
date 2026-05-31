@@ -87,12 +87,25 @@ class ActionProposalRefinementService
                 $ambiguityResolution = $this->tryClassifyAmbiguityResolution($proposal, $effectiveText);
 
                 if ($ambiguityResolution === null && empty($fieldMutations)) {
-                    // When the clarification narrowed the ambiguity by candidate
-                    // type but still matches more than one candidate, report the
-                    // remaining candidates instead of the generic message. Falls
-                    // back to the generic warning when no narrowing can be named.
-                    $warning = $this->narrowedAmbiguityWarning($context, $effectiveText)
-                        ?? __('actions::actions.ambiguity_still_unresolved');
+                    // Phase 7C.3: a type clarification (e.g. "the company") that
+                    // still matches multiple candidates progressively narrows the
+                    // active candidate set while keeping the ambiguity blocking;
+                    // the warning then names the remaining candidates. When no
+                    // narrowing applies, the candidate list is left untouched and
+                    // the generic "be more specific" warning is used.
+                    $narrowed = $this->tryNarrowAmbiguity($context, $effectiveText);
+
+                    if ($narrowed !== null) {
+                        $proposal->ambiguities = $this->applyNarrowedCandidates(
+                            $proposal->ambiguities ?? [],
+                            $narrowed['key'],
+                            $narrowed['candidates'],
+                        );
+                        $warning = $this->narrowedWarningMessage($narrowed['type'], $narrowed['candidates']);
+                    } else {
+                        $warning = __('actions::actions.ambiguity_still_unresolved');
+                    }
+
                     $proposal->warnings = $this->addWarning(
                         $proposal->warnings ?? [],
                         $warning,
@@ -373,16 +386,22 @@ class ActionProposalRefinementService
     }
 
     /**
-     * Build a more helpful warning when a clarification narrowed a blocking
-     * ambiguity by candidate type (e.g. "the company") but still matches more
-     * than one candidate. Returns null when no nameable narrowing applies, so the
-     * caller falls back to the generic "be more specific" warning.
+     * Progressive type-narrowing (Phase 7C.3). When a refinement clarifies the
+     * candidate TYPE (e.g. "the company") of the first unresolved blocking
+     * ambiguity but still matches more than one candidate, return the narrowed
+     * subset so the caller can both shrink the active candidate list and report
+     * what remains.
      *
-     * Feedback only: this mirrors resolveCandidate()'s type predicates to DESCRIBE
-     * what remains ambiguous. It never changes which candidates match, candidate
-     * scoring, the ambiguity payload, or resolution semantics.
+     * Deterministic and state/feedback only: it mirrors resolveCandidate()'s type
+     * predicates and never changes scoring, candidate generation, or resolution
+     * semantics. A single match still resolves through resolveCandidate(); zero
+     * matches or no type keyword returns null (generic warning, candidates left
+     * untouched). Idempotent — re-narrowing an already-narrowed set yields the
+     * same candidates.
+     *
+     * @return array{key: string, type: string, candidates: array<int, array<string, mixed>>}|null
      */
-    private function narrowedAmbiguityWarning(ProposalRuntimeContext $context, string $effectiveText): ?string
+    private function tryNarrowAmbiguity(ProposalRuntimeContext $context, string $effectiveText): ?array
     {
         foreach ($context->blockingAmbiguities as $ambiguity) {
             if (($ambiguity['selected_candidate_id'] ?? null) !== null) {
@@ -391,45 +410,75 @@ class ActionProposalRefinementService
 
             // Only the first unresolved blocking ambiguity is considered per
             // refinement call, matching tryClassifyAmbiguityResolution().
-            return $this->buildTypeNarrowedWarning($ambiguity, $effectiveText);
+            $type = $this->clarifiedCandidateType($effectiveText);
+            if ($type === null) {
+                return null;
+            }
+
+            $matches = array_values(array_filter(
+                $ambiguity['candidates'] ?? [],
+                fn (array $c) => ($c['type'] ?? null) === $type,
+            ));
+
+            // Two or more matches is the narrowed-but-still-ambiguous case. A
+            // single match resolves through resolveCandidate(); zero falls
+            // through to the generic warning. Original order is preserved so
+            // downstream ordinal resolution stays meaningful.
+            return count($matches) >= 2
+                ? ['key' => $ambiguity['key'], 'type' => $type, 'candidates' => $matches]
+                : null;
         }
 
         return null;
     }
 
     /**
-     * @param  array<string, mixed>  $ambiguity
+     * Map a type clarification to a candidate type, or null when none is named.
+     * Same predicates as the Phase 7C.2 narrowed-feedback path.
      */
-    private function buildTypeNarrowedWarning(array $ambiguity, string $text): ?string
+    private function clarifiedCandidateType(string $text): ?string
     {
-        $type = match (true) {
+        return match (true) {
             (bool) preg_match('/\bcompan(y|ies)\b/i', $text) => 'company',
             (bool) preg_match('/\bperson\b|\bindividual\b/i', $text) => 'person',
             default => null,
         };
+    }
 
-        if ($type === null) {
-            return null;
-        }
-
-        $matches = array_values(array_filter(
-            $ambiguity['candidates'] ?? [],
-            fn (array $c) => ($c['type'] ?? null) === $type,
-        ));
-
-        // Fewer than two matches is not a narrowed-but-still-ambiguous situation:
-        // a single match resolves, zero matches falls through to the generic
-        // warning. Only describe the remaining set when it is genuinely > 1.
-        if (count($matches) < 2) {
-            return null;
-        }
-
-        $labels = implode(', ', array_map(fn (array $c) => $c['label'], $matches));
+    /**
+     * Warning naming the candidates that still match after a type narrowing.
+     *
+     * @param  array<int, array<string, mixed>>  $candidates
+     */
+    private function narrowedWarningMessage(string $type, array $candidates): string
+    {
+        $labels = implode(', ', array_map(fn (array $c) => $c['label'], $candidates));
 
         return __('actions::actions.ambiguity_narrowed_type', [
             'type' => __('actions::actions.candidate_types.'.$type),
             'candidates' => $labels,
         ]);
+    }
+
+    /**
+     * Replace one unresolved ambiguity's candidate list with the narrowed subset,
+     * preserving order and every other ambiguity field (key/label/reason/query/
+     * blocking/selected_candidate_id). The ambiguity stays blocking with
+     * selected_candidate_id null — only the active candidate set shrinks.
+     *
+     * @param  array<int, array<string, mixed>>  $ambiguities
+     * @param  array<int, array<string, mixed>>  $candidates
+     * @return array<int, array<string, mixed>>
+     */
+    private function applyNarrowedCandidates(array $ambiguities, string $key, array $candidates): array
+    {
+        return array_map(function (array $a) use ($key, $candidates): array {
+            if ($a['key'] === $key && ($a['selected_candidate_id'] ?? null) === null) {
+                $a['candidates'] = array_values($candidates);
+            }
+
+            return $a;
+        }, $ambiguities);
     }
 
     // ── Unified mutation application ─────────────────────────────────────────

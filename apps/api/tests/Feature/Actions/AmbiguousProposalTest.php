@@ -309,6 +309,137 @@ class AmbiguousProposalTest extends TestCase
         $this->assertEquals('Rossi SRL', $fields['lead']['value']);
     }
 
+    // --- Phase 7C.3: progressive ambiguity narrowing ---
+
+    public function test_company_narrowing_filters_active_candidates_to_companies(): void
+    {
+        $this->actingAsUser();
+
+        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
+        $proposalId = $interpret->json('data.id');
+
+        $response = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The company'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.status', 'draft')
+            ->assertJsonPath('data.ambiguities.0.selected_candidate_id', null);
+
+        // Active candidate set is narrowed to the two companies; the person is gone.
+        $candidates = $response->json('data.ambiguities.0.candidates');
+        $this->assertCount(2, $candidates);
+
+        $labels = array_column($candidates, 'label');
+        $this->assertContains('Rossi SRL', $labels);
+        $this->assertContains('Studio Rossi', $labels);
+        $this->assertNotContains('Mario Rossi', $labels);
+
+        foreach ($candidates as $candidate) {
+            $this->assertSame('company', $candidate['type']);
+        }
+    }
+
+    public function test_ordinal_after_company_narrowing_resolves_on_narrowed_set(): void
+    {
+        $this->actingAsUser();
+
+        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
+        $proposalId = $interpret->json('data.id');
+
+        // Narrow to companies first: [Rossi SRL, Studio Rossi].
+        $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The company'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.ambiguities.0.selected_candidate_id', null);
+
+        // "The first one" must operate on the narrowed set → Rossi SRL (id 7).
+        $response = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The first one'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.ambiguities.0.selected_candidate_id', 7);
+
+        $fields = collect($response->json('data.editable_fields'))->keyBy('key');
+        $this->assertEquals('Rossi SRL', $fields['lead']['value']);
+    }
+
+    public function test_person_narrowing_resolves_immediately(): void
+    {
+        $this->actingAsUser();
+
+        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
+        $proposalId = $interpret->json('data.id');
+
+        // Only one person candidate exists, so "the person" resolves immediately.
+        $response = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The person'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.ambiguities.0.selected_candidate_id', 1);
+
+        $fields = collect($response->json('data.editable_fields'))->keyBy('key');
+        $this->assertEquals('Mario Rossi', $fields['lead']['value']);
+
+        // The narrowed-multiple warning must not appear on a clean resolution.
+        $warnings = $response->json('data.warnings');
+        $narrowed = collect($warnings)->first(fn (string $w) => str_contains($w, 'still match'));
+        $this->assertNull($narrowed);
+    }
+
+    public function test_meeting_person_narrowing_becomes_ready_when_temporal_present(): void
+    {
+        $this->actingAsUser();
+
+        // Date + time already present, so resolving the lead unblocks the proposal.
+        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossi tomorrow at 10']);
+        $proposalId = $interpret->json('data.id');
+
+        $interpret->assertJsonPath('data.status', 'draft');
+
+        $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The person'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.status', 'ready')
+            ->assertJsonPath('data.ambiguities.0.selected_candidate_id', 1);
+    }
+
+    public function test_repeated_company_narrowing_keeps_candidates_stable(): void
+    {
+        $this->actingAsUser();
+
+        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
+        $proposalId = $interpret->json('data.id');
+
+        $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The company'])
+            ->assertStatus(200);
+
+        $response = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The company'])
+            ->assertStatus(200);
+
+        // Re-narrowing an already-narrowed set is idempotent.
+        $candidates = $response->json('data.ambiguities.0.candidates');
+        $this->assertCount(2, $candidates);
+        $this->assertEqualsCanonicalizing(['Rossi SRL', 'Studio Rossi'], array_column($candidates, 'label'));
+
+        $narrowed = array_values(array_filter(
+            $response->json('data.warnings'),
+            fn (string $w) => str_contains($w, 'still match')
+        ));
+        $this->assertCount(1, $narrowed);
+    }
+
+    public function test_unrelated_clarification_does_not_mutate_candidates(): void
+    {
+        $this->actingAsUser();
+
+        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
+        $proposalId = $interpret->json('data.id');
+
+        $response = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'Something irrelevant'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.ambiguities.0.selected_candidate_id', null);
+
+        // The full original candidate list is preserved untouched.
+        $candidates = $response->json('data.ambiguities.0.candidates');
+        $this->assertCount(3, $candidates);
+
+        $generic = collect($response->json('data.warnings'))
+            ->first(fn (string $w) => str_contains($w, 'be more specific'));
+        $this->assertNotNull($generic);
+    }
+
     // --- status after resolution ---
 
     public function test_resolving_lead_ambiguity_alone_keeps_proposal_draft(): void
