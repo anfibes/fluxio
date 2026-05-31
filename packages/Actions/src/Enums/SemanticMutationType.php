@@ -15,6 +15,20 @@ use Fluxio\Actions\DTO\NormalizedMutation;
  * is an `add_participant`.
  *
  * Only the narrow classified cases are recognized; everything else is Unknown.
+ *
+ * ARCHITECTURAL DIRECTION (Phase 8B): this enum is the vocabulary of the
+ * Semantic Refinement IR (the interpretation boundary, see
+ * SemanticRefinementMutation). The intended flow is now one-directional:
+ *
+ *   semantic mutation (this enum) → SemanticRefinementLowerer → NormalizedMutation
+ *
+ * `classify()` below derives the semantic type FROM an already-built structural
+ * NormalizedMutation. That reverse arrow is TRANSITIONAL / backward-compatible
+ * support for Phase 7C/7D (it powers `NormalizedMutation::semanticType()` and the
+ * descriptive `last_refinement.changes[].semantic_type` rendering). It is NOT the
+ * long-term direction. A future provider (LLM/voice) emits the semantic type as
+ * authoritative interpretation output and the lowerer produces structure from it;
+ * the runtime must not depend on re-deriving meaning from structure.
  */
 enum SemanticMutationType: string
 {
