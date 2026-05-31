@@ -3,6 +3,7 @@
 namespace Tests\Feature\Actions;
 
 use Carbon\Carbon;
+use Fluxio\Actions\DTO\Ambiguity\SemanticAmbiguityClarification;
 use Fluxio\Actions\DTO\NormalizedMutation;
 use Fluxio\Actions\DTO\SemanticRefinementMutation;
 use Fluxio\Actions\Interpreters\RuleBasedRefinementInterpreter;
@@ -37,17 +38,24 @@ class NormalizedRefinementInterpreterTest extends TestCase
     }
 
     /**
-     * Interpret, then lower the Semantic Refinement IR into structural mutations —
-     * the exact pipeline the refinement service runs. Already-structural ops
-     * (priority) pass through unchanged.
+     * Interpret, then lower the Semantic Refinement IR into structural FIELD
+     * mutations — the field side of the refinement seam. Ambiguity clarifications
+     * (Phase 8D.3) are filtered out here; this helper protects the field-mutation
+     * boundary only (ambiguity selector extraction is covered by
+     * AmbiguitySelectorExtractionTest).
      *
      * @return NormalizedMutation[]
      */
     private function interpretStructural(string $text): array
     {
+        $fieldOps = array_filter(
+            $this->interpreter->interpret($text),
+            fn ($op) => ! $op instanceof SemanticAmbiguityClarification,
+        );
+
         return array_map(
             fn ($op) => $op instanceof SemanticRefinementMutation ? $this->lowerer->lower($op) : $op,
-            $this->interpreter->interpret($text),
+            array_values($fieldOps),
         );
     }
 

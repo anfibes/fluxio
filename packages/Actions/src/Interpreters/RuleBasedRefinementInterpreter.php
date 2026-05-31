@@ -3,6 +3,11 @@
 namespace Fluxio\Actions\Interpreters;
 
 use Fluxio\Actions\Contracts\RefinementInterpreterInterface;
+use Fluxio\Actions\DTO\Ambiguity\AmbiguitySelector;
+use Fluxio\Actions\DTO\Ambiguity\AttributeSelector;
+use Fluxio\Actions\DTO\Ambiguity\LabelSelector;
+use Fluxio\Actions\DTO\Ambiguity\OrdinalSelector;
+use Fluxio\Actions\DTO\Ambiguity\SemanticAmbiguityClarification;
 use Fluxio\Actions\DTO\NormalizedMutation;
 use Fluxio\Actions\DTO\SemanticRefinementMutation;
 use Fluxio\Actions\Enums\SemanticMutationType;
@@ -15,18 +20,26 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
     /**
      * Extract refinement operations from a refinement text.
      *
-     * Phase 8D.2: a semantic extractor for the migrated mutation families — it
-     * emits SemanticRefinementMutation for date/time, temporal shift, and
-     * participant add/remove/replace, and the service lowers them. Priority
+     * Phase 8D.2/8D.3: a stateless semantic extractor. It emits
+     * SemanticRefinementMutation for the migrated mutation families (date/time,
+     * temporal shift, participant add/remove/replace) and SemanticAmbiguityClarification
+     * for ambiguity clarifications; the service lowers/resolves them. Priority
      * replace/clear are not yet migrated and stay structural NormalizedMutation.
-     * The interpreter never constructs the structural shape for migrated families
-     * and never resolves anything (the temporal shift stays value-less).
+     * The interpreter never constructs the structural shape for migrated families,
+     * never resolves anything (the temporal shift stays value-less), never reads
+     * proposal state, and never selects a candidate.
+     *
+     * A refinement is treated as EITHER a field edit OR an ambiguity clarification:
+     * the clarification is only extracted in the fallthrough, when no field mutation
+     * was recognized (mirroring the former resolveCandidate behaviour, which only
+     * resolved clarification-shaped text). The clarification's ambiguity key is left
+     * unbound — the service binds it from proposal state (the interpreter is stateless).
      *
      * The interpreter is intentionally locale-fixed to English for now.
      * Future implementations (Italian, German, LLM-assisted) can implement
      * RefinementInterpreterInterface without touching the orchestration layer.
      *
-     * @return array<SemanticRefinementMutation|NormalizedMutation>
+     * @return array<SemanticRefinementMutation|SemanticAmbiguityClarification|NormalizedMutation>
      */
     public function interpret(string $text): array
     {
@@ -91,7 +104,102 @@ class RuleBasedRefinementInterpreter implements RefinementInterpreterInterface
             );
         }
 
-        return $mutations;
+        if ($mutations !== []) {
+            return $mutations;
+        }
+
+        // Fallthrough: no field mutation recognized. Treat the text as an ambiguity
+        // clarification candidate. The service decides applicability (is there a
+        // blocking ambiguity?) and the resolver decides the outcome.
+        $clarification = $this->extractAmbiguityClarification($text);
+
+        return $clarification !== null ? [$clarification] : [];
+    }
+
+    // ── Ambiguity clarification extraction (Phase 8D.3) ──────────────────────
+    // Stateless selector extraction only. The interpreter does NOT know which
+    // ambiguity exists, never matches candidates, and never resolves — it emits a
+    // selector and the deterministic AmbiguityResolver computes the outcome.
+
+    private function extractAmbiguityClarification(string $text): ?SemanticAmbiguityClarification
+    {
+        $selector = $this->extractAmbiguitySelector($text);
+        if ($selector === null) {
+            return null;
+        }
+
+        // The ambiguity key is intentionally left unbound: the interpreter is
+        // stateless and cannot know which ambiguity the user is clarifying.
+        // ActionProposalRefinementService binds it to the first unresolved blocking
+        // ambiguity from proposal state before lowering. This emitted clarification
+        // is never lowered directly.
+        return new SemanticAmbiguityClarification(ambiguityKey: '', selector: $selector);
+    }
+
+    /**
+     * Extract a single selector, preserving the former resolveCandidate precedence
+     * as far as a stateless extractor can: ordinal wins over type; exact-vs-unique-
+     * partial label is decided downstream by the resolver (both go to LabelSelector).
+     * A type word appearing inside a candidate label resolves to a type selector —
+     * a documented stateless-extraction limitation; canonical clarification phrases
+     * are unaffected.
+     */
+    private function extractAmbiguitySelector(string $text): ?AmbiguitySelector
+    {
+        $trimmed = trim($text);
+        if ($trimmed === '') {
+            return null;
+        }
+
+        $position = $this->parseOrdinalPosition($trimmed);
+        if ($position !== null) {
+            return new OrdinalSelector($position);
+        }
+
+        $type = $this->clarifiedCandidateType($trimmed);
+        if ($type !== null) {
+            return new AttributeSelector('type', $type);
+        }
+
+        return new LabelSelector($trimmed);
+    }
+
+    /**
+     * Map an ordinal expression to a 1-based position. Mirrors the former
+     * ActionProposalRefinementService::parseOrdinal (which produced a 0-based
+     * index); OrdinalSelector is 1-based, so first → 1, second → 2, third → 3.
+     */
+    private function parseOrdinalPosition(string $text): ?int
+    {
+        $lower = mb_strtolower($text);
+
+        return match (true) {
+            str_contains($lower, 'first') || str_contains($lower, '1st') => 1,
+            str_contains($lower, 'second') || str_contains($lower, '2nd') => 2,
+            str_contains($lower, 'third') || str_contains($lower, '3rd') => 3,
+            default => null,
+        };
+    }
+
+    /**
+     * Map a refinement to a candidate type ('company' / 'person'), or null.
+     *
+     * STRICT: a type selector is produced only when the WHOLE refinement is a pure
+     * type clarification (an optional leading "the" plus a single type word).
+     * Anything else — including a label that merely contains a type word, e.g.
+     * "Company ABC" or "Person Studio" — returns null and falls back to a
+     * LabelSelector. This preserves label precedence over type (the resolver still
+     * owns candidate matching); the interpreter stays stateless.
+     */
+    private function clarifiedCandidateType(string $text): ?string
+    {
+        $normalized = preg_replace('/^the\s+/', '', mb_strtolower(trim($text)));
+
+        return match (true) {
+            in_array($normalized, ['company', 'companies', 'business'], true) => 'company',
+            in_array($normalized, ['person', 'individual', 'people'], true) => 'person',
+            default => null,
+        };
     }
 
     // ── Collection mutations ─────────────────────────────────────────────────

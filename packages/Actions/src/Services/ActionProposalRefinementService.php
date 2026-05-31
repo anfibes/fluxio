@@ -3,6 +3,9 @@
 namespace Fluxio\Actions\Services;
 
 use Fluxio\Actions\Contracts\RefinementInterpreterInterface;
+use Fluxio\Actions\DTO\Ambiguity\AmbiguitySelector;
+use Fluxio\Actions\DTO\Ambiguity\AttributeSelector;
+use Fluxio\Actions\DTO\Ambiguity\SemanticAmbiguityClarification;
 use Fluxio\Actions\DTO\EditableFieldExplanation;
 use Fluxio\Actions\DTO\NormalizedMutation;
 use Fluxio\Actions\DTO\ProposalRuntimeContext;
@@ -10,6 +13,8 @@ use Fluxio\Actions\DTO\SemanticRefinementMutation;
 use Fluxio\Actions\Enums\SemanticMutationType;
 use Fluxio\Actions\Models\ActionProposal;
 use Fluxio\Actions\Registry\IntentCapabilityRegistry;
+use Fluxio\Actions\Support\AmbiguityDirectiveLowerer;
+use Fluxio\Actions\Support\AmbiguityResolver;
 use Fluxio\Actions\Support\DateTimeExpressionParser;
 use Fluxio\Actions\Support\ProposalRuntimeContextFactory;
 use Fluxio\Actions\Support\SemanticRefinementLowerer;
@@ -26,6 +31,8 @@ class ActionProposalRefinementService
         private readonly ProposalRuntimeContextFactory $contextFactory,
         private readonly DateTimeExpressionParser $parser,
         private readonly SemanticRefinementLowerer $lowerer,
+        private readonly AmbiguityDirectiveLowerer $ambiguityLowerer,
+        private readonly AmbiguityResolver $ambiguityResolver,
     ) {}
 
     public function refine(ActionProposal $proposal, string $text): ActionProposal
@@ -44,10 +51,13 @@ class ActionProposalRefinementService
 
         $effectiveText = $this->effectiveText($text, $proposal->source_text);
 
-        // Delegate NL → semantic interpretation to the interpreter, then lower the
-        // Semantic Refinement IR into the structural NormalizedMutation the rest of
-        // the pipeline consumes (Phase 8D.2 — mutation arrow flip).
-        $fieldMutations = $this->lowerSemanticMutations($this->interpreter->interpret($effectiveText));
+        // Delegate NL → semantic interpretation to the interpreter, then partition
+        // the semantic operation stream: field mutations are lowered into structural
+        // NormalizedMutation (Phase 8D.2); the at-most-one ambiguity clarification is
+        // routed through the AmbiguityResolver authority below (Phase 8D.3).
+        [$fieldMutations, $clarification] = $this->partitionSemanticOperations(
+            $this->interpreter->interpret($effectiveText)
+        );
 
         // Capability validation: filter out mutations that are not permitted for this intent.
         // Disallowed mutations produce a warning; the proposal is left unchanged for that field.
@@ -86,27 +96,49 @@ class ActionProposalRefinementService
         // Try ambiguity resolution when a blocking ambiguity exists.
         // Check capability first — if the intent does not support ambiguity resolution,
         // skip the attempt entirely.
+        //
+        // Phase 8D.3: resolution is selector-driven. The interpreter extracted a
+        // stateless ambiguity selector; here the service binds it to the first
+        // unresolved blocking ambiguity and delegates matching/narrowing/selection
+        // to the deterministic AmbiguityResolver. The service no longer matches
+        // candidates, parses ordinals, or classifies company/person itself.
         $ambiguityResolution = null;
         if ($this->hasUnresolvedBlockingAmbiguity($context)) {
             if ($this->intentSupportsAmbiguityResolution($proposal->intent)) {
-                $ambiguityResolution = $this->tryClassifyAmbiguityResolution($proposal, $effectiveText);
+                $targetAmbiguity = null;
+                $outcome = null;
+
+                if ($clarification !== null) {
+                    [$targetAmbiguity, $outcome] = $this->resolveAgainstFirstBlockingAmbiguity(
+                        $proposal,
+                        $clarification->selector,
+                    );
+
+                    if ($outcome !== null && $outcome->isResolved()) {
+                        $ambiguityResolution = [
+                            'ambiguity_key' => $targetAmbiguity['key'],
+                            'ambiguity_label' => $targetAmbiguity['label'],
+                            'candidate' => $outcome->selectedCandidate,
+                        ];
+                    }
+                }
 
                 if ($ambiguityResolution === null && empty($fieldMutations)) {
-                    // Phase 7C.3: a type clarification (e.g. "the company") that
-                    // still matches multiple candidates progressively narrows the
-                    // active candidate set while keeping the ambiguity blocking;
-                    // the warning then names the remaining candidates. When no
-                    // narrowing applies, the candidate list is left untouched and
-                    // the generic "be more specific" warning is used.
-                    $narrowed = $this->tryNarrowAmbiguity($context, $effectiveText);
-
-                    if ($narrowed !== null) {
+                    // A type clarification (e.g. "the company") that still matches
+                    // multiple candidates progressively narrows the active candidate
+                    // set while keeping the ambiguity blocking; the warning names the
+                    // remaining candidates. Otherwise the generic "be more specific"
+                    // warning is used. (Phase 7C.3 behaviour, now resolver-driven.)
+                    if ($outcome !== null && $outcome->isNarrowed()) {
                         $proposal->ambiguities = $this->applyNarrowedCandidates(
                             $proposal->ambiguities ?? [],
-                            $narrowed['key'],
-                            $narrowed['candidates'],
+                            $targetAmbiguity['key'],
+                            $outcome->narrowedCandidates,
                         );
-                        $warning = $this->narrowedWarningMessage($narrowed['type'], $narrowed['candidates']);
+                        $warning = $this->narrowedWarningMessage(
+                            $clarification->selector instanceof AttributeSelector ? $clarification->selector->value : '',
+                            $outcome->narrowedCandidates,
+                        );
                     } else {
                         $warning = __('actions::actions.ambiguity_still_unresolved');
                     }
@@ -210,6 +242,61 @@ class ActionProposalRefinementService
                 : $operation,
             $operations,
         );
+    }
+
+    /**
+     * Split the interpreter's semantic operation stream into lowered field
+     * mutations and an at-most-one ambiguity clarification (Phase 8D.3 coordinator
+     * step). Field operations are lowered to NormalizedMutation; the first
+     * ambiguity clarification (if any) is returned for resolver-driven handling.
+     *
+     * @param  array<SemanticRefinementMutation|SemanticAmbiguityClarification|NormalizedMutation>  $operations
+     * @return array{0: NormalizedMutation[], 1: SemanticAmbiguityClarification|null}
+     */
+    private function partitionSemanticOperations(array $operations): array
+    {
+        $fieldOperations = [];
+        $clarification = null;
+
+        foreach ($operations as $operation) {
+            if ($operation instanceof SemanticAmbiguityClarification) {
+                $clarification ??= $operation; // at most one per refinement; first wins
+            } else {
+                $fieldOperations[] = $operation;
+            }
+        }
+
+        return [$this->lowerSemanticMutations($fieldOperations), $clarification];
+    }
+
+    /**
+     * Bind a stateless ambiguity selector to the first unresolved blocking
+     * ambiguity on the proposal, lower it to an AmbiguityDirective, and delegate to
+     * the deterministic AmbiguityResolver. Returns the targeted ambiguity and the
+     * resolution outcome, or [null, null] when no unresolved blocking ambiguity
+     * exists. The service performs NO candidate matching itself — it only binds the
+     * key (proposal state) and applies the resolver's outcome.
+     *
+     * @return array{0: array<string, mixed>|null, 1: \Fluxio\Actions\DTO\Ambiguity\ResolutionOutcome|null}
+     */
+    private function resolveAgainstFirstBlockingAmbiguity(ActionProposal $proposal, AmbiguitySelector $selector): array
+    {
+        foreach ($proposal->ambiguities ?? [] as $ambiguity) {
+            if (! ($ambiguity['blocking'] ?? false) || ($ambiguity['selected_candidate_id'] ?? null) !== null) {
+                continue;
+            }
+
+            $directive = $this->ambiguityLowerer->lower(
+                new SemanticAmbiguityClarification($ambiguity['key'], $selector),
+            );
+
+            $outcome = $this->ambiguityResolver->resolve($directive, $ambiguity['candidates'] ?? []);
+
+            // Only the first unresolved blocking ambiguity is considered per call.
+            return [$ambiguity, $outcome];
+        }
+
+        return [null, null];
     }
 
     /**
@@ -386,93 +473,11 @@ class ActionProposalRefinementService
         return $capability->supportsAmbiguityResolution;
     }
 
-    // ── Ambiguity resolution ─────────────────────────────────────────────────
-    // Candidate matching requires proposal state (the candidates list) so it
-    // stays here rather than in the interpreter.
-
-    private function tryClassifyAmbiguityResolution(ActionProposal $proposal, string $effectiveText): ?array
-    {
-        foreach ($proposal->ambiguities ?? [] as $ambiguity) {
-            if (! ($ambiguity['blocking'] ?? false) || $ambiguity['selected_candidate_id'] !== null) {
-                continue;
-            }
-
-            $candidate = $this->resolveCandidate($ambiguity, $effectiveText);
-
-            if ($candidate !== null) {
-                return [
-                    'ambiguity_key' => $ambiguity['key'],
-                    'ambiguity_label' => $ambiguity['label'],
-                    'candidate' => $candidate,
-                ];
-            }
-
-            // Process only the first unresolved blocking ambiguity per call
-            return null;
-        }
-
-        return null;
-    }
-
-    /**
-     * Progressive type-narrowing (Phase 7C.3). When a refinement clarifies the
-     * candidate TYPE (e.g. "the company") of the first unresolved blocking
-     * ambiguity but still matches more than one candidate, return the narrowed
-     * subset so the caller can both shrink the active candidate list and report
-     * what remains.
-     *
-     * Deterministic and state/feedback only: it mirrors resolveCandidate()'s type
-     * predicates and never changes scoring, candidate generation, or resolution
-     * semantics. A single match still resolves through resolveCandidate(); zero
-     * matches or no type keyword returns null (generic warning, candidates left
-     * untouched). Idempotent — re-narrowing an already-narrowed set yields the
-     * same candidates.
-     *
-     * @return array{key: string, type: string, candidates: array<int, array<string, mixed>>}|null
-     */
-    private function tryNarrowAmbiguity(ProposalRuntimeContext $context, string $effectiveText): ?array
-    {
-        foreach ($context->blockingAmbiguities as $ambiguity) {
-            if (($ambiguity['selected_candidate_id'] ?? null) !== null) {
-                continue;
-            }
-
-            // Only the first unresolved blocking ambiguity is considered per
-            // refinement call, matching tryClassifyAmbiguityResolution().
-            $type = $this->clarifiedCandidateType($effectiveText);
-            if ($type === null) {
-                return null;
-            }
-
-            $matches = array_values(array_filter(
-                $ambiguity['candidates'] ?? [],
-                fn (array $c) => ($c['type'] ?? null) === $type,
-            ));
-
-            // Two or more matches is the narrowed-but-still-ambiguous case. A
-            // single match resolves through resolveCandidate(); zero falls
-            // through to the generic warning. Original order is preserved so
-            // downstream ordinal resolution stays meaningful.
-            return count($matches) >= 2
-                ? ['key' => $ambiguity['key'], 'type' => $type, 'candidates' => $matches]
-                : null;
-        }
-
-        return null;
-    }
-
-    /**
-     * Map a type clarification to a candidate type, or null when none is named.
-     * Same predicates as the Phase 7C.2 narrowed-feedback path.
-     */
-    private function clarifiedCandidateType(string $text): ?string
-    {
-        return match (true) {
-            (bool) preg_match('/\bcompan(y|ies)\b/i', $text) => 'company',
-            (bool) preg_match('/\bperson\b|\bindividual\b/i', $text) => 'person',
-            default => null,
-        };
-    }
+    // ── Ambiguity outcome application (Phase 8D.3) ───────────────────────────
+    // Candidate matching, narrowing, and selection live in AmbiguityResolver. The
+    // service only binds the selector to proposal state (resolveAgainstFirstBlockingAmbiguity)
+    // and applies the resolver's outcome: warning composition and the narrowed
+    // candidate-list write below, and the resolved-candidate application in applyAll().
 
     /**
      * Warning naming the candidates that still match after a type narrowing.
@@ -921,61 +926,5 @@ class ActionProposalRefinementService
             ->contains(fn (array $a) => ($a['blocking'] ?? false) && $a['selected_candidate_id'] === null);
 
         return $requiredMissingRemain || $blockingAmbiguityRemains;
-    }
-
-    private function resolveCandidate(array $ambiguity, string $text): ?array
-    {
-        $candidates = $ambiguity['candidates'] ?? [];
-        $lower = mb_strtolower(trim($text));
-
-        $ordinal = $this->parseOrdinal($lower);
-        if ($ordinal !== null && isset($candidates[$ordinal])) {
-            return $candidates[$ordinal];
-        }
-
-        foreach ($candidates as $candidate) {
-            if (mb_strtolower($candidate['label']) === $lower) {
-                return $candidate;
-            }
-        }
-
-        $partialMatches = array_values(array_filter(
-            $candidates,
-            fn (array $c) => str_contains(mb_strtolower($c['label']), $lower)
-        ));
-
-        if (count($partialMatches) === 1) {
-            return $partialMatches[0];
-        }
-
-        if ((bool) preg_match('/\bcompan(y|ies)\b/i', $text)) {
-            $typeMatches = array_values(array_filter($candidates, fn (array $c) => $c['type'] === 'company'));
-            if (count($typeMatches) === 1) {
-                return $typeMatches[0];
-            }
-
-            return null;
-        }
-
-        if ((bool) preg_match('/\bperson\b|\bindividual\b/i', $text)) {
-            $typeMatches = array_values(array_filter($candidates, fn (array $c) => $c['type'] === 'person'));
-            if (count($typeMatches) === 1) {
-                return $typeMatches[0];
-            }
-
-            return null;
-        }
-
-        return null;
-    }
-
-    private function parseOrdinal(string $text): ?int
-    {
-        return match (true) {
-            str_contains($text, 'first') || str_contains($text, '1st') => 0,
-            str_contains($text, 'second') || str_contains($text, '2nd') => 1,
-            str_contains($text, 'third') || str_contains($text, '3rd') => 2,
-            default => null,
-        };
     }
 }
