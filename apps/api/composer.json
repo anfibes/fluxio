@@ -62,7 +62,14 @@
         "test": [
             "@php artisan config:clear --ansi",
             "@php artisan test"
+        ],
+        "test:actions-corpora": [
+            "@php artisan actions:evaluate-command-interpretation-corpus --fail-on-mismatch",
+            "@php artisan actions:evaluate-refinement-corpus --fail-on-mismatch"
         ]
+    },
+    "scripts-descriptions": {
+        "test:actions-corpora": "Phase 9E.4 baseline gate: run the deterministic interpretation fidelity corpora (proposal-level command interpretation + refinement) and fail on any mismatch. Deterministic-only, no model/network. The provider-level interpretation corpus (deterministic vs. Ollama) is intentionally excluded — it depends on Ollama and is a diagnostics drift tool, not a mandatory gate."
     },
     "extra": {
         "laravel": {

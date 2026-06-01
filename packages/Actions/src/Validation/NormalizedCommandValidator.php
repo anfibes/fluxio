@@ -15,6 +15,16 @@ class NormalizedCommandValidator
      */
     private const UNIVERSAL_PARSER_KEYS = ['date', 'time'];
 
+    /**
+     * Canonical, already-interpreted runtime value keys that must carry a well-formed
+     * value, not a raw expression (Phase 9E.4). These are validated for SHAPE so a
+     * future probabilistic provider cannot leak `date: "next week"` /
+     * `time: "morning-ish"` into proposal building. The raw `*_expression` keys
+     * (date_expression, time_expression) are intentionally NOT in this set — they are
+     * interpretation-side user-facing expressions and stay unconstrained.
+     */
+    private const SHAPE_VALIDATED_KEYS = ['date', 'time'];
+
     public function __construct(private readonly IntentRegistry $registry) {}
 
     public function validate(NormalizedCommand $command): NormalizedCommandValidationResult
@@ -24,6 +34,7 @@ class NormalizedCommandValidator
         $this->validateIntent($command, $errors);
         $this->validateConfidence($command, $errors);
         $this->validateEntities($command, $errors);
+        $this->validateEntityValueShapes($command, $errors);
 
         // Entity key compatibility can only run when intent is structurally valid.
         if (empty($errors)) {
@@ -41,6 +52,7 @@ class NormalizedCommandValidator
     {
         if (trim($command->intent) === '') {
             $errors[] = 'Intent must not be empty.';
+
             return;
         }
 
@@ -67,11 +79,13 @@ class NormalizedCommandValidator
         foreach ($command->entities as $key => $value) {
             if (! is_string($key) || trim($key) === '') {
                 $errors[] = 'Each entity key must be a non-empty string.';
+
                 continue;
             }
 
             if ($value === null) {
                 $errors[] = "Entity [{$key}] must have a non-null value.";
+
                 continue;
             }
 
@@ -79,6 +93,64 @@ class NormalizedCommandValidator
                 $errors[] = "Entity [{$key}] must not have an empty string value.";
             }
         }
+    }
+
+    /**
+     * Strict value-shape validation for the normalized runtime date/time keys
+     * (Phase 9E.4). It runs independently of intent: `date` must be a valid ISO local
+     * calendar date (YYYY-MM-DD) and `time` a 24h HH:MM (00:00–23:59). Null/empty
+     * values are already reported by validateEntities and are skipped here to avoid
+     * duplicate errors. Raw `*_expression` keys are never shape-checked.
+     */
+    private function validateEntityValueShapes(NormalizedCommand $command, array &$errors): void
+    {
+        foreach (self::SHAPE_VALIDATED_KEYS as $key) {
+            if (! array_key_exists($key, $command->entities)) {
+                continue;
+            }
+
+            $value = $command->entities[$key];
+
+            if ($value === null || $value === '') {
+                continue;
+            }
+
+            $valid = match ($key) {
+                'date' => is_string($value) && $this->isIsoDate($value),
+                'time' => is_string($value) && $this->isHourMinute($value),
+                default => true,
+            };
+
+            if (! $valid) {
+                $display = is_string($value) ? $value : gettype($value);
+                $expected = $key === 'date' ? 'ISO date (YYYY-MM-DD)' : '24h time (HH:MM)';
+                $errors[] = "Entity [{$key}] value [{$display}] is not a valid {$expected}.";
+            }
+        }
+    }
+
+    /**
+     * A valid ISO local calendar date: the literal YYYY-MM-DD shape AND a real
+     * calendar date (so 2026-02-30, 2026-13-01, 06/02/2026, or 2026-6-2 are rejected).
+     */
+    private function isIsoDate(string $value): bool
+    {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) !== 1) {
+            return false;
+        }
+
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+
+        return $date !== false && $date->format('Y-m-d') === $value;
+    }
+
+    /**
+     * A valid 24h time: HH:MM, 00:00 through 23:59 (rejects 24:00, 10, 9am,
+     * 10:00:00, morning-ish).
+     */
+    private function isHourMinute(string $value): bool
+    {
+        return preg_match('/^([01][0-9]|2[0-3]):[0-5][0-9]$/', $value) === 1;
     }
 
     private function validateEntityCompatibility(NormalizedCommand $command, array &$errors): void

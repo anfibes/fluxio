@@ -2,7 +2,6 @@
 
 namespace Tests\Unit\Actions;
 
-use Fluxio\Actions\DTO\EntityRequirement;
 use Fluxio\Actions\DTO\IntentDefinition;
 use Fluxio\Actions\DTO\NormalizedCommand;
 use Fluxio\Actions\Executors\CreateTaskActionExecutor;
@@ -24,17 +23,17 @@ class NormalizedCommandValidatorTest extends TestCase
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private function command(
-        string $intent     = 'schedule_meeting',
-        float  $confidence = 0.7,
-        array  $entities   = [],
-        string $locale     = 'en',
+        string $intent = 'schedule_meeting',
+        float $confidence = 0.7,
+        array $entities = [],
+        string $locale = 'en',
     ): NormalizedCommand {
         return new NormalizedCommand(
-            intent:     $intent,
+            intent: $intent,
             confidence: $confidence,
             sourceText: 'test',
-            locale:     $locale,
-            entities:   $entities,
+            locale: $locale,
+            entities: $entities,
         );
     }
 
@@ -84,15 +83,15 @@ class NormalizedCommandValidatorTest extends TestCase
     public function test_validator_uses_intent_registry_not_hardcoded_list(): void
     {
         // Build an isolated registry with only one intent.
-        $miniRegistry = new IntentRegistry();
+        $miniRegistry = new IntentRegistry;
         $miniRegistry->register(new IntentDefinition(
-            intent:        'my_custom_intent',
-            label:         'Custom',
-            module:        'tasks',
-            operation:     'create',
-            requirements:  [],
+            intent: 'my_custom_intent',
+            label: 'Custom',
+            module: 'tasks',
+            operation: 'create',
+            requirements: [],
             executorClass: CreateTaskActionExecutor::class,
-            confidence:    0.9,
+            confidence: 0.9,
         ));
 
         $validator = new NormalizedCommandValidator($miniRegistry);
@@ -159,7 +158,7 @@ class NormalizedCommandValidatorTest extends TestCase
     public function test_entity_with_valid_string_value_passes(): void
     {
         $result = $this->validator->validate($this->command(
-            intent:   'schedule_meeting',
+            intent: 'schedule_meeting',
             entities: ['lead_query' => 'Rossini', 'date' => '2026-05-11', 'time' => '09:00'],
         ));
 
@@ -174,7 +173,7 @@ class NormalizedCommandValidatorTest extends TestCase
         // may omit all of them. Missing fields are proposal-level concerns, not
         // structural validation concerns.
         $result = $this->validator->validate($this->command(
-            intent:   'schedule_meeting',
+            intent: 'schedule_meeting',
             entities: [],
         ));
 
@@ -185,7 +184,7 @@ class NormalizedCommandValidatorTest extends TestCase
     {
         // assign_lead requires lead and assignee — both absent is structurally valid.
         $result = $this->validator->validate($this->command(
-            intent:   'assign_lead',
+            intent: 'assign_lead',
             entities: [],
         ));
 
@@ -198,7 +197,7 @@ class NormalizedCommandValidatorTest extends TestCase
     {
         // 'date' and 'time' are requirement keys for schedule_meeting.
         $result = $this->validator->validate($this->command(
-            intent:   'schedule_meeting',
+            intent: 'schedule_meeting',
             entities: ['date' => '2026-05-11', 'time' => '09:00'],
         ));
 
@@ -209,7 +208,7 @@ class NormalizedCommandValidatorTest extends TestCase
     {
         // 'lead_query' is the entityType of the lead requirement — the pre-resolution transit key.
         $result = $this->validator->validate($this->command(
-            intent:   'schedule_meeting',
+            intent: 'schedule_meeting',
             entities: ['lead_query' => 'Rossini'],
         ));
 
@@ -220,7 +219,7 @@ class NormalizedCommandValidatorTest extends TestCase
     {
         // 'invoice_id' is not declared in any schedule_meeting requirement.
         $result = $this->validator->validate($this->command(
-            intent:   'schedule_meeting',
+            intent: 'schedule_meeting',
             entities: ['invoice_id' => 'INV-999'],
         ));
 
@@ -235,7 +234,7 @@ class NormalizedCommandValidatorTest extends TestCase
         // create_task which uses 'due_at' as its canonical date key. These keys are
         // permitted via the UNIVERSAL_PARSER_KEYS transitional allowlist.
         $result = $this->validator->validate($this->command(
-            intent:   'create_task',
+            intent: 'create_task',
             entities: ['lead_query' => 'Rossini', 'date' => '2026-05-11', 'time' => '09:00'],
         ));
 
@@ -246,7 +245,7 @@ class NormalizedCommandValidatorTest extends TestCase
     {
         // 'unknown' has no definition — entity compatibility cannot be checked.
         $result = $this->validator->validate($this->command(
-            intent:   'unknown',
+            intent: 'unknown',
             entities: ['anything' => 'goes'],
             confidence: 0.3,
         ));
@@ -254,15 +253,74 @@ class NormalizedCommandValidatorTest extends TestCase
         $this->assertTrue($result->valid);
     }
 
+    // ── value-shape validation (Phase 9E.4) ──────────────────────────────────
+
+    /**
+     * @return iterable<string, array{array<string,mixed>, bool}>
+     */
+    public static function valueShapeProvider(): iterable
+    {
+        // [entities, expectedValid]
+        yield 'valid iso date + hh:mm time' => [['date' => '2026-06-02', 'time' => '10:00'], true];
+        yield 'time lower bound 00:00' => [['time' => '00:00'], true];
+        yield 'time upper bound 23:59' => [['time' => '23:59'], true];
+
+        yield 'date expression word' => [['date' => 'tomorrow'], false];
+        yield 'date impossible calendar day' => [['date' => '2026-02-30'], false];
+        yield 'date wrong separator format' => [['date' => '06/02/2026'], false];
+        yield 'date not zero padded' => [['date' => '2026-6-2'], false];
+
+        yield 'time hour only' => [['time' => '10'], false];
+        yield 'time 24 oclock' => [['time' => '24:00'], false];
+        yield 'time am pm' => [['time' => '9am'], false];
+        yield 'time fuzzy phrase' => [['time' => 'morning-ish'], false];
+        yield 'time with seconds' => [['time' => '10:00:00'], false];
+    }
+
+    /**
+     * @param  array<string, mixed>  $entities
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('valueShapeProvider')]
+    public function test_normalized_date_time_value_shapes(array $entities, bool $expectedValid): void
+    {
+        // schedule_meeting allows both the canonical date/time keys and the raw
+        // date_expression/time_expression keys.
+        $result = $this->validator->validate($this->command('schedule_meeting', 0.7, $entities));
+
+        $this->assertSame($expectedValid, $result->valid, implode('; ', $result->errors));
+    }
+
+    public function test_raw_expression_keys_are_not_shape_validated(): void
+    {
+        // date_expression / time_expression are interpretation-side raw expressions —
+        // allowed for schedule_meeting and intentionally NOT shape-constrained.
+        $result = $this->validator->validate($this->command('schedule_meeting', 0.7, [
+            'date_expression' => 'tomorrow',
+            'time_expression' => 'morning-ish',
+        ]));
+
+        $this->assertTrue($result->valid, implode('; ', $result->errors));
+    }
+
+    public function test_malformed_time_error_message_is_explicit(): void
+    {
+        $result = $this->validator->validate($this->command('schedule_meeting', 0.7, ['time' => 'morning-ish']));
+
+        $this->assertFalse($result->valid);
+        $this->assertStringContainsString('time', $result->errors[0]);
+        $this->assertStringContainsString('morning-ish', $result->errors[0]);
+        $this->assertStringContainsString('HH:MM', $result->errors[0]);
+    }
+
     // ── multiple errors ───────────────────────────────────────────────────────
 
     public function test_multiple_validation_errors_are_collected(): void
     {
         $result = $this->validator->validate(new NormalizedCommand(
-            intent:     '',
+            intent: '',
             confidence: 2.0,
             sourceText: 'test',
-            locale:     'en',
+            locale: 'en',
         ));
 
         $this->assertFalse($result->valid);

@@ -35,6 +35,7 @@ class NormalizedCommandValidationIntegrationTest extends TestCase
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user);
+
         return $user;
     }
 
@@ -42,44 +43,44 @@ class NormalizedCommandValidationIntegrationTest extends TestCase
 
     public function test_deterministic_provider_output_passes_validation_for_schedule_meeting(): void
     {
-        $provider  = $this->app->make(DeterministicInterpretationProvider::class);
+        $provider = $this->app->make(DeterministicInterpretationProvider::class);
         $validator = $this->app->make(NormalizedCommandValidator::class);
 
-        $command = $provider->interpret('Schedule a meeting with Rossini tomorrow at 4pm', new InterpretationContext());
-        $result  = $validator->validate($command);
+        $command = $provider->interpret('Schedule a meeting with Rossini tomorrow at 4pm', new InterpretationContext);
+        $result = $validator->validate($command);
 
         $this->assertTrue($result->valid, implode('; ', $result->errors));
     }
 
     public function test_deterministic_provider_output_passes_validation_for_rossi_ambiguous(): void
     {
-        $provider  = $this->app->make(DeterministicInterpretationProvider::class);
+        $provider = $this->app->make(DeterministicInterpretationProvider::class);
         $validator = $this->app->make(NormalizedCommandValidator::class);
 
-        $command = $provider->interpret('Schedule a meeting with Rossi tomorrow morning', new InterpretationContext());
-        $result  = $validator->validate($command);
+        $command = $provider->interpret('Schedule a meeting with Rossi tomorrow morning', new InterpretationContext);
+        $result = $validator->validate($command);
 
         $this->assertTrue($result->valid, implode('; ', $result->errors));
     }
 
     public function test_deterministic_provider_output_passes_validation_for_create_task(): void
     {
-        $provider  = $this->app->make(DeterministicInterpretationProvider::class);
+        $provider = $this->app->make(DeterministicInterpretationProvider::class);
         $validator = $this->app->make(NormalizedCommandValidator::class);
 
-        $command = $provider->interpret('Create a task for Rossini tomorrow at 10am', new InterpretationContext());
-        $result  = $validator->validate($command);
+        $command = $provider->interpret('Create a task for Rossini tomorrow at 10am', new InterpretationContext);
+        $result = $validator->validate($command);
 
         $this->assertTrue($result->valid, implode('; ', $result->errors));
     }
 
     public function test_deterministic_provider_output_passes_for_unknown_intent(): void
     {
-        $provider  = $this->app->make(DeterministicInterpretationProvider::class);
+        $provider = $this->app->make(DeterministicInterpretationProvider::class);
         $validator = $this->app->make(NormalizedCommandValidator::class);
 
-        $command = $provider->interpret('Show me the dashboard', new InterpretationContext());
-        $result  = $validator->validate($command);
+        $command = $provider->interpret('Show me the dashboard', new InterpretationContext);
+        $result = $validator->validate($command);
 
         $this->assertTrue($result->valid, implode('; ', $result->errors));
     }
@@ -89,12 +90,12 @@ class NormalizedCommandValidationIntegrationTest extends TestCase
     public function test_fake_provider_valid_output_passes_validation(): void
     {
         $validator = $this->app->make(NormalizedCommandValidator::class);
-        $command   = new NormalizedCommand(
-            intent:     'schedule_meeting',
+        $command = new NormalizedCommand(
+            intent: 'schedule_meeting',
             confidence: 0.95,
             sourceText: 'Book me a meeting',
-            locale:     'en',
-            entities:   ['lead_query' => 'Rossini'],
+            locale: 'en',
+            entities: ['lead_query' => 'Rossini'],
         );
 
         $result = $validator->validate($command);
@@ -106,12 +107,12 @@ class NormalizedCommandValidationIntegrationTest extends TestCase
 
     public function test_fake_provider_invalid_intent_is_rejected_by_adapter(): void
     {
-        $fake = new FakeLlmInterpretationProvider();
+        $fake = new FakeLlmInterpretationProvider;
         $fake->addResponse('do something', new NormalizedCommand(
-            intent:     'hallucinated_action',
+            intent: 'hallucinated_action',
             confidence: 0.9,
             sourceText: 'do something',
-            locale:     'en',
+            locale: 'en',
         ));
 
         $this->app->bind(InterpretationProviderInterface::class, fn () => $fake);
@@ -124,12 +125,12 @@ class NormalizedCommandValidationIntegrationTest extends TestCase
 
     public function test_fake_provider_invalid_confidence_is_rejected_by_adapter(): void
     {
-        $fake = new FakeLlmInterpretationProvider();
+        $fake = new FakeLlmInterpretationProvider;
         $fake->addResponse('book a meeting', new NormalizedCommand(
-            intent:     'schedule_meeting',
+            intent: 'schedule_meeting',
             confidence: 1.5,
             sourceText: 'book a meeting',
-            locale:     'en',
+            locale: 'en',
         ));
 
         $this->app->bind(InterpretationProviderInterface::class, fn () => $fake);
@@ -142,13 +143,13 @@ class NormalizedCommandValidationIntegrationTest extends TestCase
 
     public function test_fake_provider_entity_null_value_is_rejected_by_adapter(): void
     {
-        $fake = new FakeLlmInterpretationProvider();
+        $fake = new FakeLlmInterpretationProvider;
         $fake->addResponse('create a task', new NormalizedCommand(
-            intent:     'create_task',
+            intent: 'create_task',
             confidence: 0.9,
             sourceText: 'create a task',
-            locale:     'en',
-            entities:   ['lead' => null],
+            locale: 'en',
+            entities: ['lead' => null],
         ));
 
         $this->app->bind(InterpretationProviderInterface::class, fn () => $fake);
@@ -157,6 +158,89 @@ class NormalizedCommandValidationIntegrationTest extends TestCase
 
         $adapter = $this->app->make(\Fluxio\Actions\Contracts\CommandInterpreterInterface::class);
         $adapter->interpret('create a task');
+    }
+
+    // ── Value-shape validation: malformed date/time fails before proposal building ──
+
+    public function test_fake_provider_malformed_date_is_rejected_by_adapter(): void
+    {
+        $fake = new FakeLlmInterpretationProvider;
+        $fake->addResponse('schedule a meeting', new NormalizedCommand(
+            intent: 'schedule_meeting',
+            confidence: 0.9,
+            sourceText: 'schedule a meeting',
+            locale: 'en',
+            entities: ['lead_query' => 'Rossini', 'date' => 'next week', 'time' => '10:00'],
+        ));
+
+        $this->app->bind(InterpretationProviderInterface::class, fn () => $fake);
+
+        $this->expectException(InvalidNormalizedCommandException::class);
+
+        $adapter = $this->app->make(\Fluxio\Actions\Contracts\CommandInterpreterInterface::class);
+        $adapter->interpret('schedule a meeting');
+    }
+
+    public function test_fake_provider_malformed_time_is_rejected_by_adapter(): void
+    {
+        $fake = new FakeLlmInterpretationProvider;
+        $fake->addResponse('schedule a meeting', new NormalizedCommand(
+            intent: 'schedule_meeting',
+            confidence: 0.9,
+            sourceText: 'schedule a meeting',
+            locale: 'en',
+            entities: ['date' => '2026-06-02', 'time' => 'morning-ish'],
+        ));
+
+        $this->app->bind(InterpretationProviderInterface::class, fn () => $fake);
+
+        $this->expectException(InvalidNormalizedCommandException::class);
+
+        $adapter = $this->app->make(\Fluxio\Actions\Contracts\CommandInterpreterInterface::class);
+        $adapter->interpret('schedule a meeting');
+    }
+
+    public function test_fake_provider_raw_date_expression_is_accepted_by_adapter(): void
+    {
+        // date_expression is an interpretation-side raw expression — allowed, unconstrained.
+        $fake = new FakeLlmInterpretationProvider;
+        $fake->addResponse('schedule a meeting', new NormalizedCommand(
+            intent: 'schedule_meeting',
+            confidence: 0.9,
+            sourceText: 'schedule a meeting',
+            locale: 'en',
+            entities: ['date_expression' => 'tomorrow', 'time_expression' => 'morning-ish'],
+        ));
+
+        $this->app->bind(InterpretationProviderInterface::class, fn () => $fake);
+
+        $adapter = $this->app->make(\Fluxio\Actions\Contracts\CommandInterpreterInterface::class);
+        $command = $adapter->interpret('schedule a meeting');
+
+        $this->assertSame('tomorrow', $command->entities['date_expression']);
+        $this->assertSame('morning-ish', $command->entities['time_expression']);
+    }
+
+    public function test_malformed_date_provider_output_returns_422_and_builds_no_proposal(): void
+    {
+        $this->actingAsUser();
+
+        $fake = new FakeLlmInterpretationProvider;
+        $fake->addResponse('book it', new NormalizedCommand(
+            intent: 'schedule_meeting',
+            confidence: 0.9,
+            sourceText: 'book it',
+            locale: 'en',
+            entities: ['date' => 'next week'],
+        ));
+
+        $this->app->bind(InterpretationProviderInterface::class, fn () => $fake);
+
+        $this->postJson('/api/actions/interpret', ['text' => 'book it'])
+            ->assertStatus(422);
+
+        // Malformed value was rejected at the interpretation boundary — nothing built.
+        $this->assertDatabaseCount('action_proposals', 0);
     }
 
     // ── Feature regression tests: endpoint behavior unchanged ─────────────────
@@ -211,7 +295,7 @@ class NormalizedCommandValidationIntegrationTest extends TestCase
     {
         $this->actingAsUser();
 
-        $r1         = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
+        $r1 = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
         $proposalId = $r1->json('data.id');
 
         $r2 = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The second one']);
@@ -224,7 +308,7 @@ class NormalizedCommandValidationIntegrationTest extends TestCase
     {
         $this->actingAsUser();
 
-        $r1         = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossini tomorrow at 4pm']);
+        $r1 = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossini tomorrow at 4pm']);
         $proposalId = $r1->json('data.id');
         $this->assertEquals('ready', $r1->json('data.status'));
 
@@ -234,12 +318,12 @@ class NormalizedCommandValidationIntegrationTest extends TestCase
 
     public function test_invalid_provider_output_returns_422_not_500(): void
     {
-        $fake = new FakeLlmInterpretationProvider();
+        $fake = new FakeLlmInterpretationProvider;
         $fake->addResponse('do something bad', new NormalizedCommand(
-            intent:     'hallucinated_action',
+            intent: 'hallucinated_action',
             confidence: 0.9,
             sourceText: 'do something bad',
-            locale:     'en',
+            locale: 'en',
         ));
 
         $this->app->bind(InterpretationProviderInterface::class, fn () => $fake);
