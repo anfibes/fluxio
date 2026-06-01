@@ -3,6 +3,7 @@
 namespace Fluxio\Actions\Resolvers;
 
 use Fluxio\Actions\Contracts\IntentResolverInterface;
+use Fluxio\Actions\DTO\EntityReference;
 use Fluxio\Actions\DTO\ParsedIntent;
 use Fluxio\Actions\Support\DateTimeExpressionParser;
 use Fluxio\Actions\Support\LeadReferenceExtractor;
@@ -27,7 +28,11 @@ class RuleBasedIntentResolver implements IntentResolverInterface
             default => 'unknown',
         };
 
+        // Parsed scalar VALUES go into the entities map; entity reference SPANS are
+        // produced as typed EntityReference objects and folded back into the map by
+        // ParsedIntent::fromParts (Phase 9E.3). The wire shape is unchanged.
         $entities = [];
+        $references = [];
 
         // Preserve the user-facing lead reference SPAN (e.g. "Mario Rossi", "Rossi
         // SRL"), not a reduced token. The interpreter only extracts what the user
@@ -38,10 +43,12 @@ class RuleBasedIntentResolver implements IntentResolverInterface
         // extraction is owned by LeadReferenceExtractor (Phase 9E.1).
         $leadQuery = $this->leadReferenceExtractor->extract($text, $intent);
         if ($leadQuery !== null) {
-            $entities['lead_query'] = $leadQuery;
+            $references[] = new EntityReference('lead_query', $leadQuery);
         }
 
-        // Assignee extraction: "Assign Rossini to Marco" → assignee = Marco
+        // Assignee extraction: "Assign Rossini to Marco" → assignee = Marco.
+        // This is a parsed value (no resolver registered for user_query today), not a
+        // reference span, so it stays a plain entities entry.
         if ($intent === 'assign_lead') {
             if ((bool) preg_match('/\bto\s+([A-Z][a-z]+)\b/', $text, $m)) {
                 $entities['assignee'] = $m[1];
@@ -89,6 +96,11 @@ class RuleBasedIntentResolver implements IntentResolverInterface
             }
         }
 
-        return new ParsedIntent($intent, $entities, $warnings);
+        return ParsedIntent::fromParts(
+            intent: $intent,
+            entities: $entities,
+            warnings: $warnings,
+            entityReferences: $references,
+        );
     }
 }
