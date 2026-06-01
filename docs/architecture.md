@@ -275,6 +275,14 @@ Current separation of concerns:
 - entity resolution
 - proposal building
 
+The extraction/resolution boundary is explicit: command interpretation preserves the
+full user-facing entity reference span (it emits `lead_query`, e.g. the whole
+"Mario Rossi"), and it never normalizes that reference down to a token. Matching,
+scoring, ambiguity generation, auto-resolution, and candidate identity belong to the
+resolver — the interpreter never emits a `lead_id` / `selected_candidate_id`. A richer
+span lets the resolver exact-match where a reduced one would have produced a spurious
+ambiguity; a genuinely short reference still resolves to a blocking ambiguity.
+
 Planned additional resolvers:
 - UserResolver
 - ProductResolver
