@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import type { ActionProposalRefinement, ActionProposalRefinementChange } from '~/types/actions'
+import type {
+  ActionProposalRefinement,
+  ActionProposalRefinementChange,
+  RefinementAmbiguityOutcome,
+} from '~/types/actions'
 
 const props = defineProps<{ refinement: ActionProposalRefinement }>()
 
@@ -99,6 +103,31 @@ const decoratedChanges = computed(() =>
     badge: semanticBadge(change),
   })),
 )
+
+// ── Ambiguity outcome facet (backend Phase 8E.1) ────────────────────────────
+// Rendered distinctly from field changes and keyed off `kind` only — never by
+// parsing the summary/warning prose. Null/absent when no clarification was driven.
+const ambiguityOutcome = computed<RefinementAmbiguityOutcome | null>(
+  () => props.refinement.ambiguity_outcome ?? null,
+)
+
+function formatAmbiguityOutcome(outcome: RefinementAmbiguityOutcome): string {
+  const label = outcome.label ?? outcome.ambiguity_key ?? 'Ambiguity'
+  switch (outcome.kind) {
+    case 'narrowed':
+      return outcome.from_count != null && outcome.to_count != null
+        ? `Ambiguity narrowed: ${label} candidates ${outcome.from_count} → ${outcome.to_count}`
+        : `Ambiguity narrowed: ${label}`
+    case 'resolved':
+      return `Ambiguity resolved: ${label}`
+    case 'unresolved':
+      return 'Ambiguity unresolved'
+    case 'inapplicable':
+      return 'Clarification could not be applied'
+    default:
+      return 'Ambiguity updated'
+  }
+}
 </script>
 
 <template>
@@ -109,6 +138,15 @@ const decoratedChanges = computed(() =>
     <div class="flex flex-col gap-2 px-3.5 py-3">
       <p class="text-xs italic leading-relaxed text-text-muted">"{{ displayText }}"</p>
       <p class="text-xs text-muted">{{ refinement.summary }}</p>
+      <div
+        v-if="ambiguityOutcome"
+        class="flex items-center gap-1.5 text-xs"
+      >
+        <span
+          class="rounded bg-surface px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted"
+        >Ambiguity</span>
+        <span class="font-medium text-text-muted">{{ formatAmbiguityOutcome(ambiguityOutcome) }}</span>
+      </div>
       <ul v-if="decoratedChanges.length" class="flex flex-col gap-1 pt-0.5">
         <li
           v-for="(item, index) in decoratedChanges"

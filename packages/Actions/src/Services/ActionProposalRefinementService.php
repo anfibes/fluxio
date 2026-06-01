@@ -9,6 +9,7 @@ use Fluxio\Actions\DTO\Ambiguity\SemanticAmbiguityClarification;
 use Fluxio\Actions\DTO\EditableFieldExplanation;
 use Fluxio\Actions\DTO\NormalizedMutation;
 use Fluxio\Actions\DTO\ProposalRuntimeContext;
+use Fluxio\Actions\DTO\RefinementAmbiguityOutcome;
 use Fluxio\Actions\DTO\SemanticOperation;
 use Fluxio\Actions\DTO\SemanticRefinementMutation;
 use Fluxio\Actions\Enums\SemanticMutationType;
@@ -72,13 +73,10 @@ class ActionProposalRefinementService
         }
 
         // If ALL mutations were rejected and there is nothing else to process, bail early.
+        // No ambiguity clarification is driven on this path (the interpreter emits either
+        // field mutations or a clarification, never both), so ambiguity_outcome is null.
         if (! empty($rejectedMutations) && empty($fieldMutations)) {
-            $proposal->last_refinement = [
-                'text' => $text,
-                'effective_text' => $effectiveText,
-                'summary' => 'No changes applied.',
-                'changes' => [],
-            ];
+            $proposal->last_refinement = $this->buildLastRefinement($text, $effectiveText, 'No changes applied.', []);
             $proposal->save();
 
             return $proposal;
@@ -103,7 +101,13 @@ class ActionProposalRefinementService
         // unresolved blocking ambiguity and delegates matching/narrowing/selection
         // to the deterministic AmbiguityResolver. The service no longer matches
         // candidates, parses ordinals, or classifies company/person itself.
+        // Phase 8E.1: the ambiguity-state authority's outcome, projected as an inert
+        // reporting facet of last_refinement. It is derived from the resolver's
+        // ResolutionOutcome (and orchestration state), written for the response only,
+        // and never read back by the runtime. The authoritative candidate state stays
+        // in $proposal->ambiguities.
         $ambiguityResolution = null;
+        $ambiguityOutcome = null;
         if ($this->hasUnresolvedBlockingAmbiguity($context)) {
             if ($this->intentSupportsAmbiguityResolution($proposal->intent)) {
                 $targetAmbiguity = null;
@@ -121,6 +125,11 @@ class ActionProposalRefinementService
                             'ambiguity_label' => $targetAmbiguity['label'],
                             'candidate' => $outcome->selectedCandidate,
                         ];
+                        // Inert report only: the resolution is applied in applyAll().
+                        $ambiguityOutcome = RefinementAmbiguityOutcome::resolved(
+                            $targetAmbiguity['key'],
+                            $targetAmbiguity['label'],
+                        );
                     }
                 }
 
@@ -131,6 +140,7 @@ class ActionProposalRefinementService
                     // remaining candidates. Otherwise the generic "be more specific"
                     // warning is used. (Phase 7C.3 behaviour, now resolver-driven.)
                     if ($outcome !== null && $outcome->isNarrowed()) {
+                        $fromCount = count($targetAmbiguity['candidates'] ?? []);
                         $proposal->ambiguities = $this->applyNarrowedCandidates(
                             $proposal->ambiguities ?? [],
                             $targetAmbiguity['key'],
@@ -140,20 +150,41 @@ class ActionProposalRefinementService
                             $clarification->selector instanceof AttributeSelector ? $clarification->selector->value : '',
                             $outcome->narrowedCandidates,
                         );
+                        // Inert report: counts only, never the narrowed candidate array
+                        // (authoritative set is proposal->ambiguities).
+                        $ambiguityOutcome = RefinementAmbiguityOutcome::narrowed(
+                            $targetAmbiguity['key'],
+                            $targetAmbiguity['label'],
+                            $fromCount,
+                            count($outcome->narrowedCandidates),
+                        );
+                        $summary = 'Ambiguity narrowed.';
                     } else {
                         $warning = __('actions::actions.ambiguity_still_unresolved');
+                        $summary = 'No changes applied.';
+                        // A selector that matched zero / was out of range is a
+                        // resolver-level unresolved outcome. (A turn that extracted no
+                        // selector drove nothing — $outcome is null — and is left as a
+                        // null facet, not reported as a resolver outcome.)
+                        if ($outcome !== null && $outcome->isUnresolved()) {
+                            $ambiguityOutcome = RefinementAmbiguityOutcome::unresolved(
+                                $targetAmbiguity['key'],
+                                $targetAmbiguity['label'],
+                            );
+                        }
                     }
 
                     $proposal->warnings = $this->addWarning(
                         $proposal->warnings ?? [],
                         $warning,
                     );
-                    $proposal->last_refinement = [
-                        'text' => $text,
-                        'effective_text' => $effectiveText,
-                        'summary' => 'No changes applied.',
-                        'changes' => [],
-                    ];
+                    $proposal->last_refinement = $this->buildLastRefinement(
+                        $text,
+                        $effectiveText,
+                        $summary,
+                        [],
+                        $ambiguityOutcome,
+                    );
                     $proposal->save();
 
                     return $proposal;
@@ -169,6 +200,13 @@ class ActionProposalRefinementService
             }
         }
 
+        // Orchestration-level inapplicable: a clarification was understood, but it was
+        // not driven into a resolver outcome — either no blocking ambiguity existed, or
+        // the intent does not support ambiguity resolution. Reporting only.
+        if ($clarification !== null && $ambiguityOutcome === null && $ambiguityResolution === null) {
+            $ambiguityOutcome = RefinementAmbiguityOutcome::inapplicable();
+        }
+
         // Nothing recognized at all
         if (empty($fieldMutations) && $ambiguityResolution === null) {
             // A contextual mutation that was understood but could not be resolved
@@ -180,18 +218,19 @@ class ActionProposalRefinementService
                     __('actions::actions.refinement_not_recognized'),
                 );
             }
-            $proposal->last_refinement = [
-                'text' => $text,
-                'effective_text' => $effectiveText,
-                'summary' => 'No changes applied.',
-                'changes' => [],
-            ];
+            $proposal->last_refinement = $this->buildLastRefinement(
+                $text,
+                $effectiveText,
+                'No changes applied.',
+                [],
+                $ambiguityOutcome,
+            );
             $proposal->save();
 
             return $proposal;
         }
 
-        return $this->applyAll($proposal, $fieldMutations, $ambiguityResolution, $text, $effectiveText);
+        return $this->applyAll($proposal, $fieldMutations, $ambiguityResolution, $ambiguityOutcome, $text, $effectiveText);
     }
 
     // ── Capability validation ────────────────────────────────────────────────
@@ -523,6 +562,7 @@ class ActionProposalRefinementService
         ActionProposal $proposal,
         array $fieldMutations,
         ?array $ambiguityResolution,
+        ?RefinementAmbiguityOutcome $ambiguityOutcome,
         string $text,
         string $effectiveText,
     ): ActionProposal {
@@ -773,15 +813,42 @@ class ActionProposalRefinementService
         $proposal->changes = $proposedChanges;
         $proposal->status = $status;
         $proposal->confidence = $confidence;
-        $proposal->last_refinement = [
-            'text' => $text,
-            'effective_text' => $effectiveText,
-            'summary' => $this->buildSummary($changes),
-            'changes' => $changes,
-        ];
+        $proposal->last_refinement = $this->buildLastRefinement(
+            $text,
+            $effectiveText,
+            $this->buildSummary($changes),
+            $changes,
+            $ambiguityOutcome,
+        );
         $proposal->save();
 
         return $proposal;
+    }
+
+    /**
+     * Build the last_refinement report: the union projection of the two refinement
+     * authorities. `changes[]` is the field-state authority facet; `ambiguity_outcome`
+     * is the ambiguity-state authority facet (Phase 8E.1), null when no ambiguity
+     * clarification was driven this turn. Both facets are inert reporting metadata —
+     * never read back by the runtime.
+     *
+     * @param  array<int, array<string, mixed>>  $changes
+     * @return array<string, mixed>
+     */
+    private function buildLastRefinement(
+        string $text,
+        string $effectiveText,
+        string $summary,
+        array $changes,
+        ?RefinementAmbiguityOutcome $ambiguityOutcome = null,
+    ): array {
+        return [
+            'text' => $text,
+            'effective_text' => $effectiveText,
+            'summary' => $summary,
+            'changes' => $changes,
+            'ambiguity_outcome' => $ambiguityOutcome?->toArray(),
+        ];
     }
 
     /**

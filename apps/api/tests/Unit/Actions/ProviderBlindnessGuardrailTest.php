@@ -4,6 +4,7 @@ namespace Tests\Unit\Actions;
 
 use Fluxio\Actions\DTO\Ambiguity\AmbiguityDirective;
 use Fluxio\Actions\DTO\NormalizedMutation;
+use Fluxio\Actions\DTO\RefinementAmbiguityOutcome;
 use Fluxio\Actions\DTO\SemanticRefinementMutation;
 use Fluxio\Actions\Enums\SemanticMutationType;
 use Fluxio\Actions\Support\SemanticRefinementLowerer;
@@ -73,6 +74,27 @@ class ProviderBlindnessGuardrailTest extends TestCase
     public function test_ambiguity_directive_has_no_provider_surface(): void
     {
         $this->assertNoSurfaceMatching(AmbiguityDirective::class, self::FORBIDDEN_SURFACE);
+    }
+
+    public function test_refinement_ambiguity_outcome_has_no_provider_surface(): void
+    {
+        // Phase 8E.1: the ambiguity outcome facet is response-bound reporting metadata;
+        // it names a deterministic state transition, never who produced it.
+        $this->assertNoSurfaceMatching(RefinementAmbiguityOutcome::class, self::FORBIDDEN_SURFACE);
+    }
+
+    public function test_refinement_ambiguity_outcome_payload_carries_no_candidate_identity(): void
+    {
+        // The narrowed facet reports counts only — never the candidate array nor any
+        // selected candidate id (identity stays authoritative under proposal->ambiguities).
+        $payload = RefinementAmbiguityOutcome::narrowed('lead', 'Lead', 3, 2)->toArray();
+
+        $this->assertSame(
+            ['kind', 'ambiguity_key', 'label', 'from_count', 'to_count'],
+            array_keys($payload),
+        );
+        $this->assertArrayNotHasKey('candidates', $payload);
+        $this->assertArrayNotHasKey('selected_candidate_id', $payload);
     }
 
     public function test_ambiguity_directive_surface_is_only_key_and_selector(): void

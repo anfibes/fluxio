@@ -110,11 +110,37 @@ export interface ActionProposalRefinementChange {
   target?: unknown
 }
 
+/**
+ * Closed, provider-blind vocabulary for how a refinement turn touched the
+ * ambiguity-state authority (backend Phase 8E.1). Rendering keys off `kind`,
+ * never off parsed warning/summary prose.
+ */
+export type RefinementAmbiguityOutcomeKind = 'resolved' | 'narrowed' | 'unresolved' | 'inapplicable'
+
+/**
+ * Inert reporting facet describing the ambiguity-state authority's outcome for a
+ * refinement turn. The authoritative candidate list stays in `ProposalAmbiguity.candidates`;
+ * this carries counts only and never duplicates candidates or selected ids.
+ */
+export interface RefinementAmbiguityOutcome {
+  kind: RefinementAmbiguityOutcomeKind
+  ambiguity_key?: string
+  label?: string
+  from_count?: number
+  to_count?: number
+}
+
 export interface ActionProposalRefinement {
   text: string
   effective_text?: string
   summary: string
   changes: ActionProposalRefinementChange[]
+  /**
+   * Ambiguity-state authority facet (Phase 8E.1). `last_refinement` is the union
+   * projection of both refinement authorities: `changes[]` is field-state only,
+   * this is ambiguity-state. Null/absent when no ambiguity clarification was driven.
+   */
+  ambiguity_outcome?: RefinementAmbiguityOutcome | null
 }
 
 export interface ActionProposal {

@@ -521,4 +521,133 @@ class AmbiguousProposalTest extends TestCase
         $this->assertEquals(now()->addDay()->toDateString(), $fields['date']['value']);
         $this->assertEquals('09:00', $fields['time']['value']);
     }
+
+    // --- Phase 8E.1: ambiguity outcome feedback (inert reporting facet) ---
+
+    public function test_narrowing_reports_narrowed_ambiguity_outcome(): void
+    {
+        $this->actingAsUser();
+
+        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossi tomorrow']);
+        $proposalId = $interpret->json('data.id');
+
+        $response = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The company'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.status', 'draft')
+            ->assertJsonPath('data.ambiguities.0.selected_candidate_id', null);
+
+        // The ambiguity facet reports the narrowing; changes[] stays field-state only.
+        $response->assertJsonPath('data.last_refinement.ambiguity_outcome.kind', 'narrowed')
+            ->assertJsonPath('data.last_refinement.ambiguity_outcome.ambiguity_key', 'lead')
+            ->assertJsonPath('data.last_refinement.ambiguity_outcome.from_count', 3)
+            ->assertJsonPath('data.last_refinement.ambiguity_outcome.to_count', 2)
+            ->assertJsonPath('data.last_refinement.changes', []);
+
+        // Summary no longer lies about an unchanged proposal.
+        $this->assertNotSame('No changes applied.', $response->json('data.last_refinement.summary'));
+
+        // The candidate set is authoritatively narrowed under proposal.ambiguities.
+        $this->assertCount(2, $response->json('data.ambiguities.0.candidates'));
+
+        // No candidate array / selected id leaks into the inert facet.
+        $outcome = $response->json('data.last_refinement.ambiguity_outcome');
+        $this->assertArrayNotHasKey('candidates', $outcome);
+        $this->assertArrayNotHasKey('selected_candidate_id', $outcome);
+    }
+
+    public function test_resolution_reports_resolved_ambiguity_outcome(): void
+    {
+        $this->actingAsUser();
+
+        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossi tomorrow']);
+        $proposalId = $interpret->json('data.id');
+
+        $response = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The person'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.ambiguities.0.selected_candidate_id', 1);
+
+        $response->assertJsonPath('data.last_refinement.ambiguity_outcome.kind', 'resolved')
+            ->assertJsonPath('data.last_refinement.ambiguity_outcome.ambiguity_key', 'lead');
+
+        // Field-state authority still reports the resolved lead in changes[].
+        $changes = collect($response->json('data.last_refinement.changes'))->keyBy('field');
+        $this->assertArrayHasKey('lead', $changes->all());
+        $this->assertEquals('Mario Rossi', $changes['lead']['to']);
+    }
+
+    public function test_ordinal_after_narrowing_reports_resolved_outcome(): void
+    {
+        $this->actingAsUser();
+
+        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossi tomorrow']);
+        $proposalId = $interpret->json('data.id');
+
+        // First turn narrows.
+        $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The company'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.last_refinement.ambiguity_outcome.kind', 'narrowed');
+
+        // Second turn resolves against the narrowed set → Rossi SRL (id 7).
+        $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The first one'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.ambiguities.0.selected_candidate_id', 7)
+            ->assertJsonPath('data.last_refinement.ambiguity_outcome.kind', 'resolved');
+    }
+
+    public function test_unresolved_selector_after_narrowing_reports_unresolved_outcome(): void
+    {
+        $this->actingAsUser();
+
+        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossi tomorrow']);
+        $proposalId = $interpret->json('data.id');
+
+        // Narrow to the two companies.
+        $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The company'])
+            ->assertStatus(200);
+
+        // "Mario Rossi" no longer matches the narrowed company set → unresolved, no re-expansion.
+        $response = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'Mario Rossi'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.status', 'draft')
+            ->assertJsonPath('data.ambiguities.0.selected_candidate_id', null)
+            ->assertJsonPath('data.last_refinement.ambiguity_outcome.kind', 'unresolved')
+            ->assertJsonPath('data.last_refinement.changes', []);
+
+        // Candidate set remains narrowed (2), not re-expanded to 3.
+        $this->assertCount(2, $response->json('data.ambiguities.0.candidates'));
+    }
+
+    public function test_clarification_without_blocking_ambiguity_reports_inapplicable(): void
+    {
+        $this->actingAsUser();
+
+        // "Call Rossini" is unambiguous, so there is no blocking ambiguity to clarify.
+        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossini']);
+        $proposalId = $interpret->json('data.id');
+        $interpret->assertJsonPath('data.ambiguities', []);
+
+        $before = $interpret->json('data.editable_fields');
+
+        $response = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The first one'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.last_refinement.ambiguity_outcome.kind', 'inapplicable')
+            ->assertJsonPath('data.last_refinement.changes', []);
+
+        // No state mutation: editable_fields unchanged, ambiguities still empty.
+        $this->assertEquals($before, $response->json('data.editable_fields'));
+        $this->assertSame([], $response->json('data.ambiguities'));
+    }
+
+    public function test_field_mutation_turn_has_null_ambiguity_outcome(): void
+    {
+        $this->actingAsUser();
+
+        // Unambiguous proposal; a pure field-mutation refinement drives no ambiguity authority.
+        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossini']);
+        $proposalId = $interpret->json('data.id');
+
+        $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'Tomorrow morning'])
+            ->assertStatus(200)
+            ->assertJsonPath('data.last_refinement.ambiguity_outcome', null);
+    }
 }
