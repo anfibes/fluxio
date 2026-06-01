@@ -13,8 +13,11 @@ const canConfirm = computed(() => isReady.value && !props.loading)
 
 // ── Operational hierarchy helpers ───────────────────────────
 
+// `blocking` is authoritative and self-consistent: a resolved ambiguity is
+// persisted as `blocking: false` by the runtime, so no hidden
+// `selected_candidate_id === null` rule is needed here.
 const blockingAmbiguities = computed(() =>
-  props.proposal?.ambiguities?.filter(a => a.blocking && a.selected_candidate_id === null) ?? [],
+  props.proposal?.ambiguities?.filter(a => a.blocking) ?? [],
 )
 
 const requiredMissingFields = computed(() =>

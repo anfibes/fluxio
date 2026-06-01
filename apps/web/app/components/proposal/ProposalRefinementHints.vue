@@ -26,9 +26,8 @@ const requiredMissingFields = computed(
 )
 
 const hasResolvableBlockingAmbiguity = computed(() => {
-  const blocking = (props.proposal.ambiguities ?? []).some(
-    a => a.blocking && a.selected_candidate_id === null,
-  )
+  // Trust `blocking` directly: the runtime clears it on resolution.
+  const blocking = (props.proposal.ambiguities ?? []).some(a => a.blocking)
   return blocking && props.proposal.capabilities?.supports_ambiguity_resolution === true
 })
 

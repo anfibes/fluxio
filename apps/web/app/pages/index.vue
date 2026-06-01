@@ -44,7 +44,7 @@ const { t } = useI18n()
 const composerPlaceholder = computed<string | undefined>(() => {
   const p = displayProposal.value
   if (!p) return undefined
-  const blockingAmbiguities = p.ambiguities?.filter(a => a.blocking && a.selected_candidate_id === null) ?? []
+  const blockingAmbiguities = p.ambiguities?.filter(a => a.blocking) ?? []
   if (blockingAmbiguities.length) return t('command.placeholder_resolve_ambiguity')
   const requiredMissing = p.missing?.filter(f => f.required) ?? []
   if (requiredMissing.length) return t('command.placeholder_add_missing')

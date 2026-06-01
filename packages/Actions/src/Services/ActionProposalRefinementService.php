@@ -761,6 +761,11 @@ class ActionProposalRefinementService
             $ambiguities = array_map(function (array $a) use ($fieldKey, $candidate): array {
                 if ($a['key'] === $fieldKey && $a['selected_candidate_id'] === null) {
                     $a['selected_candidate_id'] = $candidate['id'];
+                    // Lifecycle coherence: a resolved ambiguity is no longer blocking.
+                    // The authoritative state itself is made self-consistent here
+                    // (blocking === false ⇔ selected_candidate_id !== null) so no
+                    // consumer needs the hidden `blocking && id === null` rule.
+                    $a['blocking'] = false;
                 }
 
                 return $a;
