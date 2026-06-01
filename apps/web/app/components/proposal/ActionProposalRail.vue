@@ -177,11 +177,11 @@ const exampleCommands = [
               :refinement="proposal.last_refinement"
             />
             <div
-              v-if="isFailed && proposal.failure_reason"
+              v-if="isFailed && (proposal.execution_failure || proposal.failure_reason)"
               class="mx-4 mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-xs text-red-400"
             >
               <p class="mb-1 font-semibold">{{ $t('proposal.execution_failed') }}</p>
-              <p class="leading-relaxed opacity-80">{{ proposal.failure_reason }}</p>
+              <p class="leading-relaxed opacity-80">{{ proposal.execution_failure?.message ?? proposal.failure_reason }}</p>
             </div>
             <ProposalExecutionResultPanel
               v-if="isExecuted && proposal.execution_result"

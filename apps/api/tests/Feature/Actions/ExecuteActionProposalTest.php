@@ -3,8 +3,13 @@
 namespace Tests\Feature\Actions;
 
 use App\Models\User;
+use Fluxio\Actions\Contracts\ActionExecutorInterface;
+use Fluxio\Actions\DTO\Execution\ExecutionResult;
+use Fluxio\Actions\Executors\CreateTaskActionExecutor;
+use Fluxio\Actions\Http\Resources\ActionProposalResource;
 use Fluxio\Actions\Models\ActionProposal;
 use Fluxio\Leads\Models\Lead;
+use Fluxio\Tasks\Models\Task;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -140,6 +145,14 @@ class ExecuteActionProposalTest extends TestCase
             'id' => $proposal['id'],
             'status' => 'confirmed',
         ]);
+
+        // Validation is not an execution failure: the proposal stays confirmed and
+        // records no failure state, even though it now flows through the inner
+        // savepoint / outer-lock structure.
+        $refreshed = ActionProposal::find($proposal['id']);
+        $this->assertNull($refreshed->failed_at);
+        $this->assertNull($refreshed->failure_reason);
+        $this->assertNull($refreshed->failure_reason_code);
     }
 
     // --- zero leads ---
@@ -252,6 +265,7 @@ class ExecuteActionProposalTest extends TestCase
 
         // Failure is typed + sanitized: the raw exception message (which names the
         // unsupported intent) never reaches persisted proposal state.
+        $this->assertEquals('unsupported_intent', $refreshed->failure_reason_code);
         $this->assertEquals(
             __('actions::actions.execution_failure.unsupported_intent'),
             $refreshed->failure_reason,
@@ -259,7 +273,137 @@ class ExecuteActionProposalTest extends TestCase
         $this->assertStringNotContainsString('unsupported_intent', $refreshed->failure_reason);
         $this->assertStringNotContainsString('executor', $refreshed->failure_reason);
 
+        // The typed failure surface (Phase 9B) is exposed by the resource — a closed
+        // reason code plus the sanitized message, branchable without parsing prose.
+        $payload = (new ActionProposalResource($refreshed))->resolve();
+        $this->assertSame('unsupported_intent', $payload['execution_failure']['reason']);
+        $this->assertSame($refreshed->failure_reason, $payload['execution_failure']['message']);
+
         $this->assertDatabaseCount('tasks', 0);
+    }
+
+    // --- generic executor throwable ---
+
+    public function test_executor_throwable_marks_proposal_failed_with_execution_failed_reason(): void
+    {
+        $this->actingAsUser();
+
+        // Registered intent, but its executor raises an unexpected error carrying a
+        // raw, sensitive message. The reason must be `execution_failed` and the raw
+        // message must never reach proposal state.
+        $this->app->bind(CreateTaskActionExecutor::class, fn () => new class implements ActionExecutorInterface
+        {
+            public function execute(ActionProposal $proposal): ExecutionResult
+            {
+                throw new \RuntimeException('RAW_SECRET_DB_ERROR at line 42');
+            }
+        });
+
+        $proposal = $this->interpretAndConfirm('Create a task for Rossini');
+
+        $this->postJson("/api/actions/{$proposal['id']}/execute")->assertStatus(500);
+
+        $refreshed = ActionProposal::find($proposal['id']);
+        $this->assertEquals('failed', $refreshed->status);
+        $this->assertNotNull($refreshed->failed_at);
+        $this->assertEquals('execution_failed', $refreshed->failure_reason_code);
+        $this->assertEquals(
+            __('actions::actions.execution_failure.execution_failed'),
+            $refreshed->failure_reason,
+        );
+        $this->assertStringNotContainsString('RAW_SECRET_DB_ERROR', (string) $refreshed->failure_reason);
+
+        $payload = (new ActionProposalResource($refreshed))->resolve();
+        $this->assertSame('execution_failed', $payload['execution_failure']['reason']);
+        $this->assertSame($refreshed->failure_reason, $payload['execution_failure']['message']);
+
+        $this->assertDatabaseCount('tasks', 0);
+    }
+
+    // --- typed failure surface: null when not failed ---
+
+    public function test_execution_failure_surface_is_null_when_not_failed(): void
+    {
+        $this->actingAsUser();
+
+        $proposal = $this->interpretAndConfirm('Create a task for Rossini');
+
+        $response = $this->postJson("/api/actions/{$proposal['id']}/execute");
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.status', 'executed')
+            ->assertJsonPath('data.execution_failure', null);
+
+        $this->assertNull(ActionProposal::find($proposal['id'])->failure_reason_code);
+    }
+
+    // --- atomic failure path: partial side effects roll back, failed persists ---
+
+    public function test_executor_partial_side_effects_roll_back_while_failed_state_persists(): void
+    {
+        $this->actingAsUser();
+
+        // Executor creates a domain row, THEN throws. The created Task must roll back
+        // (inner savepoint) while the proposal commits as `failed` under the same row
+        // lock — so a concurrent execute can never observe `confirmed` after rollback.
+        $this->app->bind(CreateTaskActionExecutor::class, fn () => new class implements ActionExecutorInterface
+        {
+            public function execute(ActionProposal $proposal): ExecutionResult
+            {
+                Task::create([
+                    'title' => 'partial side effect',
+                    'description' => null,
+                    'status' => 'pending',
+                    'priority' => 'normal',
+                    'due_at' => null,
+                    'lead_id' => null,
+                ]);
+
+                throw new \RuntimeException('boom after partial side effect');
+            }
+        });
+
+        $proposal = $this->interpretAndConfirm('Create a task for Rossini');
+
+        $this->postJson("/api/actions/{$proposal['id']}/execute")->assertStatus(500);
+
+        // Partial side effect was rolled back ...
+        $this->assertDatabaseCount('tasks', 0);
+
+        // ... yet the terminal failed state was committed (under the held lock).
+        $refreshed = ActionProposal::find($proposal['id']);
+        $this->assertEquals('failed', $refreshed->status);
+        $this->assertNotNull($refreshed->failed_at);
+        $this->assertEquals('execution_failed', $refreshed->failure_reason_code);
+        $this->assertStringNotContainsString('boom', (string) $refreshed->failure_reason);
+    }
+
+    // --- resource guard: failure surface only when actually failed ---
+
+    public function test_execution_failure_surface_is_null_when_status_not_failed_even_with_code(): void
+    {
+        $user = $this->actingAsUser();
+
+        // Defensive: a stale code on a non-failed proposal must never surface a failure.
+        $proposal = ActionProposal::create([
+            'user_id' => $user->id,
+            'intent' => 'create_task',
+            'status' => 'executed',
+            'confidence' => 0.9,
+            'source_text' => 'Create a task for Rossini',
+            'entities' => [],
+            'missing' => [],
+            'warnings' => [],
+            'editable_fields' => [],
+            'changes' => [],
+            'needs_confirmation' => true,
+            'failure_reason' => 'stale message',
+            'failure_reason_code' => 'execution_failed',
+        ]);
+
+        $payload = (new ActionProposalResource($proposal))->resolve();
+
+        $this->assertNull($payload['execution_failure']);
     }
 
     // --- persistence ---

@@ -20,7 +20,7 @@ class ActionProposalResource extends JsonResource
         $proposal = $this->resource;
 
         /** @var IntentCapabilityRegistry $registry */
-        $registry   = app(IntentCapabilityRegistry::class);
+        $registry = app(IntentCapabilityRegistry::class);
         $capability = $registry->find($proposal->intent);
 
         $capabilities = $capability !== null
@@ -43,10 +43,32 @@ class ActionProposalResource extends JsonResource
             'executed_at' => $proposal->executed_at?->toIso8601String(),
             'failed_at' => $proposal->failed_at?->toIso8601String(),
             'failure_reason' => $proposal->failure_reason,
+            'execution_failure' => $this->executionFailure($proposal),
             'execution_result' => $proposal->execution_result,
             'last_refinement' => $proposal->last_refinement,
             'ambiguities' => $proposal->ambiguities ?? [],
             'capabilities' => $capabilities,
+        ];
+    }
+
+    /**
+     * The typed execution failure surface (Phase 9B): a closed reason code plus the
+     * same sanitized, localized message already in `failure_reason`. Null unless the
+     * proposal carries a persisted failure code, so the frontend branches on a
+     * closed taxonomy instead of parsing prose. Provider-blind: it names a terminal
+     * outcome, never who produced the interpretation.
+     *
+     * @return array{reason: string, message: string}|null
+     */
+    private function executionFailure(ActionProposal $proposal): ?array
+    {
+        if ($proposal->status !== 'failed' || $proposal->failure_reason_code === null) {
+            return null;
+        }
+
+        return [
+            'reason' => $proposal->failure_reason_code,
+            'message' => $proposal->failure_reason ?? '',
         ];
     }
 }

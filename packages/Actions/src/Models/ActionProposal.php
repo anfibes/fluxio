@@ -30,6 +30,7 @@ class ActionProposal extends Model
         'executed_at',
         'failed_at',
         'failure_reason',
+        'failure_reason_code',
         'execution_result',
         'last_refinement',
         'ambiguities',

@@ -31,6 +31,7 @@ export const mockProposalReady: ActionProposal = {
   executed_at: null,
   failed_at: null,
   failure_reason: null,
+  execution_failure: null,
   execution_result: null,
   last_refinement: null,
   ambiguities: [],
@@ -68,6 +69,7 @@ export const mockProposalDraft: ActionProposal = {
   executed_at: null,
   failed_at: null,
   failure_reason: null,
+  execution_failure: null,
   execution_result: null,
   last_refinement: null,
   ambiguities: [],
@@ -104,6 +106,7 @@ export const mockProposalExecuted: ActionProposal = {
   executed_at: '2026-05-03T10:28:05Z',
   failed_at: null,
   failure_reason: null,
+  execution_failure: null,
   execution_result: {
     summary: 'Task created successfully.',
     details: {

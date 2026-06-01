@@ -157,6 +157,23 @@ export interface ExecutionResult {
   details: Record<string, string | number | boolean | null>
 }
 
+/**
+ * Closed execution-failure taxonomy (backend Execution Runtime v1, Phase 9B). The
+ * frontend branches on this code, never on parsed message prose.
+ */
+export type ExecutionFailureReason = 'unsupported_intent' | 'execution_failed'
+
+/**
+ * Typed execution failure surface. `message` is the same sanitized, localized
+ * string as `failure_reason` (kept for compatibility/display); `reason` is the
+ * closed code. Provider-blind: names a terminal outcome, never a producer. There
+ * are no retries and no recovery — a failed proposal stays failed.
+ */
+export interface ExecutionFailure {
+  reason: ExecutionFailureReason
+  message: string
+}
+
 export interface ActionProposal {
   id: string
   intent: string
@@ -173,6 +190,7 @@ export interface ActionProposal {
   executed_at: string | null
   failed_at: string | null
   failure_reason: string | null
+  execution_failure: ExecutionFailure | null
   execution_result: ExecutionResult | null
   last_refinement: ActionProposalRefinement | null
   ambiguities: ProposalAmbiguity[]
