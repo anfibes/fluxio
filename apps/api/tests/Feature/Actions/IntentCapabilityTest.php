@@ -4,8 +4,6 @@ namespace Tests\Feature\Actions;
 
 use App\Models\User;
 use Carbon\Carbon;
-use Fluxio\Actions\DTO\IntentCapability;
-use Fluxio\Actions\DTO\MutationCapability;
 use Fluxio\Actions\DTO\NormalizedMutation;
 use Fluxio\Actions\Enums\RefinementCapabilityType;
 use Fluxio\Actions\Models\ActionProposal;
@@ -81,9 +79,9 @@ class IntentCapabilityTest extends TestCase
         $registry = $this->app->make(IntentCapabilityRegistry::class);
 
         $mutation = new NormalizedMutation(
-            field:     'participants',
-            label:     'Participants',
-            value:     'Mario',
+            field: 'participants',
+            label: 'Participants',
+            value: 'Mario',
             operation: 'append',
         );
 
@@ -96,11 +94,11 @@ class IntentCapabilityTest extends TestCase
         $registry = $this->app->make(IntentCapabilityRegistry::class);
 
         $mutation = new NormalizedMutation(
-            field:     'participants',
-            label:     'Participants',
-            value:     null,
+            field: 'participants',
+            label: 'Participants',
+            value: null,
             operation: 'remove',
-            target:    'Mario',
+            target: 'Mario',
         );
 
         $this->assertTrue($registry->allowsMutation('schedule_meeting', $mutation));
@@ -112,11 +110,11 @@ class IntentCapabilityTest extends TestCase
         $registry = $this->app->make(IntentCapabilityRegistry::class);
 
         $mutation = new NormalizedMutation(
-            field:     'participants',
-            label:     'Participants',
-            value:     'Marco',
+            field: 'participants',
+            label: 'Participants',
+            value: 'Marco',
             operation: 'replace',
-            target:    'Luca',
+            target: 'Luca',
         );
 
         $this->assertTrue($registry->allowsMutation('schedule_meeting', $mutation));
@@ -160,9 +158,9 @@ class IntentCapabilityTest extends TestCase
         $registry = $this->app->make(IntentCapabilityRegistry::class);
 
         $mutation = new NormalizedMutation(
-            field:     'participants',
-            label:     'Participants',
-            value:     'Mario',
+            field: 'participants',
+            label: 'Participants',
+            value: 'Mario',
             operation: 'append',
         );
 
@@ -175,11 +173,11 @@ class IntentCapabilityTest extends TestCase
         $registry = $this->app->make(IntentCapabilityRegistry::class);
 
         $mutation = new NormalizedMutation(
-            field:     'participants',
-            label:     'Participants',
-            value:     null,
+            field: 'participants',
+            label: 'Participants',
+            value: null,
             operation: 'remove',
-            target:    'Mario',
+            target: 'Mario',
         );
 
         $this->assertFalse($registry->allowsMutation('create_task', $mutation));
@@ -195,44 +193,51 @@ class IntentCapabilityTest extends TestCase
         $this->assertFalse($capability->supportsCollectionMutations);
     }
 
-    public function test_create_task_does_not_support_ambiguity_resolution(): void
+    public function test_create_task_supports_ambiguity_resolution(): void
     {
+        // create_task carries an optional lead that goes through entity resolution and
+        // can become a blocking ambiguity. Any intent that can generate a blocking
+        // ambiguity must be able to resolve it via refinement, or the proposal becomes
+        // permanently unconfirmable.
         /** @var IntentCapabilityRegistry $registry */
         $registry = $this->app->make(IntentCapabilityRegistry::class);
 
         $capability = $registry->find('create_task');
         $this->assertNotNull($capability);
-        $this->assertFalse($capability->supportsAmbiguityResolution);
+        $this->assertTrue($capability->supportsAmbiguityResolution);
+        $this->assertContains(
+            RefinementCapabilityType::ResolveAmbiguity,
+            $capability->refinements,
+        );
     }
 
     // ── 4 & 5. Unsupported mutation: no change + warning ─────────────────────
 
-    /** @return ActionProposal */
     private function createTaskProposal(User $user): ActionProposal
     {
         return ActionProposal::create([
-            'user_id'         => $user->id,
-            'intent'          => 'create_task',
-            'status'          => 'ready',
-            'confidence'      => 0.9,
-            'source_text'     => 'Create a task for Rossini',
-            'entities'        => ['lead' => 'Rossini'],
-            'missing'         => [],
-            'warnings'        => [],
+            'user_id' => $user->id,
+            'intent' => 'create_task',
+            'status' => 'ready',
+            'confidence' => 0.9,
+            'source_text' => 'Create a task for Rossini',
+            'entities' => ['lead' => 'Rossini'],
+            'missing' => [],
+            'warnings' => [],
             'editable_fields' => [
                 ['key' => 'lead', 'label' => 'Lead', 'value' => 'Rossini', 'source' => 'detected', 'required' => false],
             ],
-            'changes'         => [
+            'changes' => [
                 ['type' => 'create', 'label' => 'Create Task', 'module' => 'tasks', 'payload' => []],
             ],
             'needs_confirmation' => true,
-            'ambiguities'     => [],
+            'ambiguities' => [],
         ]);
     }
 
     public function test_participant_append_on_create_task_does_not_change_proposal(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->createTaskProposal($user);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Mario too']);
@@ -250,7 +255,7 @@ class IntentCapabilityTest extends TestCase
 
     public function test_participant_append_on_create_task_adds_warning(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->createTaskProposal($user);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Mario too']);
@@ -267,7 +272,7 @@ class IntentCapabilityTest extends TestCase
 
     public function test_participant_append_on_create_task_proposal_status_unchanged(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->createTaskProposal($user);
 
         $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Mario too'])
@@ -284,25 +289,25 @@ class IntentCapabilityTest extends TestCase
         $user = $this->actingAsUser();
 
         ActionProposal::create([
-            'user_id'         => $user->id,
-            'intent'          => 'schedule_call',
-            'status'          => 'draft',
-            'confidence'      => 0.7,
-            'source_text'     => 'Call Rossini',
-            'entities'        => ['lead' => 'Rossini'],
-            'missing'         => [
+            'user_id' => $user->id,
+            'intent' => 'schedule_call',
+            'status' => 'draft',
+            'confidence' => 0.7,
+            'source_text' => 'Call Rossini',
+            'entities' => ['lead' => 'Rossini'],
+            'missing' => [
                 ['key' => 'date', 'label' => 'Date', 'required' => true],
                 ['key' => 'time', 'label' => 'Time', 'required' => true],
             ],
-            'warnings'        => [],
+            'warnings' => [],
             'editable_fields' => [
                 ['key' => 'lead', 'label' => 'Lead', 'value' => 'Rossini', 'source' => 'detected', 'required' => true],
             ],
-            'changes'         => [
+            'changes' => [
                 ['type' => 'schedule', 'label' => 'Schedule Call', 'module' => 'calendar', 'payload' => []],
             ],
             'needs_confirmation' => true,
-            'ambiguities'     => [],
+            'ambiguities' => [],
         ]);
 
         $proposal = ActionProposal::latest()->first();
@@ -322,24 +327,24 @@ class IntentCapabilityTest extends TestCase
         $user = $this->actingAsUser();
 
         $proposal = ActionProposal::create([
-            'user_id'         => $user->id,
-            'intent'          => 'schedule_call',
-            'status'          => 'ready',
-            'confidence'      => 0.85,
-            'source_text'     => 'Call Rossini',
-            'entities'        => ['lead' => 'Rossini'],
-            'missing'         => [],
-            'warnings'        => [],
+            'user_id' => $user->id,
+            'intent' => 'schedule_call',
+            'status' => 'ready',
+            'confidence' => 0.85,
+            'source_text' => 'Call Rossini',
+            'entities' => ['lead' => 'Rossini'],
+            'missing' => [],
+            'warnings' => [],
             'editable_fields' => [
                 ['key' => 'lead', 'label' => 'Lead', 'value' => 'Rossini',                           'source' => 'detected', 'required' => true],
                 ['key' => 'date', 'label' => 'Date', 'value' => now()->addDay()->toDateString(),      'source' => 'detected', 'required' => true],
                 ['key' => 'time', 'label' => 'Time', 'value' => '09:00',                             'source' => 'detected', 'required' => true],
             ],
-            'changes'         => [
+            'changes' => [
                 ['type' => 'schedule', 'label' => 'Schedule Call', 'module' => 'calendar', 'payload' => []],
             ],
             'needs_confirmation' => true,
-            'ambiguities'     => [],
+            'ambiguities' => [],
         ]);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'High priority']);
@@ -356,25 +361,25 @@ class IntentCapabilityTest extends TestCase
         $user = $this->actingAsUser();
 
         $proposal = ActionProposal::create([
-            'user_id'         => $user->id,
-            'intent'          => 'schedule_meeting',
-            'status'          => 'ready',
-            'confidence'      => 0.85,
-            'source_text'     => 'Meeting with Rossini',
-            'entities'        => ['lead' => 'Rossini'],
-            'missing'         => [],
-            'warnings'        => [],
+            'user_id' => $user->id,
+            'intent' => 'schedule_meeting',
+            'status' => 'ready',
+            'confidence' => 0.85,
+            'source_text' => 'Meeting with Rossini',
+            'entities' => ['lead' => 'Rossini'],
+            'missing' => [],
+            'warnings' => [],
             'editable_fields' => [
                 ['key' => 'lead',         'label' => 'Lead',         'value' => 'Rossini',                      'source' => 'detected', 'required' => true],
                 ['key' => 'date',         'label' => 'Date',         'value' => now()->addDay()->toDateString(), 'source' => 'detected', 'required' => true],
                 ['key' => 'time',         'label' => 'Time',         'value' => '10:00',                        'source' => 'detected', 'required' => true],
                 ['key' => 'participants', 'label' => 'Participants', 'value' => ['Luca'],                       'source' => 'detected', 'required' => false],
             ],
-            'changes'         => [
+            'changes' => [
                 ['type' => 'schedule', 'label' => 'Schedule Meeting', 'module' => 'calendar', 'payload' => []],
             ],
             'needs_confirmation' => true,
-            'ambiguities'     => [],
+            'ambiguities' => [],
         ]);
 
         $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Mario too']);
@@ -392,7 +397,7 @@ class IntentCapabilityTest extends TestCase
     {
         $user = $this->actingAsUser();
 
-        $r1         = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
+        $r1 = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
         $proposalId = $r1->json('data.id');
 
         $this->assertEquals('schedule_call', $r1->json('data.intent'));
@@ -411,7 +416,7 @@ class IntentCapabilityTest extends TestCase
     {
         $user = $this->actingAsUser();
 
-        $r1         = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossi tomorrow morning']);
+        $r1 = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossi tomorrow morning']);
         $proposalId = $r1->json('data.id');
 
         $this->assertEquals('schedule_meeting', $r1->json('data.intent'));
@@ -444,28 +449,28 @@ class IntentCapabilityTest extends TestCase
         $user = $this->actingAsUser();
 
         $proposal = ActionProposal::create([
-            'user_id'         => $user->id,
-            'intent'          => 'prepare_contract_from_quote',
-            'status'          => 'draft',
-            'confidence'      => 0.75,
-            'source_text'     => 'Prepare a contract for Rossi',
-            'entities'        => [],
-            'missing'         => [],
-            'warnings'        => [],
+            'user_id' => $user->id,
+            'intent' => 'prepare_contract_from_quote',
+            'status' => 'draft',
+            'confidence' => 0.75,
+            'source_text' => 'Prepare a contract for Rossi',
+            'entities' => [],
+            'missing' => [],
+            'warnings' => [],
             'editable_fields' => [],
-            'changes'         => [
+            'changes' => [
                 ['type' => 'create', 'label' => 'Prepare Contract', 'module' => 'tasks', 'payload' => []],
             ],
             'needs_confirmation' => true,
-            'ambiguities'     => [
+            'ambiguities' => [
                 [
-                    'key'                  => 'lead',
-                    'label'                => 'Lead',
-                    'reason'               => 'multiple_matches',
-                    'blocking'             => true,
-                    'query'                => 'Rossi',
+                    'key' => 'lead',
+                    'label' => 'Lead',
+                    'reason' => 'multiple_matches',
+                    'blocking' => true,
+                    'query' => 'Rossi',
                     'selected_candidate_id' => null,
-                    'candidates'           => [
+                    'candidates' => [
                         ['id' => 1, 'label' => 'Mario Rossi', 'type' => 'person',  'confidence' => 0.65],
                         ['id' => 7, 'label' => 'Rossi SRL',   'type' => 'company', 'confidence' => 0.80],
                     ],
@@ -496,9 +501,9 @@ class IntentCapabilityTest extends TestCase
         $registry = $this->app->make(IntentCapabilityRegistry::class);
 
         $mutation = new NormalizedMutation(
-            field:     'date',
-            label:     'Date',
-            value:     '2026-05-20',
+            field: 'date',
+            label: 'Date',
+            value: '2026-05-20',
             operation: 'replace',
         );
 
@@ -511,9 +516,9 @@ class IntentCapabilityTest extends TestCase
         $registry = $this->app->make(IntentCapabilityRegistry::class);
 
         $mutation = new NormalizedMutation(
-            field:     'lead',
-            label:     'Lead',
-            value:     'Rossini',
+            field: 'lead',
+            label: 'Lead',
+            value: 'Rossini',
             operation: 'replace',
         );
 
@@ -526,9 +531,9 @@ class IntentCapabilityTest extends TestCase
         $registry = $this->app->make(IntentCapabilityRegistry::class);
 
         $mutation = new NormalizedMutation(
-            field:     'participants',
-            label:     'Participants',
-            value:     'Mario',
+            field: 'participants',
+            label: 'Participants',
+            value: 'Mario',
             operation: 'append',
         );
 
@@ -541,9 +546,9 @@ class IntentCapabilityTest extends TestCase
         $registry = $this->app->make(IntentCapabilityRegistry::class);
 
         $mutation = new NormalizedMutation(
-            field:     'priority',
-            label:     'Priority',
-            value:     null,
+            field: 'priority',
+            label: 'Priority',
+            value: null,
             operation: 'clear',
         );
 
@@ -556,9 +561,9 @@ class IntentCapabilityTest extends TestCase
         $registry = $this->app->make(IntentCapabilityRegistry::class);
 
         $mutation = new NormalizedMutation(
-            field:     'priority',
-            label:     'Priority',
-            value:     'high',
+            field: 'priority',
+            label: 'Priority',
+            value: 'high',
             operation: 'replace',
         );
 
@@ -582,10 +587,16 @@ class IntentCapabilityTest extends TestCase
     }
 
     // ── 9. Ambiguity warning is emitted when intent does not support resolution ─
+    //
+    // NB: every REGISTERED intent that can produce a blocking lead ambiguity now
+    // supports resolving it (that is the architectural invariant). The
+    // not-supported branch therefore only applies to an unregistered/unknown intent
+    // (null capability → deny-by-default), which these tests exercise with a crafted
+    // proposal carrying a synthetic blocking ambiguity.
 
     /**
      * When a proposal has a blocking ambiguity and the intent does not support
-     * ambiguity resolution, a refinement attempt must:
+     * ambiguity resolution (here: an unregistered intent), a refinement attempt must:
      * - add the 'ambiguity_resolution_not_supported' warning
      * - leave the ambiguity unresolved
      * - not throw
@@ -595,28 +606,28 @@ class IntentCapabilityTest extends TestCase
         $user = $this->actingAsUser();
 
         $proposal = ActionProposal::create([
-            'user_id'         => $user->id,
-            'intent'          => 'create_task',
-            'status'          => 'draft',
-            'confidence'      => 0.9,
-            'source_text'     => 'Create a task for Rossi',
-            'entities'        => [],
-            'missing'         => [],
-            'warnings'        => [],
+            'user_id' => $user->id,
+            'intent' => 'archive_record',
+            'status' => 'draft',
+            'confidence' => 0.9,
+            'source_text' => 'Create a task for Rossi',
+            'entities' => [],
+            'missing' => [],
+            'warnings' => [],
             'editable_fields' => [],
-            'changes'         => [
+            'changes' => [
                 ['type' => 'create', 'label' => 'Create Task', 'module' => 'tasks', 'payload' => []],
             ],
             'needs_confirmation' => true,
-            'ambiguities'     => [
+            'ambiguities' => [
                 [
-                    'key'                  => 'lead',
-                    'label'                => 'Lead',
-                    'reason'               => 'multiple_matches',
-                    'blocking'             => true,
-                    'query'                => 'Rossi',
+                    'key' => 'lead',
+                    'label' => 'Lead',
+                    'reason' => 'multiple_matches',
+                    'blocking' => true,
+                    'query' => 'Rossi',
                     'selected_candidate_id' => null,
-                    'candidates'           => [
+                    'candidates' => [
                         ['id' => 1, 'label' => 'Mario Rossi', 'type' => 'person',  'confidence' => 0.65],
                         ['id' => 7, 'label' => 'Rossi SRL',   'type' => 'company', 'confidence' => 0.80],
                     ],
@@ -649,28 +660,28 @@ class IntentCapabilityTest extends TestCase
         $user = $this->actingAsUser();
 
         $proposal = ActionProposal::create([
-            'user_id'         => $user->id,
-            'intent'          => 'create_task',
-            'status'          => 'draft',
-            'confidence'      => 0.9,
-            'source_text'     => 'Create a task for Rossi',
-            'entities'        => [],
-            'missing'         => [],
-            'warnings'        => [],
+            'user_id' => $user->id,
+            'intent' => 'archive_record',
+            'status' => 'draft',
+            'confidence' => 0.9,
+            'source_text' => 'Create a task for Rossi',
+            'entities' => [],
+            'missing' => [],
+            'warnings' => [],
             'editable_fields' => [],
-            'changes'         => [
+            'changes' => [
                 ['type' => 'create', 'label' => 'Create Task', 'module' => 'tasks', 'payload' => []],
             ],
             'needs_confirmation' => true,
-            'ambiguities'     => [
+            'ambiguities' => [
                 [
-                    'key'                  => 'lead',
-                    'label'                => 'Lead',
-                    'reason'               => 'multiple_matches',
-                    'blocking'             => true,
-                    'query'                => 'Rossi',
+                    'key' => 'lead',
+                    'label' => 'Lead',
+                    'reason' => 'multiple_matches',
+                    'blocking' => true,
+                    'query' => 'Rossi',
                     'selected_candidate_id' => null,
-                    'candidates'           => [
+                    'candidates' => [
                         ['id' => 1, 'label' => 'Mario Rossi', 'type' => 'person',  'confidence' => 0.65],
                         ['id' => 7, 'label' => 'Rossi SRL',   'type' => 'company', 'confidence' => 0.80],
                     ],
@@ -678,7 +689,9 @@ class IntentCapabilityTest extends TestCase
             ],
         ]);
 
-        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'High priority']);
+        // A clarification attempt on an intent that cannot resolve ambiguity: the
+        // proposal must stay continuable (status preserved, no exception).
+        $response = $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Rossi SRL']);
 
         $response->assertStatus(200);
 
@@ -703,30 +716,30 @@ class IntentCapabilityTest extends TestCase
         $user = $this->actingAsUser();
 
         $proposal = ActionProposal::create([
-            'user_id'         => $user->id,
-            'intent'          => 'assign_lead',
-            'status'          => 'draft',
-            'confidence'      => 0.8,
-            'source_text'     => 'Assign Rossi to Giulia',
-            'entities'        => [],
-            'missing'         => [],
-            'warnings'        => [],
+            'user_id' => $user->id,
+            'intent' => 'assign_lead',
+            'status' => 'draft',
+            'confidence' => 0.8,
+            'source_text' => 'Assign Rossi to Giulia',
+            'entities' => [],
+            'missing' => [],
+            'warnings' => [],
             'editable_fields' => [
                 ['key' => 'assignee', 'label' => 'Assignee', 'value' => 'Giulia', 'source' => 'detected', 'required' => true],
             ],
-            'changes'         => [
+            'changes' => [
                 ['type' => 'assign', 'label' => 'Assign Lead', 'module' => 'leads', 'payload' => []],
             ],
             'needs_confirmation' => true,
-            'ambiguities'     => [
+            'ambiguities' => [
                 [
-                    'key'                  => 'lead',
-                    'label'                => 'Lead',
-                    'reason'               => 'multiple_matches',
-                    'blocking'             => true,
-                    'query'                => 'Rossi',
+                    'key' => 'lead',
+                    'label' => 'Lead',
+                    'reason' => 'multiple_matches',
+                    'blocking' => true,
+                    'query' => 'Rossi',
                     'selected_candidate_id' => null,
-                    'candidates'           => [
+                    'candidates' => [
                         ['id' => 1, 'label' => 'Mario Rossi', 'type' => 'person',  'confidence' => 0.65],
                         ['id' => 7, 'label' => 'Rossi SRL',   'type' => 'company', 'confidence' => 0.80],
                     ],
@@ -776,22 +789,22 @@ class IntentCapabilityTest extends TestCase
         $user = $this->actingAsUser();
 
         $proposal = ActionProposal::create([
-            'user_id'            => $user->id,
-            'intent'             => 'schedule_meeting',
-            'status'             => 'ready',
-            'confidence'         => 0.85,
-            'source_text'        => 'Meeting with Rossini tomorrow',
-            'entities'           => ['lead' => 'Rossini'],
-            'missing'            => [],
-            'warnings'           => [],
-            'editable_fields'    => [
+            'user_id' => $user->id,
+            'intent' => 'schedule_meeting',
+            'status' => 'ready',
+            'confidence' => 0.85,
+            'source_text' => 'Meeting with Rossini tomorrow',
+            'entities' => ['lead' => 'Rossini'],
+            'missing' => [],
+            'warnings' => [],
+            'editable_fields' => [
                 ['key' => 'lead', 'label' => 'Lead', 'value' => 'Rossini', 'source' => 'detected', 'required' => true],
             ],
-            'changes'            => [
+            'changes' => [
                 ['type' => 'schedule', 'label' => 'Schedule Meeting', 'module' => 'calendar', 'payload' => []],
             ],
             'needs_confirmation' => true,
-            'ambiguities'        => [],
+            'ambiguities' => [],
         ]);
 
         // Refine to get back a full resource response that includes capabilities
@@ -920,7 +933,7 @@ class IntentCapabilityTest extends TestCase
 
     public function test_repeated_unsupported_mutation_does_not_duplicate_warning(): void
     {
-        $user     = $this->actingAsUser();
+        $user = $this->actingAsUser();
         $proposal = $this->createTaskProposal($user);
 
         $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Add Mario too'])->assertStatus(200);
@@ -942,28 +955,28 @@ class IntentCapabilityTest extends TestCase
         $user = $this->actingAsUser();
 
         $proposal = ActionProposal::create([
-            'user_id'         => $user->id,
-            'intent'          => 'create_task',
-            'status'          => 'draft',
-            'confidence'      => 0.9,
-            'source_text'     => 'Create a task for Rossi',
-            'entities'        => [],
-            'missing'         => [],
-            'warnings'        => [],
+            'user_id' => $user->id,
+            'intent' => 'archive_record',
+            'status' => 'draft',
+            'confidence' => 0.9,
+            'source_text' => 'Create a task for Rossi',
+            'entities' => [],
+            'missing' => [],
+            'warnings' => [],
             'editable_fields' => [],
-            'changes'         => [
+            'changes' => [
                 ['type' => 'create', 'label' => 'Create Task', 'module' => 'tasks', 'payload' => []],
             ],
             'needs_confirmation' => true,
-            'ambiguities'     => [
+            'ambiguities' => [
                 [
-                    'key'                  => 'lead',
-                    'label'                => 'Lead',
-                    'reason'               => 'multiple_matches',
-                    'blocking'             => true,
-                    'query'                => 'Rossi',
+                    'key' => 'lead',
+                    'label' => 'Lead',
+                    'reason' => 'multiple_matches',
+                    'blocking' => true,
+                    'query' => 'Rossi',
                     'selected_candidate_id' => null,
-                    'candidates'           => [
+                    'candidates' => [
                         ['id' => 1, 'label' => 'Mario Rossi', 'type' => 'person',  'confidence' => 0.65],
                         ['id' => 7, 'label' => 'Rossi SRL',   'type' => 'company', 'confidence' => 0.80],
                     ],

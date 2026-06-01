@@ -24,33 +24,37 @@ final class DefaultIntentCapabilities
     {
         return [
             // create_task: scalar fields only — no collection mutations.
-            // Lead is optional and currently resolved at interpretation time, not via refinement.
-            // Ambiguity resolution is not applicable for create_task (lead is optional).
+            // Lead is optional, but when supplied it goes through entity resolution and
+            // can produce a blocking lead ambiguity. Any intent that can generate a
+            // blocking ambiguity must be able to resolve it via refinement, otherwise the
+            // proposal becomes permanently unconfirmable — so ambiguity resolution is
+            // supported here (lead replace already covers promoting the resolved candidate).
             new IntentCapability(
-                intent:    'create_task',
+                intent: 'create_task',
                 mutations: [
                     new MutationCapability(operation: 'replace', fields: ['date', 'time', 'priority', 'lead'], collection: false),
-                    new MutationCapability(operation: 'clear',   fields: ['priority'],                         collection: false),
+                    new MutationCapability(operation: 'clear', fields: ['priority'], collection: false),
                 ],
                 refinements: [
                     RefinementCapabilityType::ReplaceField,
                     RefinementCapabilityType::ClearField,
+                    RefinementCapabilityType::ResolveAmbiguity,
                 ],
                 supportsContextualReferences: false,
-                supportsAmbiguityResolution:  false,
-                supportsCollectionMutations:  false,
+                supportsAmbiguityResolution: true,
+                supportsCollectionMutations: false,
             ),
 
             // schedule_call: scalar fields + collection participants.
             // Ambiguity resolution is supported (lead requires entity resolution).
             new IntentCapability(
-                intent:    'schedule_call',
+                intent: 'schedule_call',
                 mutations: [
                     new MutationCapability(operation: 'replace', fields: ['date', 'time', 'lead', 'priority'], collection: false),
-                    new MutationCapability(operation: 'clear',   fields: ['priority'],                          collection: false),
-                    new MutationCapability(operation: 'append',  fields: ['participants'],                      collection: true),
-                    new MutationCapability(operation: 'remove',  fields: ['participants'],                      collection: true),
-                    new MutationCapability(operation: 'replace', fields: ['participants'],                      collection: true),
+                    new MutationCapability(operation: 'clear', fields: ['priority'], collection: false),
+                    new MutationCapability(operation: 'append', fields: ['participants'], collection: true),
+                    new MutationCapability(operation: 'remove', fields: ['participants'], collection: true),
+                    new MutationCapability(operation: 'replace', fields: ['participants'], collection: true),
                 ],
                 refinements: [
                     RefinementCapabilityType::ReplaceField,
@@ -61,20 +65,20 @@ final class DefaultIntentCapabilities
                     RefinementCapabilityType::ResolveAmbiguity,
                 ],
                 supportsContextualReferences: false,
-                supportsAmbiguityResolution:  true,
-                supportsCollectionMutations:  true,
+                supportsAmbiguityResolution: true,
+                supportsCollectionMutations: true,
             ),
 
             // schedule_meeting: same as schedule_call plus location and contextual references.
             // Full collection mutation support + ambiguity resolution.
             new IntentCapability(
-                intent:    'schedule_meeting',
+                intent: 'schedule_meeting',
                 mutations: [
                     new MutationCapability(operation: 'replace', fields: ['date', 'time', 'lead', 'location'], collection: false),
-                    new MutationCapability(operation: 'clear',   fields: ['location'],                          collection: false),
-                    new MutationCapability(operation: 'append',  fields: ['participants'],                      collection: true),
-                    new MutationCapability(operation: 'remove',  fields: ['participants'],                      collection: true),
-                    new MutationCapability(operation: 'replace', fields: ['participants'],                      collection: true),
+                    new MutationCapability(operation: 'clear', fields: ['location'], collection: false),
+                    new MutationCapability(operation: 'append', fields: ['participants'], collection: true),
+                    new MutationCapability(operation: 'remove', fields: ['participants'], collection: true),
+                    new MutationCapability(operation: 'replace', fields: ['participants'], collection: true),
                 ],
                 refinements: [
                     RefinementCapabilityType::ReplaceField,
@@ -86,15 +90,15 @@ final class DefaultIntentCapabilities
                     RefinementCapabilityType::ContextualReference,
                 ],
                 supportsContextualReferences: true,
-                supportsAmbiguityResolution:  true,
-                supportsCollectionMutations:  true,
+                supportsAmbiguityResolution: true,
+                supportsCollectionMutations: true,
             ),
 
             // assign_lead: scalar field replacements only.
             // Ambiguity resolution is supported (both lead and assignee may require it in future).
             // No collection mutations.
             new IntentCapability(
-                intent:    'assign_lead',
+                intent: 'assign_lead',
                 mutations: [
                     new MutationCapability(operation: 'replace', fields: ['lead', 'assignee'], collection: false),
                 ],
@@ -103,15 +107,15 @@ final class DefaultIntentCapabilities
                     RefinementCapabilityType::ResolveAmbiguity,
                 ],
                 supportsContextualReferences: false,
-                supportsAmbiguityResolution:  true,
-                supportsCollectionMutations:  false,
+                supportsAmbiguityResolution: true,
+                supportsCollectionMutations: false,
             ),
 
             // prepare_contract_from_quote: lead and quote replacement.
             // Ambiguity resolution is supported because lead requires entity resolution.
             // Collection mutations and contextual references remain disabled.
             new IntentCapability(
-                intent:    'prepare_contract_from_quote',
+                intent: 'prepare_contract_from_quote',
                 mutations: [
                     new MutationCapability(operation: 'replace', fields: ['lead', 'quote'], collection: false),
                 ],
@@ -120,8 +124,8 @@ final class DefaultIntentCapabilities
                     RefinementCapabilityType::ResolveAmbiguity,
                 ],
                 supportsContextualReferences: false,
-                supportsAmbiguityResolution:  true,
-                supportsCollectionMutations:  false,
+                supportsAmbiguityResolution: true,
+                supportsCollectionMutations: false,
             ),
         ];
     }
