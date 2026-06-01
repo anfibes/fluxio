@@ -18,21 +18,34 @@ use Fluxio\Actions\Validation\NormalizedCommandValidator;
  * Every NormalizedCommand returned by the provider is validated before it enters
  * the proposal pipeline. Invalid provider output throws InvalidNormalizedCommandException
  * so malformed responses cannot silently corrupt proposal state.
+ *
+ * Phase 9F.0: after structural/value validation, the command is also checked against
+ * the frozen ProviderSandboxContract — the single boundary that locks the allowed
+ * provider surface to exactly what the runtime honors today (lead_query as the only
+ * resolver-backed reference; no identity/lifecycle/runtime surface). This is
+ * provider-agnostic and behavior-preserving for the deterministic provider, which
+ * never emits a forbidden surface.
  */
 class InterpretationProviderAdapter implements CommandInterpreterInterface
 {
     public function __construct(
         private readonly InterpretationProviderInterface $provider,
-        private readonly NormalizedCommandValidator      $validator,
+        private readonly NormalizedCommandValidator $validator,
+        private readonly ProviderSandboxContract $sandbox = new ProviderSandboxContract,
     ) {}
 
     public function interpret(string $text): NormalizedCommand
     {
-        $command = $this->provider->interpret($text, new InterpretationContext());
-        $result  = $this->validator->validate($command);
+        $command = $this->provider->interpret($text, new InterpretationContext);
 
+        $result = $this->validator->validate($command);
         if (! $result->valid) {
             throw new InvalidNormalizedCommandException($command, $result->errors);
+        }
+
+        $violations = $this->sandbox->violations($command);
+        if ($violations !== []) {
+            throw new InvalidNormalizedCommandException($command, $violations);
         }
 
         return $command;

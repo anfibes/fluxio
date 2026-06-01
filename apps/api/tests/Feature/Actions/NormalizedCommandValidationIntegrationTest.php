@@ -243,6 +243,71 @@ class NormalizedCommandValidationIntegrationTest extends TestCase
         $this->assertDatabaseCount('action_proposals', 0);
     }
 
+    // ── Phase 9F.0 provider sandbox: surface lock enforced at the adapter ─────
+
+    public function test_fake_provider_participant_query_is_rejected_by_sandbox(): void
+    {
+        // participant_query IS a declared entityType for schedule_meeting, so the
+        // NormalizedCommandValidator accepts it — the SANDBOX is what rejects it,
+        // because the runtime resolves only lead_query today.
+        $fake = new FakeLlmInterpretationProvider;
+        $fake->addResponse('book it', new NormalizedCommand(
+            intent: 'schedule_meeting',
+            confidence: 0.9,
+            sourceText: 'book it',
+            locale: 'en',
+            entities: ['lead_query' => 'Rossini', 'participant_query' => 'Marco'],
+        ));
+
+        $this->app->bind(InterpretationProviderInterface::class, fn () => $fake);
+
+        // It passes the structural validator on its own …
+        $validator = $this->app->make(NormalizedCommandValidator::class);
+        $command = $fake->interpret('book it', new InterpretationContext);
+        $this->assertTrue($validator->validate($command)->valid);
+
+        // … but the adapter's sandbox rejects it.
+        $this->expectException(InvalidNormalizedCommandException::class);
+        $this->app->make(\Fluxio\Actions\Contracts\CommandInterpreterInterface::class)->interpret('book it');
+    }
+
+    public function test_fake_provider_identity_surface_is_rejected_even_for_unknown_intent(): void
+    {
+        // unknown skips key-compatibility in the validator; the sandbox still rejects
+        // a selected_candidate_id surface — proving the gap is closed.
+        $fake = new FakeLlmInterpretationProvider;
+        $fake->addResponse('do it', new NormalizedCommand(
+            intent: 'unknown',
+            confidence: 0.3,
+            sourceText: 'do it',
+            locale: 'en',
+            entities: ['selected_candidate_id' => '7'],
+        ));
+
+        $this->app->bind(InterpretationProviderInterface::class, fn () => $fake);
+
+        $this->expectException(InvalidNormalizedCommandException::class);
+        $this->app->make(\Fluxio\Actions\Contracts\CommandInterpreterInterface::class)->interpret('do it');
+    }
+
+    public function test_deterministic_provider_output_is_sandbox_legal(): void
+    {
+        // Behavior-preserving: every deterministic command passes the sandbox.
+        $provider = $this->app->make(DeterministicInterpretationProvider::class);
+        $sandbox = new \Fluxio\Actions\Interpretation\ProviderSandboxContract;
+
+        foreach ([
+            'Create a high priority follow-up task for Mario Rossi tomorrow at 10',
+            'Schedule a meeting with Rossi SRL next Friday at 3pm',
+            'Schedule a call with Rossi tomorrow at 10',
+            'Assign Mario Rossi to Marco',
+            'Show me the dashboard',
+        ] as $text) {
+            $command = $provider->interpret($text, new InterpretationContext);
+            $this->assertSame([], $sandbox->violations($command), "sandbox violation for: {$text}");
+        }
+    }
+
     // ── Feature regression tests: endpoint behavior unchanged ─────────────────
 
     public function test_schedule_meeting_with_rossini_endpoint_unchanged(): void
