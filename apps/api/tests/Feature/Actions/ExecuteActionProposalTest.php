@@ -47,9 +47,10 @@ class ExecuteActionProposalTest extends TestCase
             ->assertJsonPath('data.status', 'executed');
 
         $this->assertNotNull($response->json('data.executed_at'));
-        $this->assertNotNull($response->json('data.execution_result.resource_id'));
-        $this->assertEquals('tasks', $response->json('data.execution_result.module'));
-        $this->assertEquals('created', $response->json('data.execution_result.action'));
+        $this->assertEquals('Task created successfully.', $response->json('data.execution_result.summary'));
+        $this->assertNotNull($response->json('data.execution_result.details.resource_id'));
+        $this->assertEquals('tasks', $response->json('data.execution_result.details.module'));
+        $this->assertEquals('created', $response->json('data.execution_result.details.action'));
 
         $this->assertDatabaseCount('tasks', 1);
     }
@@ -249,6 +250,15 @@ class ExecuteActionProposalTest extends TestCase
         $this->assertNotNull($refreshed->failed_at);
         $this->assertNotNull($refreshed->failure_reason);
 
+        // Failure is typed + sanitized: the raw exception message (which names the
+        // unsupported intent) never reaches persisted proposal state.
+        $this->assertEquals(
+            __('actions::actions.execution_failure.unsupported_intent'),
+            $refreshed->failure_reason,
+        );
+        $this->assertStringNotContainsString('unsupported_intent', $refreshed->failure_reason);
+        $this->assertStringNotContainsString('executor', $refreshed->failure_reason);
+
         $this->assertDatabaseCount('tasks', 0);
     }
 
@@ -267,10 +277,11 @@ class ExecuteActionProposalTest extends TestCase
         $result = $refreshed->execution_result;
 
         $this->assertNotNull($result);
-        $this->assertEquals('tasks', $result['module']);
-        $this->assertEquals('created', $result['action']);
-        $this->assertEquals('task', $result['resource_type']);
-        $this->assertNotNull($result['resource_id']);
+        $this->assertEquals('Task created successfully.', $result['summary']);
+        $this->assertEquals('tasks', $result['details']['module']);
+        $this->assertEquals('created', $result['details']['action']);
+        $this->assertEquals('task', $result['details']['resource_type']);
+        $this->assertNotNull($result['details']['resource_id']);
     }
 
     public function test_executed_at_is_stored_in_database(): void

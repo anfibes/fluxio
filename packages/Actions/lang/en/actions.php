@@ -20,6 +20,11 @@ return [
     'ambiguity_resolution_not_supported' => 'This action type does not support ambiguity resolution.',
     'cannot_shift_time_no_current_time' => 'Cannot shift the time because the proposal has no current time.',
 
+    'execution_failure' => [
+        'unsupported_intent' => 'This action type cannot be executed.',
+        'execution_failed' => 'The action could not be completed. No changes were made.',
+    ],
+
     'capabilities' => [
         'operations' => [
             'replace' => 'Update',

@@ -143,6 +143,20 @@ export interface ActionProposalRefinement {
   ambiguity_outcome?: RefinementAmbiguityOutcome | null
 }
 
+/**
+ * Typed execution result contract (backend Execution Runtime v1). Execution is
+ * the third deterministic runtime authority; its result is inert, response-bound
+ * display data with one consistent shape across every intent:
+ *  - `summary` : a short human one-liner describing the effect;
+ *  - `details` : flat, presentation-ready label/value pairs (e.g. the created
+ *                resource reference, or the scheduled lead/date/time).
+ * The frontend renders this typed shape instead of iterating an arbitrary object.
+ */
+export interface ExecutionResult {
+  summary: string
+  details: Record<string, string | number | boolean | null>
+}
+
 export interface ActionProposal {
   id: string
   intent: string
@@ -159,7 +173,7 @@ export interface ActionProposal {
   executed_at: string | null
   failed_at: string | null
   failure_reason: string | null
-  execution_result: Record<string, unknown> | null
+  execution_result: ExecutionResult | null
   last_refinement: ActionProposalRefinement | null
   ambiguities: ProposalAmbiguity[]
   capabilities?: ProposalCapabilities

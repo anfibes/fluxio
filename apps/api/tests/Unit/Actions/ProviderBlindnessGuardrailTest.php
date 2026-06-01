@@ -3,6 +3,8 @@
 namespace Tests\Unit\Actions;
 
 use Fluxio\Actions\DTO\Ambiguity\AmbiguityDirective;
+use Fluxio\Actions\DTO\Execution\ExecutionFailure;
+use Fluxio\Actions\DTO\Execution\ExecutionResult;
 use Fluxio\Actions\DTO\NormalizedMutation;
 use Fluxio\Actions\DTO\RefinementAmbiguityOutcome;
 use Fluxio\Actions\DTO\SemanticRefinementMutation;
@@ -95,6 +97,19 @@ class ProviderBlindnessGuardrailTest extends TestCase
         );
         $this->assertArrayNotHasKey('candidates', $payload);
         $this->assertArrayNotHasKey('selected_candidate_id', $payload);
+    }
+
+    public function test_execution_result_has_no_provider_surface(): void
+    {
+        // Execution Runtime v1: the execution authority's result is inert,
+        // response-bound display data — it names what happened, never who produced
+        // the interpretation.
+        $this->assertNoSurfaceMatching(ExecutionResult::class, self::FORBIDDEN_SURFACE);
+    }
+
+    public function test_execution_failure_has_no_provider_surface(): void
+    {
+        $this->assertNoSurfaceMatching(ExecutionFailure::class, self::FORBIDDEN_SURFACE);
     }
 
     public function test_ambiguity_directive_surface_is_only_key_and_selector(): void

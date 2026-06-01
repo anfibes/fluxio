@@ -3,6 +3,7 @@
 namespace Fluxio\Actions\Executors;
 
 use Fluxio\Actions\Contracts\ActionExecutorInterface;
+use Fluxio\Actions\DTO\Execution\ExecutionResult;
 use Fluxio\Actions\Models\ActionProposal;
 use Fluxio\Leads\Models\Lead;
 use Fluxio\Tasks\Models\Task;
@@ -10,7 +11,7 @@ use Illuminate\Validation\ValidationException;
 
 class CreateTaskActionExecutor implements ActionExecutorInterface
 {
-    public function execute(ActionProposal $proposal): array
+    public function execute(ActionProposal $proposal): ExecutionResult
     {
         $payload = $proposal->changes[0]['payload'] ?? [];
 
@@ -25,12 +26,15 @@ class CreateTaskActionExecutor implements ActionExecutorInterface
             'lead_id' => $leadId,
         ]);
 
-        return [
-            'module' => 'tasks',
-            'action' => 'created',
-            'resource_type' => 'task',
-            'resource_id' => $task->id,
-        ];
+        return ExecutionResult::make(
+            summary: 'Task created successfully.',
+            details: [
+                'module' => 'tasks',
+                'action' => 'created',
+                'resource_type' => 'task',
+                'resource_id' => $task->id,
+            ],
+        );
     }
 
     private function resolveLeadId(?string $leadName): ?int

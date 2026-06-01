@@ -1,5 +1,7 @@
 <script setup lang="ts">
-defineProps<{ result: Record<string, unknown> }>()
+import type { ExecutionResult } from '~/types/actions'
+
+defineProps<{ result: ExecutionResult }>()
 </script>
 
 <template>
@@ -8,9 +10,10 @@ defineProps<{ result: Record<string, unknown> }>()
       <span class="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20 text-xs text-emerald-400">✓</span>
       <p class="text-xs font-semibold text-emerald-400">{{ $t('proposal.executed_successfully') }}</p>
     </div>
-    <dl class="flex flex-col gap-0 divide-y divide-emerald-500/10">
+    <p class="px-3.5 pt-2.5 text-xs font-medium text-emerald-300">{{ result.summary }}</p>
+    <dl class="mt-1 flex flex-col gap-0 divide-y divide-emerald-500/10">
       <div
-        v-for="(value, key) in result"
+        v-for="(value, key) in result.details"
         :key="key"
         class="flex items-center justify-between px-3.5 py-2 text-xs"
       >

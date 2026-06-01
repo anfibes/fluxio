@@ -20,6 +20,11 @@ return [
     'ambiguity_resolution_not_supported' => 'Questo tipo di azione non supporta la risoluzione delle ambiguità.',
     'cannot_shift_time_no_current_time' => 'Impossibile spostare l\'orario perché la proposta non ha un orario attuale.',
 
+    'execution_failure' => [
+        'unsupported_intent' => 'Questo tipo di azione non può essere eseguito.',
+        'execution_failed' => 'Non è stato possibile completare l\'azione. Nessuna modifica è stata applicata.',
+    ],
+
     'capabilities' => [
         'operations' => [
             'replace' => 'Aggiorna',

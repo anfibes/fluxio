@@ -81,8 +81,8 @@ class ExecuteScheduleCallProposalTest extends TestCase
         $response = $this->postJson("/api/actions/{$proposal->id}/execute");
 
         $response->assertStatus(200)
-            ->assertJsonPath('data.execution_result.type', 'scheduled_call')
-            ->assertJsonPath('data.execution_result.status', 'scheduled');
+            ->assertJsonPath('data.execution_result.details.type', 'scheduled_call')
+            ->assertJsonPath('data.execution_result.details.status', 'scheduled');
     }
 
     public function test_execution_result_contains_lead_date_and_time(): void
@@ -93,9 +93,9 @@ class ExecuteScheduleCallProposalTest extends TestCase
         $response = $this->postJson("/api/actions/{$proposal->id}/execute");
 
         $response->assertStatus(200)
-            ->assertJsonPath('data.execution_result.lead', 'Rossini')
-            ->assertJsonPath('data.execution_result.date', '2026-05-10')
-            ->assertJsonPath('data.execution_result.time', '09:00');
+            ->assertJsonPath('data.execution_result.details.lead', 'Rossini')
+            ->assertJsonPath('data.execution_result.details.date', '2026-05-10')
+            ->assertJsonPath('data.execution_result.details.time', '09:00');
     }
 
     public function test_executed_at_is_set(): void
@@ -153,8 +153,8 @@ class ExecuteScheduleCallProposalTest extends TestCase
         $execute = $this->postJson("/api/actions/{$id}/execute");
         $execute->assertStatus(200)
             ->assertJsonPath('data.status', 'executed')
-            ->assertJsonPath('data.execution_result.type', 'scheduled_call')
-            ->assertJsonPath('data.execution_result.status', 'scheduled');
+            ->assertJsonPath('data.execution_result.details.type', 'scheduled_call')
+            ->assertJsonPath('data.execution_result.details.status', 'scheduled');
     }
 
     // --- lifecycle guards ---

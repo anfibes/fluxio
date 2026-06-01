@@ -105,9 +105,13 @@ export const mockProposalExecuted: ActionProposal = {
   failed_at: null,
   failure_reason: null,
   execution_result: {
-    task_id: 42,
-    title: 'Product demo with TechStart',
-    status: 'created',
+    summary: 'Task created successfully.',
+    details: {
+      module: 'tasks',
+      action: 'created',
+      resource_type: 'task',
+      resource_id: 42,
+    },
   },
   last_refinement: null,
   ambiguities: [],

@@ -195,6 +195,6 @@ class ScalarRefinementConsistencyTest extends TestCase
             ->assertStatus(200)
             ->json('data.execution_result');
 
-        $this->assertSame('10:30', $result['time']);
+        $this->assertSame('10:30', $result['details']['time']);
     }
 }

@@ -300,7 +300,7 @@ class RicherOperationalIntentsTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonPath('data.status', 'executed');
 
-        $this->assertEquals('contract_prepared', $response->json('data.execution_result.type'));
+        $this->assertEquals('contract_prepared', $response->json('data.execution_result.details.type'));
     }
 
     public function test_assign_lead_proposal_can_execute(): void
@@ -335,9 +335,9 @@ class RicherOperationalIntentsTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonPath('data.status', 'executed');
 
-        $this->assertEquals('lead_assigned', $response->json('data.execution_result.type'));
-        $this->assertEquals('Rossini', $response->json('data.execution_result.lead'));
-        $this->assertEquals('Marco', $response->json('data.execution_result.assignee'));
+        $this->assertEquals('lead_assigned', $response->json('data.execution_result.details.type'));
+        $this->assertEquals('Rossini', $response->json('data.execution_result.details.lead'));
+        $this->assertEquals('Marco', $response->json('data.execution_result.details.assignee'));
     }
 
     public function test_schedule_meeting_proposal_can_execute(): void
@@ -373,7 +373,7 @@ class RicherOperationalIntentsTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonPath('data.status', 'executed');
 
-        $this->assertEquals('meeting_scheduled', $response->json('data.execution_result.type'));
+        $this->assertEquals('meeting_scheduled', $response->json('data.execution_result.details.type'));
     }
 
     // ── Full-command richer intent regression tests ───────────────────────────

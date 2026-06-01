@@ -3,11 +3,12 @@
 namespace Fluxio\Actions\Executors;
 
 use Fluxio\Actions\Contracts\ActionExecutorInterface;
+use Fluxio\Actions\DTO\Execution\ExecutionResult;
 use Fluxio\Actions\Models\ActionProposal;
 
 class ScheduleCallActionExecutor implements ActionExecutorInterface
 {
-    public function execute(ActionProposal $proposal): array
+    public function execute(ActionProposal $proposal): ExecutionResult
     {
         $fields = collect($proposal->editable_fields ?? [])->keyBy('key');
 
@@ -15,13 +16,15 @@ class ScheduleCallActionExecutor implements ActionExecutorInterface
         $date = $fields->get('date')['value'] ?? null;
         $time = $fields->get('time')['value'] ?? null;
 
-        return [
-            'type' => 'scheduled_call',
-            'status' => 'scheduled',
-            'lead' => $lead,
-            'date' => $date,
-            'time' => $time,
-            'message' => 'Call scheduled successfully.',
-        ];
+        return ExecutionResult::make(
+            summary: 'Call scheduled successfully.',
+            details: [
+                'type' => 'scheduled_call',
+                'status' => 'scheduled',
+                'lead' => $lead,
+                'date' => $date,
+                'time' => $time,
+            ],
+        );
     }
 }
