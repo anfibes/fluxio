@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Actions;
 
+use Fluxio\Actions\DTO\EntityReference;
 use Fluxio\Actions\DTO\NormalizedCommand;
 use Fluxio\Actions\DTO\ParsedIntent;
 use PHPUnit\Framework\TestCase;
@@ -30,7 +31,7 @@ class InterpretationContractGuardrailTest extends TestCase
         'ambiguit',
         'missing',
         'selected_candidate',
-        'candidate_id',
+        'candidate',
         'lead_id',
         'readiness',
         'execution',
@@ -95,5 +96,30 @@ class InterpretationContractGuardrailTest extends TestCase
 
         // Exactly the interpretation-side fields: meaning + raw references + notes.
         $this->assertSame(['intent', 'entities', 'warnings'], $params);
+    }
+
+    public function test_entity_reference_has_no_lifecycle_or_identity_surface(): void
+    {
+        $this->assertNoForbiddenSurface(EntityReference::class);
+    }
+
+    public function test_entity_reference_is_exactly_key_and_value(): void
+    {
+        // An EntityReference is the reference span only — no id, no candidates, no
+        // selected_candidate_id, no resolved-label authority, no ambiguity/lifecycle.
+        $reflection = new ReflectionClass(EntityReference::class);
+        $params = array_map(
+            static fn ($p) => $p->getName(),
+            $reflection->getConstructor()->getParameters(),
+        );
+
+        $this->assertSame(['key', 'value'], $params);
+
+        $properties = array_map(
+            static fn ($p) => $p->getName(),
+            $reflection->getProperties(),
+        );
+        sort($properties);
+        $this->assertSame(['key', 'value'], $properties);
     }
 }
