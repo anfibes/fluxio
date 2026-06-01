@@ -153,12 +153,14 @@ Refinements are NOT generic chat replies.
 
 Refinements mutate proposal state explicitly.
 
-Current supported mutation operations:
+Current structural mutation operations (the closed application vocabulary):
 - replace
 - append
 - remove
 - clear
-- replace_target
+
+A targeted collection replace ("replace Mario with Marco") is a `replace` carrying
+a target item, not a separate operation.
 
 Examples:
 
@@ -176,8 +178,9 @@ deterministically against the proposal's current time — never invented.
 
 Each tracked change can also carry a descriptive `semantic_type`
 (`shift_time`, `replace_time`, `replace_date`, `add_participant`,
-`remove_participant`, `replace_participant`) — explainability metadata only,
-surfaced in `last_refinement.changes` and rendered in the proposal rail.
+`remove_participant`, `replace_participant`, `replace_priority`, `clear_priority`) —
+explainability metadata only, surfaced in `last_refinement.changes` and rendered in
+the proposal rail.
 
 Fluxio tracks:
 - what changed
@@ -398,6 +401,8 @@ Current capabilities:
 - intent capability model (per-intent mutation/refinement legality)
 - localized capability labels in the proposal payload
 - refinement warning deduplication
+- typed, atomic execution (a deterministic execution authority: at-most-once,
+  confirmed-only, transactional, with a typed result and a typed/sanitized failure)
 
 ---
 
@@ -504,19 +509,18 @@ This protects:
 
 ---
 
-# Event-Driven Architecture
+# Cross-Module Communication
 
-Modules communicate through:
-- events
-- listeners
-- jobs
+The architectural rule is that modules stay decoupled: cross-domain work should
+flow through events/listeners and DTO contracts rather than direct calls into
+another module's services or models.
 
-Examples:
-- `ActionExecuted`
-- `LeadCreated`
-- `TaskCompleted`
-
-Direct cross-domain coupling is intentionally minimized.
+Status — this is a **design rule, not yet a wired mechanism**. No domain events are
+dispatched today; the MVP executors (e.g. `CreateTaskActionExecutor`) still call
+domain models directly (`Task::create(...)`, `Lead::where(...)`). The event-driven
+decoupling (e.g. an `ActionExecuted` event consumed by other modules) is planned,
+not implemented. Keeping module boundaries crisp now is what makes that extraction
+possible later.
 
 ---
 
@@ -662,6 +666,8 @@ Frontend direction remains:
   default and authoritative path)
 - Runtime hybrid interpretation (both providers in one request — comparison
   is currently diagnostics-only)
+- Event-driven cross-module communication (a design rule; executors currently call
+  domain models directly)
 - Semantic entity search
 - Advanced resolver ranking
 - Voice workflows
@@ -740,9 +746,11 @@ notes and working documents live in `.docs/`.
 
 ## Internal notes (`.docs/`)
 
-- [Backend Current State](.docs/backend-current-state.md)
-- [Development Plan](.docs/development-plan.md)
-- [LLM Interpretation Contract](.docs/llm-interpretation-contract.md)
+- [Runtime Architecture v1](.docs/runtime-architecture-v1.md) — authoritative current-state runtime reference (authorities, lowering boundaries, execution runtime)
+- [Backend Current State](.docs/backend-current-state.md) — implementation-grounded, phase-by-phase runtime state
+- [Development Plan](.docs/development-plan.md) — roadmap and implemented-phase log
+- [LLM Interpretation Contract](.docs/llm-interpretation-contract.md) — interpretation boundary contract
+- [Refinement IR Contract](.docs/refinement-ir-contract.md) — semantic refinement IR and lowering boundary
 
 ---
 

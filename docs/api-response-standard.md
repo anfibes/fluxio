@@ -469,11 +469,18 @@ These endpoints use the same standardized response envelope used by the rest of 
         "executed_at": null,
         "failed_at": null,
         "failure_reason": null,
+        "failure_reason_code": null,
+        "execution_failure": null,
         "execution_result": null,
         "last_refinement": null
     }
 }
 ```
+
+On `executed`, `execution_result` is a typed `{ "summary": string, "details": { … } }`.
+On `failed`, `execution_failure` is `{ "reason": "unsupported_intent" | "execution_failed",
+"message": string }`, with `failure_reason_code` mirroring the reason and `failure_reason`
+holding the same sanitized message. Raw exception text is never exposed.
 
 ---
 

@@ -129,10 +129,15 @@ Example:
     "executed_at": null,
     "failed_at": null,
     "failure_reason": null,
+    "failure_reason_code": null,
+    "execution_failure": null,
     "execution_result": null,
     "last_refinement": null
 }
 ```
+
+(The serialized payload also carries a read-only `capabilities` block; see the
+Architecture doc's Intent Capability Layer.)
 
 The proposal acts as:
 - execution contract
@@ -221,38 +226,41 @@ This prepares future support for:
 
 # State: `executed`
 
-A proposal becomes `executed` after successful business execution.
+A proposal becomes `executed` after a successful, atomic, at-most-once execution.
 
 At this point:
-- business mutation completed
-- execution metadata persisted
-- execution result exposed
+- the business side effect completed inside a transaction
+- `executed_at` is persisted
+- `execution_result` is exposed as a typed, consistent shape:
+  `{ "summary": <human one-liner>, "details": { … } }` — the same envelope for
+  every intent (e.g. a created-resource reference, or the scheduled lead/date/time)
 
-Executed proposals should remain immutable.
+Executed proposals are terminal and immutable (re-executing returns the stored
+result; refinement and confirmation are rejected).
 
 ---
 
 # State: `failed`
 
-A proposal becomes `failed` when execution cannot complete.
+A proposal becomes `failed` only when an **execution attempt** raises an unexpected
+error, or the intent has no registered executor. The failure is recorded as a typed,
+sanitized outcome:
 
-Examples:
-- validation failures
-- permission issues
-- business constraints
-- unresolved ambiguity
-- execution exceptions
+- `failed_at` is persisted
+- `failure_reason_code` ∈ `{ unsupported_intent, execution_failed }` (closed taxonomy)
+- `failure_reason` / `execution_failure.message` carry a sanitized, localized
+  message — raw exception text is never persisted or exposed
+- any partial side effects from the failing executor are rolled back
 
-Failures must remain:
-- visible
-- explicit
-- operational
-- explainable
+Important distinction (grounded in `ActionExecutionService`): a *validation* condition
+surfaced at execution time — e.g. an ambiguous lead detected inside the executor — is
+returned as a `422` and leaves the proposal `confirmed`. It is **not** a `failed`
+terminal state. Likewise, an unresolved blocking ambiguity keeps a proposal in
+`draft` and never reaches execution at all. `failed` is reserved for genuine
+execution-time errors.
 
-Fluxio intentionally avoids hiding:
-- uncertainty
-- ambiguity
-- execution problems
+Failures remain visible, explicit, operational, and explainable; Fluxio intentionally
+avoids hiding uncertainty, ambiguity, or execution problems.
 
 ---
 
@@ -492,6 +500,8 @@ Current semantic types:
 | `add_participant` | a participant appended to the collection |
 | `remove_participant` | a participant removed from the collection |
 | `replace_participant` | a targeted participant swap |
+| `replace_priority` | a priority replace (e.g. "high priority") |
+| `clear_priority` | a priority cleared |
 | `unknown` | no recognized semantic meaning (default) |
 
 A `shift_time` is still a concrete `replace` on the `time` field — the semantic
@@ -734,7 +744,11 @@ A refinement against a blocking ambiguity has three deterministic outcomes:
 
 1. **Resolve** — the clarification matches exactly one candidate (an exact label,
    an ordinal like "the first one", or a type clarification that leaves a single
-   match). `selected_candidate_id` is set and the ambiguity stops blocking.
+   match). The authoritative ambiguity state is made self-consistent in one update:
+   `selected_candidate_id` is set **and** `blocking` is cleared to `false`. The
+   payload therefore never shows a resolved-but-blocking ambiguity, so consumers can
+   trust `blocking` directly rather than the compound
+   `blocking && selected_candidate_id === null` rule.
 2. **Narrow but stay blocking** — a type clarification ("the company") matches
    more than one candidate. The active `candidates` list is replaced with the
    matching subset (order preserved), `selected_candidate_id` stays `null`, the
@@ -757,6 +771,15 @@ intent does not declare `supportsAmbiguityResolution = true`, the attempt is
 skipped, a warning is added, and the proposal remains continuable. The
 mutation engine applies the same gate to detected refinement mutations
 through `IntentCapabilityRegistry::allowsMutation()`.
+
+This gate is paired with a hard invariant: any intent that can *generate* a
+resolver-backed blocking ambiguity must also support resolving it — otherwise a
+proposal could become structurally blocked yet operationally unresolvable. So the
+skipped-resolution path applies only to intents that cannot emit such an ambiguity.
+The invariant is enforced by a runtime guardrail test
+(`AmbiguityCapabilityInvariantTest`) derived from the live `IntentRegistry` and
+`EntityResolverRegistry`, so a future intent that wires a resolver-backed entity
+without resolution capability fails CI.
 
 Warnings produced during refinement (unsupported mutation, ambiguity
 resolution not supported, refinement not recognized) are deduplicated on the
@@ -861,6 +884,27 @@ Execution must remain:
 - auditable
 
 AI never directly mutates business data.
+
+## Execution runtime
+
+Execution is a deterministic runtime authority (`ActionExecutionService`) — the only
+path that produces business side effects. Its guarantees:
+
+- **Confirmed-only, at-most-once.** Execution runs only from a `confirmed` proposal.
+  The service opens a transaction, locks the proposal row (`lockForUpdate`), and
+  re-checks status under the lock before dispatching the executor, so two concurrent
+  executes can never both run. A second execute observes `executed` and returns the
+  stored result (idempotent).
+- **Atomic outcome.** The executor runs inside an inner savepoint. On success its
+  side effect and the `executed` transition commit together; on an unexpected error
+  the partial side effect rolls back while the `failed` terminal state is still
+  committed under the same lock (the throwable is re-raised only after commit).
+- **Typed result / failure.** Every executor returns one consistent
+  `ExecutionResult` (`{ summary, details }`); failures are a typed `ExecutionFailure`
+  (`{ reason, message }`) drawn from a closed taxonomy, with a sanitized message.
+- **Provider-blind and terminal.** Execution consumes committed proposal state only —
+  no reinterpretation, no ambiguity reopening, no provider metadata. A failed proposal
+  stays failed: there is no retry, recovery, or re-confirmation.
 
 ---
 

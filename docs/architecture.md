@@ -922,8 +922,18 @@ If a proposal has an unresolved blocking ambiguity AND the intent does not decla
 `supportsAmbiguityResolution = true`, the resolution attempt is skipped entirely.
 A warning is added; the proposal remains continuable.
 
-This prevents silent resolution attempts on intents where entity disambiguation is
-not part of the defined refinement contract.
+**Capability/lifecycle invariant.** An intent that can *generate* a resolver-backed
+blocking ambiguity MUST also support resolving it. Otherwise a proposal could become
+structurally blocked yet operationally unresolvable (`draft` → blocking ambiguity →
+no resolution capability → never confirmable). Concretely, any intent declaring an
+`EntityRequirement` with `resolverRequired = true` whose entity type has a registered
+resolver must declare `supportsAmbiguityResolution = true` and expose
+`ResolveAmbiguity`. All five MVP intents (including `create_task`, whose lead is
+optional but still resolver-backed) satisfy this. The invariant is enforced as a
+runtime guardrail test (`AmbiguityCapabilityInvariantTest`) derived from the live
+`IntentRegistry` + `EntityResolverRegistry`, so the skipped-resolution path above
+applies only to intents that cannot emit a resolver-backed blocking ambiguity in the
+first place.
 
 ## Static, deterministic, in-memory
 
@@ -996,8 +1006,18 @@ Rules:
 - proposal IDs remain stable
 - ambiguities may block readiness
 - ready proposals may still mutate
-- execution remains explicit
-- execution remains idempotent
+- execution remains explicit (confirmation is mandatory)
+- execution is atomic and runs at most once
+- execution terminates in exactly one outcome: `executed` (typed result) or
+  `failed` (typed, sanitized failure)
+
+Execution is a deterministic runtime authority (`ActionExecutionService`): it is the
+only path that produces business side effects, runs only from a `confirmed`
+proposal, locks the proposal row, re-checks status under the lock, and executes once.
+A `ValidationException` raised at execution time (e.g. an ambiguous lead surfacing
+in the executor) is a 422 that leaves the proposal `confirmed` — it is NOT a `failed`
+terminal state. Only an unexpected executor error (or an unsupported intent) marks
+the proposal `failed`, with the executor's partial side effects rolled back.
 
 ---
 
@@ -1024,7 +1044,15 @@ Example:
     "editable_fields": [],
     "changes": [],
     "needs_confirmation": true,
-    "last_refinement": null
+    "confirmed_at": null,
+    "executed_at": null,
+    "failed_at": null,
+    "failure_reason": null,
+    "failure_reason_code": null,
+    "execution_failure": null,
+    "execution_result": null,
+    "last_refinement": null,
+    "capabilities": {}
 }
 ```
 
@@ -1033,6 +1061,15 @@ The proposal contract must remain:
 - deterministic
 - explainable
 - frontend-friendly
+
+Execution outcome fields are typed and consistent across intents:
+- `execution_result` (on `executed`): `{ "summary": string, "details": { … } }` —
+  one shape for every intent, instead of ad-hoc per-executor payloads.
+- `execution_failure` (on `failed`): `{ "reason": "unsupported_intent" |
+  "execution_failed", "message": string }` — a closed reason taxonomy plus a
+  sanitized, localized message. `failure_reason` keeps the same message string for
+  compatibility; `failure_reason_code` persists the reason. Raw exception text is
+  never exposed.
 
 ---
 
@@ -1152,13 +1189,21 @@ Avoid:
 - hidden side effects
 - model-driven orchestration
 
-Preferred:
+Preferred (illustrative — the named event does not exist yet):
 
 ```php id="1sj34j"
 event(new LeadFollowUpRequested($leadId, $dueAt));
 ```
 
 instead of direct cross-domain mutations.
+
+**Current state (honest):** this is a *design rule*, not an implemented mechanism.
+No domain events are dispatched today and there are no `Events/` directories. The
+MVP executors still call other modules' models directly — e.g.
+`CreateTaskActionExecutor` calls `Task::create(...)` and `Lead::where(...)`. This is
+an accepted transitional simplification for the MVP; the boundaries are kept crisp
+so the direct calls can later be replaced by events/listeners without reshaping the
+modules.
 
 ---
 
