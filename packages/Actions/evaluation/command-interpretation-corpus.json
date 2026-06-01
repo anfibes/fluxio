@@ -1,0 +1,137 @@
+[
+    {
+        "id": "create-task-person-span-auto-resolves",
+        "text": "Create a high priority follow-up task for Mario Rossi tomorrow at 10",
+        "description": "Full person lead span is preserved and exact-matched (no spurious ambiguity).",
+        "expected": {
+            "intent": "create_task",
+            "status": "ready",
+            "lead": "Mario Rossi",
+            "no_lead_ambiguity": true,
+            "entities": { "time": "10:00" },
+            "entities_present": ["date"]
+        },
+        "notes": [
+            "Phase 9D.1 span preservation: 'Mario Rossi' no longer degrades to 'Rossi'.",
+            "Date is run-relative and intentionally asserted by presence only.",
+            "Priority is NOT extracted at command-interpretation time (refinement-only today); deliberately not asserted."
+        ]
+    },
+    {
+        "id": "create-task-company-span-auto-resolves",
+        "text": "Create a follow-up task for Rossi SRL tomorrow",
+        "description": "Full company lead span exact-matches.",
+        "expected": {
+            "intent": "create_task",
+            "status": "ready",
+            "lead": "Rossi SRL",
+            "no_lead_ambiguity": true,
+            "entities_present": ["date"]
+        }
+    },
+    {
+        "id": "create-task-studio-span-auto-resolves",
+        "text": "Create a high priority follow-up task for Studio Rossi tomorrow",
+        "description": "Full studio lead span exact-matches.",
+        "expected": {
+            "intent": "create_task",
+            "status": "ready",
+            "lead": "Studio Rossi",
+            "no_lead_ambiguity": true,
+            "entities_present": ["date"]
+        }
+    },
+    {
+        "id": "schedule-call-short-lead-ambiguous",
+        "text": "Schedule a call with Rossi tomorrow at 10",
+        "description": "A genuinely short lead reference must still surface the blocking ambiguity.",
+        "expected": {
+            "intent": "schedule_call",
+            "status": "draft",
+            "entities": { "time": "10:00" },
+            "entities_present": ["date"],
+            "ambiguity": {
+                "key": "lead",
+                "blocking": true,
+                "query": "Rossi",
+                "candidate_labels": ["Rossi SRL", "Mario Rossi", "Studio Rossi"]
+            }
+        }
+    },
+    {
+        "id": "schedule-call-person-span-auto-resolves",
+        "text": "Schedule a call with Mario Rossi tomorrow at 10",
+        "description": "Exact person lead in a scheduling intent auto-resolves and completes the proposal.",
+        "expected": {
+            "intent": "schedule_call",
+            "status": "ready",
+            "lead": "Mario Rossi",
+            "no_lead_ambiguity": true,
+            "entities": { "time": "10:00" },
+            "entities_present": ["date"]
+        }
+    },
+    {
+        "id": "schedule-meeting-company-span-auto-resolves",
+        "text": "Schedule a meeting with Rossi SRL next Friday at 3pm",
+        "description": "Meeting with a company span auto-resolves; temporal values extracted.",
+        "expected": {
+            "intent": "schedule_meeting",
+            "status": "ready",
+            "lead": "Rossi SRL",
+            "no_lead_ambiguity": true,
+            "entities": { "time": "15:00" },
+            "entities_present": ["date"]
+        }
+    },
+    {
+        "id": "assign-lead-person-span-and-assignee",
+        "text": "Assign Mario Rossi to Marco",
+        "description": "Assign preserves the lead span (auto-resolved) and extracts the assignee.",
+        "expected": {
+            "intent": "assign_lead",
+            "status": "ready",
+            "lead": "Mario Rossi",
+            "no_lead_ambiguity": true,
+            "entities": { "assignee": "Marco" }
+        }
+    },
+    {
+        "id": "prepare-contract-person-span",
+        "text": "Prepare a contract for Mario Rossi",
+        "description": "Contract preparation preserves the lead span and auto-resolves it.",
+        "expected": {
+            "intent": "prepare_contract_from_quote",
+            "status": "ready",
+            "lead": "Mario Rossi",
+            "no_lead_ambiguity": true
+        }
+    },
+    {
+        "id": "call-bare-short-lead-ambiguous",
+        "text": "Call Rossi",
+        "description": "Verb-anchored short lead reference stays ambiguous; date/time absent.",
+        "expected": {
+            "intent": "schedule_call",
+            "status": "draft",
+            "missing": ["date", "time"],
+            "ambiguity": {
+                "key": "lead",
+                "blocking": true,
+                "query": "Rossi",
+                "candidate_labels": ["Rossi SRL", "Mario Rossi", "Studio Rossi"]
+            }
+        }
+    },
+    {
+        "id": "create-task-no-lead",
+        "text": "Create a task for tomorrow",
+        "description": "No lead reference must NOT fabricate a lead; create_task with an optional lead stays ready.",
+        "expected": {
+            "intent": "create_task",
+            "status": "ready",
+            "no_lead_ambiguity": true,
+            "entities_present": ["date"]
+        }
+    }
+]
