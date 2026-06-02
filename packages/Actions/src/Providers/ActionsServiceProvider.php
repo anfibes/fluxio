@@ -6,6 +6,7 @@ use Fluxio\Actions\Console\CompareInterpretationCommand;
 use Fluxio\Actions\Console\EvaluateCommandInterpretationCorpusCommand;
 use Fluxio\Actions\Console\EvaluateInterpretationCorpusCommand;
 use Fluxio\Actions\Console\EvaluateRefinementCorpusCommand;
+use Fluxio\Actions\Console\ExportInterpretationGrammarCommand;
 use Fluxio\Actions\Contracts\CommandInterpreterInterface;
 use Fluxio\Actions\Contracts\IntentResolverInterface;
 use Fluxio\Actions\Contracts\RefinementInterpreterInterface;
@@ -225,6 +226,7 @@ class ActionsServiceProvider extends ServiceProvider
                 EvaluateInterpretationCorpusCommand::class,
                 EvaluateRefinementCorpusCommand::class,
                 EvaluateCommandInterpretationCorpusCommand::class,
+                ExportInterpretationGrammarCommand::class,
             ]);
         }
     }
