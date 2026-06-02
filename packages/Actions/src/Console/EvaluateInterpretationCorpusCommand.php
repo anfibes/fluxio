@@ -5,6 +5,7 @@ namespace Fluxio\Actions\Console;
 use Fluxio\Actions\Diagnostics\Evaluation\InterpretationCorpusLoader;
 use Fluxio\Actions\Diagnostics\Evaluation\InterpretationDriftAnalyzer;
 use Fluxio\Actions\Diagnostics\Evaluation\InterpretationEvaluationService;
+use Fluxio\Actions\Interpretation\InterpretationGrammar;
 use Illuminate\Console\Command;
 
 /**
@@ -39,6 +40,7 @@ class EvaluateInterpretationCorpusCommand extends Command
         InterpretationCorpusLoader $loader,
         InterpretationEvaluationService $service,
         InterpretationDriftAnalyzer $analyzer,
+        InterpretationGrammar $grammar,
     ): int {
         if ($this->getLaravel()->environment('production')) {
             $this->error('actions:evaluate-interpretation-corpus is a diagnostics command and is disabled in production.');
@@ -53,12 +55,16 @@ class EvaluateInterpretationCorpusCommand extends Command
         $metrics = $analyzer->analyze($summary);
 
         if ($this->option('json')) {
-            // Backward-friendly: existing summary fields stay; metrics are added.
+            // Backward-friendly: existing summary fields stay; metrics and grammar are added.
+            // `grammar` records the provider-facing surface (InterpretationGrammar::export())
+            // the comparison ran against — the same surface the prompt/validator use.
             $payload = $summary->toArray();
             $payload['metrics'] = $metrics->toArray();
+            $payload['grammar'] = $grammar->export();
             $this->line(json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
         } else {
             $this->renderSummary($summary->toArray());
+            $this->renderGrammar($grammar->export());
 
             if ($this->option('metrics')) {
                 $this->renderMetrics($metrics->toArray());
@@ -84,6 +90,21 @@ class EvaluateInterpretationCorpusCommand extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Concise grammar-awareness block: which provider-facing contract/version and
+     * intent/key surface the corpus was evaluated against. Derived from
+     * InterpretationGrammar::export(); observability only.
+     *
+     * @param  array<string, mixed>  $grammar
+     */
+    private function renderGrammar(array $grammar): void
+    {
+        $this->newLine();
+        $this->line('<info>Grammar</info> '.$grammar['contract'].' v'.$grammar['version']);
+        $this->line('  allowed_reference_keys: '.implode(', ', $grammar['allowed_reference_keys']));
+        $this->line('  intents: '.implode(', ', $grammar['intents']));
     }
 
     /**

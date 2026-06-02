@@ -4,6 +4,7 @@ namespace Fluxio\Actions\Console;
 
 use Fluxio\Actions\Diagnostics\InterpretationComparisonService;
 use Fluxio\Actions\Interpretation\DTO\InterpretationContext;
+use Fluxio\Actions\Interpretation\InterpretationGrammar;
 use Illuminate\Console\Command;
 
 /**
@@ -16,6 +17,12 @@ use Illuminate\Console\Command;
  *
  * CI boundary: this is OPT-IN provider diagnostics (may contact the Ollama sandbox),
  * not a CI gate, and is intentionally excluded from `composer test:actions-corpora`.
+ *
+ * Grammar awareness (Phase 9F.3A): the output also carries the read-only
+ * InterpretationGrammar::export() artifact — the same provider-facing surface the
+ * prompt builder renders and the structured-output validator enforces — so a reader
+ * can see which contract/version and intent/key surface the comparison ran against.
+ * Observability only; nothing here enforces the grammar or changes runtime.
  */
 class CompareInterpretationCommand extends Command
 {
@@ -26,7 +33,7 @@ class CompareInterpretationCommand extends Command
 
     protected $description = 'Opt-in provider diagnostics: compare deterministic vs. Ollama sandbox interpretation for one input. NOT a CI gate; excluded from composer test:actions-corpora. Non-production.';
 
-    public function handle(InterpretationComparisonService $service): int
+    public function handle(InterpretationComparisonService $service, InterpretationGrammar $grammar): int
     {
         if ($this->getLaravel()->environment('production')) {
             $this->error('actions:compare-interpretation is a diagnostics command and is disabled in production.');
@@ -38,14 +45,35 @@ class CompareInterpretationCommand extends Command
         $result = $service->compare($text, new InterpretationContext(locale: (string) $this->option('locale')));
 
         if ($this->option('json')) {
-            $this->line(json_encode($result->toArray(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            // Additive: the existing comparison fields are unchanged; `grammar` records the
+            // provider-facing surface (from InterpretationGrammar::export()) the run used.
+            $payload = $result->toArray();
+            $payload['grammar'] = $grammar->export();
+
+            $this->line(json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
 
             return self::SUCCESS;
         }
 
         $this->renderSummary($result->toArray());
+        $this->renderGrammar($grammar->export());
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Concise grammar-awareness block: which provider-facing contract/version and
+     * intent/key surface the diagnostics ran against. Derived from
+     * InterpretationGrammar::export(); observability only.
+     *
+     * @param  array<string, mixed>  $grammar
+     */
+    private function renderGrammar(array $grammar): void
+    {
+        $this->newLine();
+        $this->line('<info>grammar:</info> '.$grammar['contract'].' v'.$grammar['version']);
+        $this->line('  allowed_reference_keys: '.implode(', ', $grammar['allowed_reference_keys']));
+        $this->line('  intents: '.implode(', ', $grammar['intents']));
     }
 
     /**

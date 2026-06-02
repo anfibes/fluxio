@@ -114,6 +114,27 @@ class EvaluateInterpretationCorpusMetricsCommandTest extends TestCase
         $this->assertEquals(1.0, $decoded['metrics']['provider_intent_agreement_rate']);
     }
 
+    public function test_json_includes_grammar_artifact_from_export(): void
+    {
+        $this->fakeLlmReturning(['intent' => 'create_task', 'confidence' => 0.8, 'entities' => [], 'notes' => []]);
+
+        Artisan::call('actions:evaluate-interpretation-corpus', [
+            '--path' => $this->createTaskCorpus(),
+            '--json' => true,
+        ]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        // Additive grammar block equals the export() artifact — the same provider-facing
+        // surface the prompt/validator use; existing summary + metrics fields remain.
+        $this->assertArrayHasKey('grammar', $decoded);
+        $this->assertSame(
+            $this->app->make(\Fluxio\Actions\Interpretation\InterpretationGrammar::class)->export(),
+            $decoded['grammar'],
+        );
+        $this->assertArrayHasKey('total', $decoded);
+        $this->assertArrayHasKey('metrics', $decoded);
+    }
+
     public function test_json_includes_baseline_relative_outcomes(): void
     {
         // Deterministic and Ollama both resolve create_task for the create-task case.

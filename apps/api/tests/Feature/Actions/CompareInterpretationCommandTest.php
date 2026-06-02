@@ -3,6 +3,7 @@
 namespace Tests\Feature\Actions;
 
 use Fluxio\Actions\Interpretation\Contracts\InterpretationProviderInterface;
+use Fluxio\Actions\Interpretation\InterpretationGrammar;
 use Fluxio\Actions\Interpretation\Providers\DeterministicInterpretationProvider;
 use Fluxio\Actions\Llm\Contracts\LlmClientInterface;
 use Fluxio\Actions\Llm\DTO\LlmRequest;
@@ -67,6 +68,35 @@ class CompareInterpretationCommandTest extends TestCase
             DeterministicInterpretationProvider::class,
             $this->app->make(InterpretationProviderInterface::class),
         );
+    }
+
+    public function test_json_output_includes_grammar_artifact_from_export(): void
+    {
+        $this->fakeLlmReturning([
+            'intent' => 'create_task',
+            'confidence' => 0.82,
+            'entities' => [],
+            'notes' => [],
+        ]);
+
+        Artisan::call('actions:compare-interpretation', [
+            'text' => 'Create a task for Rossi',
+            '--json' => true,
+        ]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        // The grammar block is additive and is the exact export() artifact — proving the
+        // comparison was inspected against the same provider-facing surface the prompt
+        // builder and validator use.
+        $this->assertArrayHasKey('grammar', $decoded);
+        $this->assertSame(
+            $this->app->make(InterpretationGrammar::class)->export(),
+            $decoded['grammar'],
+        );
+
+        // Existing fields remain (backward-friendly).
+        $this->assertArrayHasKey('deterministic', $decoded);
+        $this->assertArrayHasKey('same_intent', $decoded);
     }
 
     public function test_command_does_not_create_action_proposal_records(): void
