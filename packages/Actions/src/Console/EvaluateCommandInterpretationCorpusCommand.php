@@ -21,6 +21,11 @@ use Illuminate\Console\Command;
  * It changes no runtime behavior, calls no LLM, and persists nothing (the pipeline
  * is DB-free). It is blocked in production. Only an invalid corpus aborts the run;
  * case mismatches are reported (and optionally gated with --fail-on-mismatch).
+ *
+ * CI boundary: with --fail-on-mismatch this is one of the two deterministic,
+ * network-free corpora that back the mandatory `composer test:actions-corpora`
+ * gate. The provider-level interpretation diagnostics (deterministic vs. Ollama)
+ * are a separate, opt-in tool and are NOT part of that gate.
  */
 class EvaluateCommandInterpretationCorpusCommand extends Command
 {
@@ -29,7 +34,7 @@ class EvaluateCommandInterpretationCorpusCommand extends Command
                             {--json : Emit the full evaluation as pretty JSON instead of the summary table}
                             {--fail-on-mismatch : Exit non-zero when any corpus case does not match its expectations (opt-in, for CI)}';
 
-    protected $description = 'Diagnostics: evaluate proposal-level command interpretation against the deterministic baseline corpus (non-production).';
+    protected $description = 'Deterministic CI gate: evaluate proposal-level command interpretation against the baseline corpus. Network-free; with --fail-on-mismatch it backs composer test:actions-corpora. Non-production.';
 
     public function handle(
         CommandInterpretationCorpusLoader $loader,

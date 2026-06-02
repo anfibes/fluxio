@@ -13,6 +13,9 @@ use Illuminate\Console\Command;
  * It builds no proposals, calls no ActionInterpreterService, persists nothing,
  * and does not change the configured runtime interpretation provider. It is
  * blocked in production.
+ *
+ * CI boundary: this is OPT-IN provider diagnostics (may contact the Ollama sandbox),
+ * not a CI gate, and is intentionally excluded from `composer test:actions-corpora`.
  */
 class CompareInterpretationCommand extends Command
 {
@@ -21,7 +24,7 @@ class CompareInterpretationCommand extends Command
                             {--locale=en : Locale passed to the interpretation context}
                             {--json : Emit raw pretty JSON instead of the summary table}';
 
-    protected $description = 'Diagnostics: compare deterministic vs. Ollama sandbox interpretation for one input (non-production).';
+    protected $description = 'Opt-in provider diagnostics: compare deterministic vs. Ollama sandbox interpretation for one input. NOT a CI gate; excluded from composer test:actions-corpora. Non-production.';
 
     public function handle(InterpretationComparisonService $service): int
     {

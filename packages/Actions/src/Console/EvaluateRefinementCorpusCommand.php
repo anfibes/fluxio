@@ -20,6 +20,11 @@ use Illuminate\Support\Facades\DB;
  * proposals and evaluation user never reach the database. It is blocked in
  * production. Only an invalid corpus file aborts the run; case mismatches are
  * reported (and optionally gated with --fail-on-mismatch).
+ *
+ * CI boundary: with --fail-on-mismatch this is one of the two deterministic,
+ * network-free corpora that back the mandatory `composer test:actions-corpora`
+ * gate. The provider-level interpretation diagnostics (deterministic vs. Ollama)
+ * are a separate, opt-in tool and are NOT part of that gate.
  */
 class EvaluateRefinementCorpusCommand extends Command
 {
@@ -28,7 +33,7 @@ class EvaluateRefinementCorpusCommand extends Command
                             {--json : Emit the full evaluation as pretty JSON instead of the summary table}
                             {--fail-on-mismatch : Exit non-zero when any corpus case does not match its expectations (opt-in, for CI)}';
 
-    protected $description = 'Diagnostics: evaluate the refinement corpus against the rule-based refinement interpreter (non-production).';
+    protected $description = 'Deterministic CI gate: evaluate the refinement corpus against the rule-based refinement interpreter. Network-free; with --fail-on-mismatch it backs composer test:actions-corpora. Non-production.';
 
     public function handle(
         RefinementCorpusLoader $loader,

@@ -16,6 +16,13 @@ use Illuminate\Console\Command;
  * and does not change the configured runtime interpretation provider. It is
  * blocked in production. A captured Ollama failure is reported per case, not a
  * crash; only an invalid corpus file aborts the run.
+ *
+ * CI boundary: this is OPT-IN provider diagnostics. It compares the deterministic
+ * baseline against the Ollama sandbox and may contact a model when that provider is
+ * selected, so it is intentionally NOT part of the mandatory `composer test:actions-corpora`
+ * gate. Baseline-relative outcomes (--metrics) and --fail-on-drift are diagnostics
+ * signals only: the deterministic provider stays the oracle and nothing here becomes
+ * runtime authority or auto-selects a provider.
  */
 class EvaluateInterpretationCorpusCommand extends Command
 {
@@ -26,7 +33,7 @@ class EvaluateInterpretationCorpusCommand extends Command
                             {--fail-on-drift : Exit non-zero when provider intent agreement is below the threshold (opt-in, for CI experiments)}
                             {--agreement-threshold=0.8 : Minimum provider intent agreement rate; only applies with --fail-on-drift}';
 
-    protected $description = 'Diagnostics: evaluate the interpretation corpus (deterministic vs. Ollama sandbox) against expected results, with optional drift metrics (non-production).';
+    protected $description = 'Opt-in provider diagnostics: compare the deterministic baseline vs. the Ollama sandbox over the interpretation corpus, with optional drift metrics. NOT part of composer test:actions-corpora; may contact a model. Non-production.';
 
     public function handle(
         InterpretationCorpusLoader $loader,
