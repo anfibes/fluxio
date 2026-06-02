@@ -129,6 +129,25 @@ class EvaluateInterpretationCorpusCommand extends Command
                 ));
             }
         }
+
+        $this->newLine();
+        $this->line('<info>Baseline-relative outcomes</info> <comment>(provider vs deterministic oracle)</comment>');
+        $outcomes = $metrics['baseline_relative_outcomes'];
+        $this->line(sprintf(
+            '  improved=%d  regressed=%d  parity_match=%d  parity_miss=%d',
+            $outcomes['improved'],
+            $outcomes['regressed'],
+            $outcomes['parity_match'],
+            $outcomes['parity_miss'],
+        ));
+        if ($metrics['regression_cases'] === []) {
+            $this->line('  regression cases: (none)');
+        } else {
+            $this->line('  regression cases:');
+            foreach ($metrics['regression_cases'] as $case) {
+                $this->line(sprintf('    - %s (expected %s)', $case['id'], $case['expected_intent']));
+            }
+        }
     }
 
     private function scalar(mixed $value): string

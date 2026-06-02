@@ -26,6 +26,8 @@ final class InterpretationEvaluationMetrics
      * @param  list<array<string, mixed>>  $providerFailureCases
      * @param  array<string, array<string, mixed>>  $weakExpectedIntents
      * @param  array<string, int>  $divergentEntityKeys
+     * @param  array{improved: int, regressed: int, parity_match: int, parity_miss: int}  $baselineRelativeOutcomes
+     * @param  list<array{id: string, expected_intent: string}>  $regressionCases
      */
     public function __construct(
         public readonly int $totalCases,
@@ -46,6 +48,8 @@ final class InterpretationEvaluationMetrics
         public readonly array $providerFailureCases,
         public readonly array $weakExpectedIntents,
         public readonly array $divergentEntityKeys,
+        public readonly array $baselineRelativeOutcomes,
+        public readonly array $regressionCases,
     ) {}
 
     /**
@@ -72,6 +76,8 @@ final class InterpretationEvaluationMetrics
             'provider_failure_cases' => $this->providerFailureCases,
             'weak_expected_intents' => $this->weakExpectedIntents,
             'divergent_entity_keys' => $this->divergentEntityKeys,
+            'baseline_relative_outcomes' => $this->baselineRelativeOutcomes,
+            'regression_cases' => $this->regressionCases,
         ];
     }
 }

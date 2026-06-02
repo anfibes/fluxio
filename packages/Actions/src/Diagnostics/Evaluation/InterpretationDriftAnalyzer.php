@@ -35,6 +35,14 @@ class InterpretationDriftAnalyzer
         $ollamaConfidences = [];
         $deltas = [];
 
+        // Baseline-relative outcomes: the deterministic provider is the oracle; classify
+        // the configured provider against it, per case, on the expected corpus result.
+        $baselineImproved = 0;
+        $baselineRegressed = 0;
+        $baselineParityMatch = 0;
+        $baselineParityMiss = 0;
+        $regressionCases = [];
+
         $entityAgreementCount = 0;
 
         /** @var array<string, array{cases: int, deterministic_intent_match: int, ollama_intent_match: int}> $byExpectedIntent */
@@ -98,6 +106,24 @@ class InterpretationDriftAnalyzer
                     'ollama_error' => $ollama->errorClass,
                 ];
             }
+
+            // Baseline-relative verdict. A case "matches" for a provider when it hits
+            // BOTH the expected intent and the expected entities. A failed/sandbox-rejected
+            // provider matches nothing, so it falls into regressed or parity_miss — keeping
+            // failure visibility tied to the head-to-head outcome.
+            $deterministicMatch = $case->deterministicIntentMatch && $case->deterministicEntityMatch;
+            $providerMatch = $case->ollamaIntentMatch && $case->ollamaEntityMatch;
+
+            if ($deterministicMatch && $providerMatch) {
+                $baselineParityMatch++;
+            } elseif ($deterministicMatch) {
+                $baselineRegressed++;
+                $regressionCases[] = ['id' => $case->id, 'expected_intent' => $case->expectedIntent];
+            } elseif ($providerMatch) {
+                $baselineImproved++;
+            } else {
+                $baselineParityMiss++;
+            }
         }
 
         // Top cases by absolute confidence delta.
@@ -128,6 +154,13 @@ class InterpretationDriftAnalyzer
             providerFailureCases: $providerFailureCases,
             weakExpectedIntents: $this->weakExpectedIntents($byExpectedIntent),
             divergentEntityKeys: $divergentEntityKeys,
+            baselineRelativeOutcomes: [
+                'improved' => $baselineImproved,
+                'regressed' => $baselineRegressed,
+                'parity_match' => $baselineParityMatch,
+                'parity_miss' => $baselineParityMiss,
+            ],
+            regressionCases: $regressionCases,
         );
     }
 

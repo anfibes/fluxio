@@ -114,6 +114,51 @@ class EvaluateInterpretationCorpusMetricsCommandTest extends TestCase
         $this->assertEquals(1.0, $decoded['metrics']['provider_intent_agreement_rate']);
     }
 
+    public function test_json_includes_baseline_relative_outcomes(): void
+    {
+        // Deterministic and Ollama both resolve create_task for the create-task case.
+        $this->fakeLlmReturning(['intent' => 'create_task', 'confidence' => 0.8, 'entities' => [], 'notes' => []]);
+
+        Artisan::call('actions:evaluate-interpretation-corpus', [
+            '--path' => $this->createTaskCorpus(),
+            '--json' => true,
+        ]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        $this->assertArrayHasKey('baseline_relative_outcomes', $decoded['metrics']);
+        $this->assertArrayHasKey('regression_cases', $decoded['metrics']);
+        $this->assertSame(1, $decoded['metrics']['baseline_relative_outcomes']['parity_match']);
+        $this->assertSame([], $decoded['metrics']['regression_cases']);
+    }
+
+    public function test_json_reports_provider_regression_against_baseline(): void
+    {
+        // Deterministic → create_task (matches expected); Ollama → schedule_call (regresses).
+        $this->fakeLlmReturning(['intent' => 'schedule_call', 'confidence' => 0.5, 'entities' => [], 'notes' => []]);
+
+        Artisan::call('actions:evaluate-interpretation-corpus', [
+            '--path' => $this->createTaskCorpus(),
+            '--json' => true,
+        ]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        $this->assertSame(1, $decoded['metrics']['baseline_relative_outcomes']['regressed']);
+        $this->assertSame('create-task', $decoded['metrics']['regression_cases'][0]['id']);
+        $this->assertSame('create_task', $decoded['metrics']['regression_cases'][0]['expected_intent']);
+    }
+
+    public function test_metrics_table_shows_baseline_relative_outcomes(): void
+    {
+        $this->fakeLlmReturning(['intent' => 'create_task', 'confidence' => 0.8, 'entities' => [], 'notes' => []]);
+
+        Artisan::call('actions:evaluate-interpretation-corpus', [
+            '--path' => $this->createTaskCorpus(),
+            '--metrics' => true,
+        ]);
+
+        $this->assertStringContainsString('Baseline-relative outcomes', Artisan::output());
+    }
+
     public function test_fail_on_drift_exits_success_when_agreement_above_threshold(): void
     {
         // Both providers produce create_task → agreement 1.0 ≥ 0.8.

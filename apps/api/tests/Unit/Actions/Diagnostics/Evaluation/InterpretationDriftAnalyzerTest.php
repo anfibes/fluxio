@@ -243,4 +243,81 @@ class InterpretationDriftAnalyzerTest extends TestCase
         $this->assertArrayNotHasKey('create_task', $metrics->weakExpectedIntents);
         $this->assertSame(0.0, $metrics->weakExpectedIntents['schedule_call']['deterministic_intent_match_rate']);
     }
+
+    // ── Phase 9F.1D: baseline-relative outcomes (provider vs deterministic oracle) ──
+
+    public function test_baseline_parity_match_when_both_hit_expected(): void
+    {
+        $metrics = $this->analyzer->analyze($this->summaryFor(
+            $this->commandProvider('create_task', 0.9),
+            $this->commandProvider('create_task', 0.8),
+            [$this->case('a', 'create_task')],
+        ));
+
+        $this->assertSame(1, $metrics->baselineRelativeOutcomes['parity_match']);
+        $this->assertSame(0, $metrics->baselineRelativeOutcomes['regressed']);
+        $this->assertSame([], $metrics->regressionCases);
+    }
+
+    public function test_baseline_regressed_when_provider_misses_intent_but_deterministic_hits(): void
+    {
+        $metrics = $this->analyzer->analyze($this->summaryFor(
+            $this->commandProvider('create_task', 0.9),
+            $this->commandProvider('schedule_call', 0.8),
+            [$this->case('reg', 'create_task')],
+        ));
+
+        $this->assertSame(1, $metrics->baselineRelativeOutcomes['regressed']);
+        $this->assertSame([['id' => 'reg', 'expected_intent' => 'create_task']], $metrics->regressionCases);
+    }
+
+    public function test_baseline_regressed_on_entity_mismatch_even_when_intent_agrees(): void
+    {
+        $metrics = $this->analyzer->analyze($this->summaryFor(
+            $this->commandProvider('create_task', 0.9, ['lead' => 'Rossi']),
+            $this->commandProvider('create_task', 0.8, ['lead' => 'Wrong']),
+            [$this->case('ent', 'create_task', ['lead' => 'Rossi'])],
+        ));
+
+        $this->assertSame(1, $metrics->baselineRelativeOutcomes['regressed']);
+        $this->assertSame('ent', $metrics->regressionCases[0]['id']);
+    }
+
+    public function test_baseline_improved_when_provider_hits_and_deterministic_misses(): void
+    {
+        $metrics = $this->analyzer->analyze($this->summaryFor(
+            $this->commandProvider('schedule_call', 0.9),
+            $this->commandProvider('create_task', 0.8),
+            [$this->case('imp', 'create_task')],
+        ));
+
+        $this->assertSame(1, $metrics->baselineRelativeOutcomes['improved']);
+        $this->assertSame([], $metrics->regressionCases);
+    }
+
+    public function test_baseline_parity_miss_when_neither_hits_expected(): void
+    {
+        $metrics = $this->analyzer->analyze($this->summaryFor(
+            $this->commandProvider('schedule_call', 0.9),
+            $this->commandProvider('schedule_call', 0.8),
+            [$this->case('miss', 'create_task')],
+        ));
+
+        $this->assertSame(1, $metrics->baselineRelativeOutcomes['parity_miss']);
+    }
+
+    public function test_provider_failure_counts_as_baseline_regression_and_stays_visible(): void
+    {
+        // A failing/sandbox-rejected provider matches nothing → regressed against the
+        // deterministic oracle, and the failure remains visible in providerFailureCases.
+        $metrics = $this->analyzer->analyze($this->summaryFor(
+            $this->commandProvider('create_task', 0.9),
+            $this->throwingProvider(),
+            [$this->case('fail', 'create_task')],
+        ));
+
+        $this->assertSame(1, $metrics->baselineRelativeOutcomes['regressed']);
+        $this->assertSame('fail', $metrics->regressionCases[0]['id']);
+        $this->assertCount(1, $metrics->providerFailureCases);
+    }
 }
