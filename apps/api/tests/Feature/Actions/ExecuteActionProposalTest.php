@@ -11,7 +11,9 @@ use Fluxio\Actions\Models\ActionProposal;
 use Fluxio\Leads\Models\Lead;
 use Fluxio\Tasks\Models\Task;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Exceptions;
 use Laravel\Sanctum\Sanctum;
+use RuntimeException;
 use Tests\TestCase;
 
 class ExecuteActionProposalTest extends TestCase
@@ -241,6 +243,13 @@ class ExecuteActionProposalTest extends TestCase
     {
         $user = $this->actingAsUser();
 
+        // This negative path intentionally re-throws the "no executor" RuntimeException
+        // so the request returns 500. Fake reporting for ONLY that exception type so its
+        // expected stack trace does not pollute laravel.log; rendering (the 500) still
+        // delegates to the real handler, and we assert below it was reported so the path
+        // is still proven to have fired. Scoped to this test; no runtime change.
+        Exceptions::fake([RuntimeException::class]);
+
         $proposal = ActionProposal::create([
             'user_id' => $user->id,
             'intent' => 'unsupported_intent',
@@ -280,6 +289,10 @@ class ExecuteActionProposalTest extends TestCase
         $this->assertSame($refreshed->failure_reason, $payload['execution_failure']['message']);
 
         $this->assertDatabaseCount('tasks', 0);
+
+        // The negative path still reported the exception (it was suppressed from the
+        // log, not swallowed) — proving the re-throw / 500 behavior is unchanged.
+        Exceptions::assertReported(RuntimeException::class);
     }
 
     // --- generic executor throwable ---
@@ -287,6 +300,12 @@ class ExecuteActionProposalTest extends TestCase
     public function test_executor_throwable_marks_proposal_failed_with_execution_failed_reason(): void
     {
         $this->actingAsUser();
+
+        // Expected negative path: the executor re-throws, producing a 500. Fake reporting
+        // for ONLY RuntimeException so the raw message does not pollute laravel.log;
+        // rendering still delegates to the real handler (500 preserved) and we assert
+        // below it was reported. Scoped to this test; no runtime change.
+        Exceptions::fake([RuntimeException::class]);
 
         // Registered intent, but its executor raises an unexpected error carrying a
         // raw, sensitive message. The reason must be `execution_failed` and the raw
@@ -318,6 +337,9 @@ class ExecuteActionProposalTest extends TestCase
         $this->assertSame($refreshed->failure_reason, $payload['execution_failure']['message']);
 
         $this->assertDatabaseCount('tasks', 0);
+
+        // Suppressed from the log, not swallowed — the re-throw / 500 path still fired.
+        Exceptions::assertReported(RuntimeException::class);
     }
 
     // --- typed failure surface: null when not failed ---
@@ -342,6 +364,11 @@ class ExecuteActionProposalTest extends TestCase
     public function test_executor_partial_side_effects_roll_back_while_failed_state_persists(): void
     {
         $this->actingAsUser();
+
+        // Expected negative path: the executor re-throws, producing a 500. Fake reporting
+        // for ONLY RuntimeException so its message does not pollute laravel.log; rendering
+        // still delegates to the real handler (500 preserved). Scoped to this test.
+        Exceptions::fake([RuntimeException::class]);
 
         // Executor creates a domain row, THEN throws. The created Task must roll back
         // (inner savepoint) while the proposal commits as `failed` under the same row
@@ -376,6 +403,9 @@ class ExecuteActionProposalTest extends TestCase
         $this->assertNotNull($refreshed->failed_at);
         $this->assertEquals('execution_failed', $refreshed->failure_reason_code);
         $this->assertStringNotContainsString('boom', (string) $refreshed->failure_reason);
+
+        // Suppressed from the log, not swallowed — the re-throw / 500 path still fired.
+        Exceptions::assertReported(RuntimeException::class);
     }
 
     // --- resource guard: failure surface only when actually failed ---

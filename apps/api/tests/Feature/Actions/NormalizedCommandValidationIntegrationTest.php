@@ -12,6 +12,7 @@ use Fluxio\Actions\Interpretation\Providers\DeterministicInterpretationProvider;
 use Fluxio\Actions\Interpretation\Providers\FakeLlmInterpretationProvider;
 use Fluxio\Actions\Validation\NormalizedCommandValidator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Exceptions;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -225,6 +226,11 @@ class NormalizedCommandValidationIntegrationTest extends TestCase
     {
         $this->actingAsUser();
 
+        // Expected fail-closed path: invalid provider output is reported as a 422.
+        // Fake reporting for ONLY this exception so its expected message does not pollute
+        // laravel.log; rendering still delegates to the real handler (422 preserved).
+        Exceptions::fake([InvalidNormalizedCommandException::class]);
+
         $fake = new FakeLlmInterpretationProvider;
         $fake->addResponse('book it', new NormalizedCommand(
             intent: 'schedule_meeting',
@@ -241,6 +247,9 @@ class NormalizedCommandValidationIntegrationTest extends TestCase
 
         // Malformed value was rejected at the interpretation boundary — nothing built.
         $this->assertDatabaseCount('action_proposals', 0);
+
+        // Suppressed from the log, not swallowed — fail-closed validation still fired.
+        Exceptions::assertReported(InvalidNormalizedCommandException::class);
     }
 
     // ── Phase 9F.0 provider sandbox: surface lock enforced at the adapter ─────
@@ -383,6 +392,11 @@ class NormalizedCommandValidationIntegrationTest extends TestCase
 
     public function test_invalid_provider_output_returns_422_not_500(): void
     {
+        // Expected fail-closed path: an unregistered intent is reported as a 422.
+        // Fake reporting for ONLY this exception so its expected message does not pollute
+        // laravel.log; rendering still delegates to the real handler (422 preserved).
+        Exceptions::fake([InvalidNormalizedCommandException::class]);
+
         $fake = new FakeLlmInterpretationProvider;
         $fake->addResponse('do something bad', new NormalizedCommand(
             intent: 'hallucinated_action',
@@ -400,5 +414,8 @@ class NormalizedCommandValidationIntegrationTest extends TestCase
         $response->assertStatus(422);
         $response->assertJsonPath('success', false);
         $this->assertStringNotContainsString('hallucinated_action', $response->content());
+
+        // Suppressed from the log, not swallowed — fail-closed validation still fired.
+        Exceptions::assertReported(InvalidNormalizedCommandException::class);
     }
 }
