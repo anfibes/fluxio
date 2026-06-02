@@ -2,39 +2,26 @@
 
 namespace Fluxio\Actions\Llm\Prompting;
 
-use Fluxio\Actions\DTO\IntentDefinition;
 use Fluxio\Actions\Interpretation\DTO\InterpretationContext;
-use Fluxio\Actions\Interpretation\ProviderSandboxContract;
-use Fluxio\Actions\Registry\IntentRegistry;
+use Fluxio\Actions\Interpretation\InterpretationGrammar;
 
 /**
  * Builds the strict prompt for the Ollama interpretation sandbox.
  *
- * The intent list and per-intent allowed entity keys are derived dynamically
- * from IntentRegistry / IntentDefinition / EntityRequirement — never hardcoded.
- * The allowed-key set mirrors LlmStructuredOutputValidator (requirement key +
- * sandbox-legal entityType + the universal parser keys) so the prompt and the
- * validator stay in agreement.
- *
- * Phase 9F.1A: the advertised surface is narrowed to the frozen
- * ProviderSandboxContract. Resolver-backed reference keys (`*_query`) are
- * advertised only when ProviderSandboxContract::allowsReferenceKey() permits them
- * (today: lead_query only), so the prompt never invites a key the adapter sandbox
- * would reject (participant_query, user_query). The generic `scalar` entityType
- * marker is not a real entity key and is never advertised.
+ * The intent list and per-intent allowed entity keys are NOT derived here. They are
+ * rendered from the runtime-owned InterpretationGrammar descriptor (Phase 9F.1B), the
+ * single projection of IntentRegistry + ProviderSandboxContract that the structured-output
+ * validator also consumes — so the prompt and the validator cannot describe different
+ * surfaces. The descriptor already narrows resolver-backed `*_query` keys to the frozen
+ * sandbox (lead_query only; never participant_query / user_query) and drops the generic
+ * `scalar` marker.
  *
  * This is intentionally a flat, readable string builder. It is not a prompt
- * DSL or a template engine; it carries no business logic beyond enumeration.
+ * DSL or a template engine; it carries no business logic beyond rendering.
  */
 class InterpretationPromptBuilder
 {
-    /**
-     * Universal parser keys accepted for any intent, mirrored from
-     * LlmStructuredOutputValidator / NormalizedCommandValidator.
-     */
-    private const UNIVERSAL_PARSER_KEYS = ['date', 'time'];
-
-    public function __construct(private readonly IntentRegistry $registry) {}
+    public function __construct(private readonly InterpretationGrammar $grammar) {}
 
     public function buildSystemPrompt(): string
     {
@@ -58,8 +45,8 @@ class InterpretationPromptBuilder
             'Registered intents and their allowed entity keys:',
         ];
 
-        foreach ($this->registry->all() as $definition) {
-            $lines[] = '- '.$definition->intent.': '.implode(', ', $this->allowedEntityKeys($definition));
+        foreach ($this->grammar->entityKeysByIntent() as $intent => $keys) {
+            $lines[] = '- '.$intent.': '.implode(', ', $keys);
         }
 
         $lines[] = '- unknown: (no entities)';
@@ -77,39 +64,5 @@ class InterpretationPromptBuilder
             'User message:',
             $text,
         ]);
-    }
-
-    /**
-     * The entity keys advertised to the model for an intent: the canonical
-     * requirement keys, the universal parser keys, and only the sandbox-legal
-     * entityType markers. Public so a guardrail test can assert the advertised
-     * surface is a subset of the sandbox-legal provider surface.
-     *
-     * @return list<string>
-     */
-    public function allowedEntityKeys(IntentDefinition $definition): array
-    {
-        $keys = self::UNIVERSAL_PARSER_KEYS;
-
-        foreach ($definition->requirements as $req) {
-            $keys[] = $req->key;
-
-            $type = $req->entityType;
-
-            // `scalar` is a generic type marker, not a real entity key — never advertise it.
-            if ($type === 'scalar') {
-                continue;
-            }
-
-            // Resolver-backed references (`*_query`) are advertised only when the
-            // sandbox allows them; participant_query / user_query are not honored yet.
-            if (str_ends_with($type, '_query') && ! ProviderSandboxContract::allowsReferenceKey($type)) {
-                continue;
-            }
-
-            $keys[] = $type;
-        }
-
-        return array_values(array_unique($keys));
     }
 }

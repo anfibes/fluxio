@@ -4,7 +4,6 @@ namespace Tests\Unit\Actions\Llm;
 
 use Fluxio\Actions\Llm\Exceptions\InvalidLlmStructuredOutputException;
 use Fluxio\Actions\Llm\Validation\LlmStructuredOutputValidator;
-use Fluxio\Actions\Registry\IntentRegistry;
 use Tests\TestCase;
 
 /**
@@ -21,9 +20,7 @@ class LlmStructuredOutputValidatorTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->validator = new LlmStructuredOutputValidator(
-            $this->app->make(IntentRegistry::class),
-        );
+        $this->validator = $this->app->make(LlmStructuredOutputValidator::class);
     }
 
     private function assertValid(array $payload): void

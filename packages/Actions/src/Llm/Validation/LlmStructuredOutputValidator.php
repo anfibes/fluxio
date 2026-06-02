@@ -2,10 +2,8 @@
 
 namespace Fluxio\Actions\Llm\Validation;
 
-use Fluxio\Actions\DTO\IntentDefinition;
-use Fluxio\Actions\Interpretation\ProviderSandboxContract;
+use Fluxio\Actions\Interpretation\InterpretationGrammar;
 use Fluxio\Actions\Llm\Exceptions\InvalidLlmStructuredOutputException;
-use Fluxio\Actions\Registry\IntentRegistry;
 
 /**
  * Validates the parsed JSON produced by a future LLM-backed interpretation
@@ -24,16 +22,17 @@ use Fluxio\Actions\Registry\IntentRegistry;
  * Rules (strict mode):
  *  - root must be an associative array
  *  - only {intent, confidence, entities, notes} are allowed at the root
- *  - intent: non-empty string; registered in IntentRegistry or "unknown"
+ *  - intent: non-empty string; registered (per InterpretationGrammar) or "unknown"
  *  - confidence: numeric, within [0.0, 1.0]
  *  - entities: associative array, no forbidden keys, no *_id keys
  *  - entity values: non-empty scalar (string/int/float/bool) or array of
  *    non-empty scalars; null and empty strings are rejected; nested objects
  *    are rejected
  *  - "unknown" intent requires empty entities
- *  - non-"unknown" intent requires entity keys compatible with the intent's
- *    EntityRequirement.key or .entityType, plus transitional UNIVERSAL keys
- *    (date, time) — same set the NormalizedCommandValidator accepts
+ *  - non-"unknown" intent requires entity keys allowed for the intent by the
+ *    runtime-owned InterpretationGrammar descriptor (Phase 9F.1B) — the same
+ *    narrowed projection the prompt builder advertises, so prompt and validator
+ *    never diverge
  *  - notes: when present, must be an array of non-empty strings
  *  - missing required entities do NOT fail validation (handled later in the
  *    proposal pipeline)
@@ -41,12 +40,6 @@ use Fluxio\Actions\Registry\IntentRegistry;
  */
 class LlmStructuredOutputValidator
 {
-    /**
-     * Transitional keys that DateTimeExpressionParser may append to any
-     * intent's entities, mirrored from NormalizedCommandValidator.
-     */
-    private const UNIVERSAL_PARSER_KEYS = ['date', 'time'];
-
     private const ALLOWED_ROOT_KEYS = ['intent', 'confidence', 'entities', 'notes'];
 
     /**
@@ -94,7 +87,7 @@ class LlmStructuredOutputValidator
         'model',
     ];
 
-    public function __construct(private readonly IntentRegistry $registry) {}
+    public function __construct(private readonly InterpretationGrammar $grammar) {}
 
     /**
      * @param array<int|string, mixed> $payload
@@ -190,7 +183,7 @@ class LlmStructuredOutputValidator
             return true;
         }
 
-        if ($this->registry->find($intent) === null) {
+        if (! $this->grammar->hasIntent($intent)) {
             $errors[] = "Intent [{$intent}] is not registered.";
             return false;
         }
@@ -363,51 +356,17 @@ class LlmStructuredOutputValidator
             return;
         }
 
-        $definition = $this->registry->find($intent);
-        if ($definition === null) {
+        if (! $this->grammar->hasIntent($intent)) {
             return; // already reported by validateIntent
         }
 
-        $allowed = $this->allowedEntityKeys($definition);
+        $allowed = $this->grammar->allowedEntityKeys($intent);
 
         foreach (array_keys($entities) as $key) {
             if (! in_array($key, $allowed, true)) {
                 $errors[] = "Entity key [{$key}] is not compatible with intent [{$intent}].";
             }
         }
-    }
-
-    /**
-     * Phase 9F.1A: entity keys accepted for an intent are narrowed to the frozen
-     * ProviderSandboxContract. Resolver-backed reference keys (`*_query`) are accepted
-     * only when ProviderSandboxContract::allowsReferenceKey() permits them (today:
-     * lead_query only), so the structured-output contract rejects participant_query /
-     * user_query at the same surface the adapter sandbox forbids. The generic `scalar`
-     * entityType marker is not a real entity key and is never accepted.
-     *
-     * @return list<string>
-     */
-    private function allowedEntityKeys(IntentDefinition $definition): array
-    {
-        $keys = self::UNIVERSAL_PARSER_KEYS;
-
-        foreach ($definition->requirements as $req) {
-            $keys[] = $req->key;
-
-            $type = $req->entityType;
-
-            if ($type === 'scalar') {
-                continue;
-            }
-
-            if (str_ends_with($type, '_query') && ! ProviderSandboxContract::allowsReferenceKey($type)) {
-                continue;
-            }
-
-            $keys[] = $type;
-        }
-
-        return array_values(array_unique($keys));
     }
 
     /**

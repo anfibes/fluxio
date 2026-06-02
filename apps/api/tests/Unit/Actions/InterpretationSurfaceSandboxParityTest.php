@@ -2,25 +2,24 @@
 
 namespace Tests\Unit\Actions;
 
-use Fluxio\Actions\DTO\NormalizedCommand;
-use Fluxio\Actions\Interpretation\ProviderSandboxContract;
+use Fluxio\Actions\Interpretation\InterpretationGrammar;
 use Fluxio\Actions\Llm\Prompting\InterpretationPromptBuilder;
 use Fluxio\Actions\Llm\Validation\LlmStructuredOutputValidator;
-use Fluxio\Actions\Registry\IntentRegistry;
 use Tests\TestCase;
 
 /**
- * Phase 9F.1A — parity guardrail between the LLM-advertised interpretation surface
- * and the frozen ProviderSandboxContract.
+ * Phase 9F.1A/9F.1B — parity guardrail between the LLM-advertised interpretation
+ * surface and the runtime-owned grammar descriptor.
  *
- * The prompt builder and the structured-output validator must describe exactly the
- * narrowed surface the adapter sandbox enforces: lead_query is the only resolver-backed
- * reference key, and unsupported `*_query` keys (participant_query, user_query) are never
- * advertised or accepted. These tests fail loudly if the surfaces drift apart again.
+ * The prompt builder and the structured-output validator must both derive their allowed
+ * entity keys from the single InterpretationGrammar descriptor (which is itself narrowed
+ * to the frozen ProviderSandboxContract). These tests fail loudly if either consumer
+ * re-grows its own derivation or drifts from the descriptor: unsupported `*_query` keys
+ * (participant_query, user_query) stay rejected; lead_query stays accepted.
  */
 class InterpretationSurfaceSandboxParityTest extends TestCase
 {
-    private IntentRegistry $registry;
+    private InterpretationGrammar $grammar;
 
     private InterpretationPromptBuilder $promptBuilder;
 
@@ -30,35 +29,23 @@ class InterpretationSurfaceSandboxParityTest extends TestCase
     {
         parent::setUp();
 
-        $this->registry      = $this->app->make(IntentRegistry::class);
-        $this->promptBuilder = new InterpretationPromptBuilder($this->registry);
-        $this->validator     = new LlmStructuredOutputValidator($this->registry);
+        $this->grammar       = $this->app->make(InterpretationGrammar::class);
+        $this->promptBuilder = $this->app->make(InterpretationPromptBuilder::class);
+        $this->validator     = $this->app->make(LlmStructuredOutputValidator::class);
     }
 
-    // ── Prompt-advertised keys ⊆ sandbox-legal provider surface ───────────────
+    // ── Prompt renders the descriptor ─────────────────────────────────────────
 
-    public function test_every_advertised_entity_key_is_sandbox_legal(): void
+    public function test_prompt_advertises_exactly_the_descriptor_keys_per_intent(): void
     {
-        $sandbox = new ProviderSandboxContract;
+        $prompt = $this->promptBuilder->buildSystemPrompt();
 
-        foreach ($this->registry->all() as $definition) {
-            $keys = $this->promptBuilder->allowedEntityKeys($definition);
-
-            // The sandbox inspects keys only; any non-empty value suffices here.
-            $entities = array_fill_keys($keys, 'x');
-
-            $violations = $sandbox->violations(new NormalizedCommand(
-                intent: $definition->intent,
-                confidence: 0.8,
-                sourceText: 'test',
-                locale: 'en',
-                entities: $entities,
-            ));
-
-            $this->assertSame(
-                [],
-                $violations,
-                "Intent [{$definition->intent}] advertises a non-sandbox-legal key: ".implode(' | ', $violations),
+        foreach ($this->grammar->entityKeysByIntent() as $intent => $keys) {
+            // The prompt builder renders each intent's descriptor keys verbatim.
+            $this->assertStringContainsString(
+                '- '.$intent.': '.implode(', ', $keys),
+                $prompt,
+                "Prompt does not render the descriptor keys for intent [{$intent}].",
             );
         }
     }
@@ -78,7 +65,32 @@ class InterpretationSurfaceSandboxParityTest extends TestCase
         $this->assertStringContainsString('lead_query', $this->promptBuilder->buildSystemPrompt());
     }
 
-    // ── Validator rejects keys the sandbox forbids ────────────────────────────
+    // ── Validator enforces the descriptor ─────────────────────────────────────
+
+    public function test_validator_accepts_exactly_the_descriptor_keys(): void
+    {
+        $keys = $this->grammar->allowedEntityKeys('schedule_call');
+
+        // A payload using every descriptor key (with non-empty scalar values) is accepted.
+        $result = $this->validator->validate([
+            'intent'     => 'schedule_call',
+            'confidence' => 0.8,
+            'entities'   => array_fill_keys($keys, 'x'),
+        ]);
+        $this->assertTrue($result->valid, implode(' | ', $result->errors));
+
+        // A key outside the descriptor is rejected as incompatible.
+        $rejected = $this->validator->validate([
+            'intent'     => 'schedule_call',
+            'confidence' => 0.8,
+            'entities'   => ['not_a_descriptor_key' => 'x'],
+        ]);
+        $this->assertFalse($rejected->valid);
+        $this->assertStringContainsString(
+            'Entity key [not_a_descriptor_key] is not compatible with intent [schedule_call].',
+            implode(' | ', $rejected->errors),
+        );
+    }
 
     public function test_validator_rejects_participant_query_reference_key(): void
     {
