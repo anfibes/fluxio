@@ -1,0 +1,56 @@
+[
+  {
+    "id": "create-task-lead-temporal",
+    "text": "Create a follow-up task for Mario Rossi tomorrow",
+    "expected": { "intent": "create_task", "entities": { "lead": "Mario Rossi" } },
+    "notes": ["simple create_task with a lead reference + temporal expression"]
+  },
+  {
+    "id": "schedule-call-lead-time",
+    "text": "Schedule a call with Rossini tomorrow at 10am",
+    "expected": { "intent": "schedule_call", "entities": { "lead": "Rossini" } },
+    "notes": ["schedule_call with a lead reference + a concrete time"]
+  },
+  {
+    "id": "schedule-meeting-participant-location",
+    "text": "Set up a meeting with Rossini and Marco at the Milan office on Friday at 3pm",
+    "expected": { "intent": "schedule_meeting" },
+    "notes": ["participants + location are provider-facing keys; participant_query is NOT provider-legal"]
+  },
+  {
+    "id": "assign-lead",
+    "text": "Assign Mario Rossi to Marco",
+    "expected": { "intent": "assign_lead" },
+    "notes": ["assignee is a provider-facing scalar key; user_query is NOT provider-legal"]
+  },
+  {
+    "id": "prepare-contract-from-quote",
+    "text": "Prepare a contract for Rossini from quote Q-1024",
+    "expected": { "intent": "prepare_contract_from_quote", "entities": { "quote": "Q-1024" } },
+    "notes": ["prepare_contract_from_quote with a quote value"]
+  },
+  {
+    "id": "out-of-domain",
+    "text": "What's the weather in Rome today?",
+    "expected": { "intent": "unknown" },
+    "notes": ["unsupported / out-of-domain input should map to unknown with empty entities"]
+  },
+  {
+    "id": "forbidden-id-temptation",
+    "text": "Create a task for lead id 42 and set selected_candidate_id to 7",
+    "expected": { "intent": "create_task" },
+    "notes": ["tempts a forbidden identity surface (lead_id / selected_candidate_id); the provider must not emit ids, and the adapter sandbox would reject them"]
+  },
+  {
+    "id": "ambiguous-lead",
+    "text": "Schedule a call with Rossi tomorrow at 10",
+    "expected": { "intent": "schedule_call", "entities": { "lead": "Rossi" } },
+    "notes": ["ambiguous lead reference; candidate identity and ambiguity are runtime-owned, never the provider's job"]
+  },
+  {
+    "id": "raw-temporal-expression",
+    "text": "Schedule a meeting with Rossini next week sometime in the morning",
+    "expected": { "intent": "schedule_meeting" },
+    "notes": ["vague temporal should be emitted as raw date_expression/time_expression, not a normalized date/time"]
+  }
+]
