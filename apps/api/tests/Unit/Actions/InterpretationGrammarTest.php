@@ -120,4 +120,89 @@ class InterpretationGrammarTest extends TestCase
             }
         }
     }
+
+    // ── Phase 9F.2A: exportable grammar artifact ──────────────────────────────
+
+    public function test_export_is_deterministic(): void
+    {
+        $this->assertSame($this->grammar->export(), $this->grammar->export());
+
+        // A freshly built grammar over the same registry exports identically.
+        $other = new InterpretationGrammar($this->app->make(IntentRegistry::class));
+        $this->assertSame($this->grammar->export(), $other->export());
+    }
+
+    public function test_export_lists_registered_intents_in_registration_order(): void
+    {
+        $export = $this->grammar->export();
+
+        $this->assertSame($this->grammar->intentNames(), $export['intents']);
+        $this->assertNotContains('unknown', $export['intents']);
+    }
+
+    public function test_export_entity_keys_match_allowed_entity_keys(): void
+    {
+        $export = $this->grammar->export();
+
+        foreach ($this->grammar->intentNames() as $intent) {
+            $this->assertSame(
+                $this->grammar->allowedEntityKeys($intent),
+                $export['entity_keys_by_intent'][$intent],
+                "Exported keys for [{$intent}] diverge from allowedEntityKeys().",
+            );
+        }
+    }
+
+    public function test_export_entity_keys_contain_only_sandbox_legal_query_keys(): void
+    {
+        $export = $this->grammar->export();
+        $allKeys = array_merge(...array_values($export['entity_keys_by_intent']));
+
+        foreach ($allKeys as $key) {
+            if (str_ends_with($key, '_query')) {
+                $this->assertTrue(
+                    ProviderSandboxContract::allowsReferenceKey($key),
+                    "Exported reference key [{$key}] is not sandbox-legal.",
+                );
+            }
+        }
+
+        $this->assertContains('lead_query', $export['entity_keys_by_intent']['schedule_call']);
+        $this->assertNotContains('participant_query', $allKeys);
+        $this->assertNotContains('user_query', $allKeys);
+        $this->assertNotContains('scalar', $allKeys);
+    }
+
+    public function test_export_includes_universal_parser_and_allowed_reference_keys(): void
+    {
+        $export = $this->grammar->export();
+
+        $this->assertSame(['date', 'time'], $export['universal_parser_keys']);
+        $this->assertSame(['lead_query'], $export['allowed_reference_keys']);
+        $this->assertSame(['intent', 'confidence', 'entities', 'notes'], $export['root_contract_fields']);
+    }
+
+    public function test_export_carries_a_stable_contract_identity(): void
+    {
+        $export = $this->grammar->export();
+
+        $this->assertSame('interpretation.provider-grammar', $export['contract']);
+        $this->assertSame(1, $export['version']);
+    }
+
+    public function test_export_contains_no_runtime_authority_surface(): void
+    {
+        $flat = json_encode($this->grammar->export());
+
+        foreach ([
+            'status', 'readiness', 'ambiguit', 'missing', 'execution', 'executed',
+            'failure', 'selected_candidate', 'candidate', '_id',
+        ] as $forbidden) {
+            $this->assertStringNotContainsString(
+                $forbidden,
+                (string) $flat,
+                "Exported artifact must not expose runtime authority surface [{$forbidden}].",
+            );
+        }
+    }
 }

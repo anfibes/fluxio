@@ -36,6 +36,23 @@ final class InterpretationGrammar
      */
     public const UNIVERSAL_PARSER_KEYS = ['date', 'time'];
 
+    /**
+     * Stable identity of the exported provider-facing grammar artifact. The version is
+     * a contract-revision integer, bumped only when the exported shape changes.
+     */
+    public const CONTRACT_NAME = 'interpretation.provider-grammar';
+
+    public const CONTRACT_VERSION = 1;
+
+    /**
+     * The root JSON fields a provider's structured output carries, mirrored from
+     * LlmStructuredOutputValidator. Structural fact only — no confidence thresholds or
+     * enforcement semantics are exported.
+     *
+     * @var list<string>
+     */
+    private const ROOT_CONTRACT_FIELDS = ['intent', 'confidence', 'entities', 'notes'];
+
     public function __construct(private readonly IntentRegistry $registry) {}
 
     /**
@@ -95,6 +112,41 @@ final class InterpretationGrammar
     public function universalParserKeys(): array
     {
         return self::UNIVERSAL_PARSER_KEYS;
+    }
+
+    /**
+     * A deterministic, machine-readable projection of the provider-facing grammar.
+     *
+     * This is a SERIALIZED VIEW of runtime-owned facts (registered intents, the
+     * sandbox-narrowed per-intent entity keys, the universal parser keys, the allowed
+     * resolver-backed reference keys, and the root JSON contract fields) — never a new
+     * source of truth. It exists to prepare future constrained-emission experiments
+     * without implementing any decoding: it carries no lifecycle/readiness/missing/
+     * execution/identity surface, no provider/model names, and no enforcement
+     * thresholds. Ordering is stable — intents in registration order, entity keys
+     * exactly as allowedEntityKeys() — so the artifact is reproducible byte-for-byte.
+     *
+     * @return array{
+     *     contract: string,
+     *     version: int,
+     *     intents: list<string>,
+     *     entity_keys_by_intent: array<string, list<string>>,
+     *     universal_parser_keys: list<string>,
+     *     allowed_reference_keys: list<string>,
+     *     root_contract_fields: list<string>,
+     * }
+     */
+    public function export(): array
+    {
+        return [
+            'contract' => self::CONTRACT_NAME,
+            'version' => self::CONTRACT_VERSION,
+            'intents' => $this->intentNames(),
+            'entity_keys_by_intent' => $this->entityKeysByIntent(),
+            'universal_parser_keys' => $this->universalParserKeys(),
+            'allowed_reference_keys' => array_values(ProviderSandboxContract::ALLOWED_REFERENCE_KEYS),
+            'root_contract_fields' => self::ROOT_CONTRACT_FIELDS,
+        ];
     }
 
     /**
