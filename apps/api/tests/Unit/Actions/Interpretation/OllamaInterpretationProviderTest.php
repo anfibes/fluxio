@@ -172,6 +172,112 @@ class OllamaInterpretationProviderTest extends TestCase
         ])->interpret('Create a task for lead 42', $this->context());
     }
 
+    // ── Phase 9F.1C: provider output contract hardening ──────────────────────
+
+    public function test_extra_root_key_fails_closed(): void
+    {
+        $this->expectException(InvalidLlmStructuredOutputException::class);
+
+        $this->provider([
+            'intent'     => 'create_task',
+            'confidence' => 0.8,
+            'entities'   => [],
+            'notes'      => [],
+            'status'     => 'ready',
+        ])->interpret('Create a task', $this->context());
+    }
+
+    public function test_lifecycle_entity_key_fails_closed(): void
+    {
+        $this->expectException(InvalidLlmStructuredOutputException::class);
+
+        $this->provider([
+            'intent'     => 'schedule_call',
+            'confidence' => 0.8,
+            'entities'   => ['ambiguities' => 'x'],
+            'notes'      => [],
+        ])->interpret('Call Rossi', $this->context());
+    }
+
+    public function test_identity_entity_key_fails_closed(): void
+    {
+        $this->expectException(InvalidLlmStructuredOutputException::class);
+
+        $this->provider([
+            'intent'     => 'schedule_call',
+            'confidence' => 0.8,
+            'entities'   => ['selected_candidate_id' => 7],
+            'notes'      => [],
+        ])->interpret('Call Rossi', $this->context());
+    }
+
+    public function test_unknown_intent_with_entities_fails_closed(): void
+    {
+        $this->expectException(InvalidLlmStructuredOutputException::class);
+
+        $this->provider([
+            'intent'     => 'unknown',
+            'confidence' => 0.1,
+            'entities'   => ['lead' => 'Rossi'],
+            'notes'      => [],
+        ])->interpret('Whatever', $this->context());
+    }
+
+    public function test_malformed_entities_payload_fails_closed(): void
+    {
+        $this->expectException(InvalidLlmStructuredOutputException::class);
+
+        $this->provider([
+            'intent'     => 'create_task',
+            'confidence' => 0.8,
+            'entities'   => ['just', 'a', 'list'],
+            'notes'      => [],
+        ])->interpret('Create a task', $this->context());
+    }
+
+    public function test_participant_query_reference_fails_closed(): void
+    {
+        $this->expectException(InvalidLlmStructuredOutputException::class);
+
+        $this->provider([
+            'intent'     => 'schedule_call',
+            'confidence' => 0.7,
+            'entities'   => ['participant_query' => 'Marco'],
+            'notes'      => [],
+        ])->interpret('Call Rossi with Marco', $this->context());
+    }
+
+    public function test_lead_query_reference_is_accepted_and_mapped(): void
+    {
+        $command = $this->provider([
+            'intent'     => 'schedule_call',
+            'confidence' => 0.7,
+            'entities'   => ['lead_query' => 'Rossi'],
+            'notes'      => [],
+        ])->interpret('Call Rossi', $this->context());
+
+        $this->assertSame(['lead_query' => 'Rossi'], $command->entities);
+    }
+
+    public function test_valid_output_maps_to_the_same_normalized_command_shape(): void
+    {
+        $command = $this->provider([
+            'intent'     => 'create_task',
+            'confidence' => 0.82,
+            'entities'   => ['lead' => 'Rossi'],
+            'notes'      => ['assumed module'],
+        ])->interpret('Create a task for Rossi', $this->context());
+
+        $this->assertInstanceOf(NormalizedCommand::class, $command);
+        $this->assertSame('create_task', $command->intent);
+        $this->assertSame(0.82, $command->confidence);
+        $this->assertSame(['lead' => 'Rossi'], $command->entities);
+        // notes map to non-authoritative warnings only.
+        $this->assertSame(['assumed module'], $command->warnings);
+        $this->assertSame('Create a task for Rossi', $command->sourceText);
+        $this->assertSame('en', $command->locale);
+    }
+
     // ── Adapter boundary: NormalizedCommandValidator still runs ───────────────
 
     public function test_provider_output_flows_through_normalized_command_validator(): void

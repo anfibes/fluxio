@@ -7,6 +7,7 @@ use Fluxio\Actions\Interpretation\Contracts\InterpretationProviderInterface;
 use Fluxio\Actions\Interpretation\DTO\InterpretationContext;
 use Fluxio\Actions\Llm\Contracts\LlmClientInterface;
 use Fluxio\Actions\Llm\DTO\LlmRequest;
+use Fluxio\Actions\Llm\DTO\LlmStructuredOutput;
 use Fluxio\Actions\Llm\Exceptions\InvalidLlmStructuredOutputException;
 use Fluxio\Actions\Llm\Prompting\InterpretationPromptBuilder;
 use Fluxio\Actions\Llm\Validation\LlmStructuredOutputValidator;
@@ -20,6 +21,7 @@ use Fluxio\Actions\Llm\Validation\LlmStructuredOutputValidator;
  *     → LlmClientInterface::generateStructured()
  *     → parsed JSON from LlmResponse
  *     → LlmStructuredOutputValidator (fail closed)
+ *     → LlmStructuredOutput (typed provider-internal contract)
  *     → NormalizedCommand
  *
  * Boundaries — this provider ONLY produces a candidate NormalizedCommand. It
@@ -73,23 +75,23 @@ class OllamaInterpretationProvider implements InterpretationProviderInterface
     }
 
     /**
+     * Map already-validated structured output to a NormalizedCommand. The provider-internal
+     * LlmStructuredOutput DTO names the four-field contract; `notes` become non-authoritative
+     * interpretation warnings. Identity/ambiguity/readiness/lifecycle remain runtime-owned.
+     *
      * @param  array<string, mixed>  $payload  Validated structured output.
      */
     private function toNormalizedCommand(array $payload, string $text, InterpretationContext $context): NormalizedCommand
     {
-        /** @var array<string, mixed> $entities */
-        $entities = $payload['entities'] ?? [];
-
-        /** @var list<string> $warnings */
-        $warnings = array_values($payload['notes'] ?? []);
+        $output = LlmStructuredOutput::fromValidatedPayload($payload);
 
         return new NormalizedCommand(
-            intent: (string) $payload['intent'],
-            confidence: (float) $payload['confidence'],
+            intent: $output->intent,
+            confidence: $output->confidence,
             sourceText: $text,
             locale: $context->locale,
-            entities: $entities,
-            warnings: $warnings,
+            entities: $output->entities,
+            warnings: $output->notes,
         );
     }
 }
