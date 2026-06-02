@@ -75,6 +75,19 @@ final class ProviderSandboxContract
     ];
 
     /**
+     * Whether a resolver-backed reference key (`*_query`) is sandbox-legal.
+     *
+     * This is the single predicate behind both runtime enforcement (violations(),
+     * below) and the LLM-advertised surface (InterpretationPromptBuilder and
+     * LlmStructuredOutputValidator consult it), so the prompt, the structured-output
+     * validator, and this contract cannot describe different reference surfaces.
+     */
+    public static function allowsReferenceKey(string $key): bool
+    {
+        return in_array(mb_strtolower($key), self::ALLOWED_REFERENCE_KEYS, true);
+    }
+
+    /**
      * The sandbox violations for a provider command (empty = sandbox-legal). Keys are
      * inspected; values are left to NormalizedCommandValidator (shape/non-empty).
      *
@@ -92,7 +105,7 @@ final class ProviderSandboxContract
             $lower = mb_strtolower($key);
 
             // Resolver-backed references are restricted to lead_query.
-            if (str_ends_with($lower, '_query') && ! in_array($lower, self::ALLOWED_REFERENCE_KEYS, true)) {
+            if (str_ends_with($lower, '_query') && ! self::allowsReferenceKey($lower)) {
                 $violations[] = "entity reference key [{$key}] is not provider-legal in the 9F.0 sandbox; "
                     .'only lead_query is resolved by the runtime today';
 

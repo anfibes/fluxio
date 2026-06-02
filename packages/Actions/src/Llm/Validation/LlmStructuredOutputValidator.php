@@ -3,6 +3,7 @@
 namespace Fluxio\Actions\Llm\Validation;
 
 use Fluxio\Actions\DTO\IntentDefinition;
+use Fluxio\Actions\Interpretation\ProviderSandboxContract;
 use Fluxio\Actions\Llm\Exceptions\InvalidLlmStructuredOutputException;
 use Fluxio\Actions\Registry\IntentRegistry;
 
@@ -377,6 +378,13 @@ class LlmStructuredOutputValidator
     }
 
     /**
+     * Phase 9F.1A: entity keys accepted for an intent are narrowed to the frozen
+     * ProviderSandboxContract. Resolver-backed reference keys (`*_query`) are accepted
+     * only when ProviderSandboxContract::allowsReferenceKey() permits them (today:
+     * lead_query only), so the structured-output contract rejects participant_query /
+     * user_query at the same surface the adapter sandbox forbids. The generic `scalar`
+     * entityType marker is not a real entity key and is never accepted.
+     *
      * @return list<string>
      */
     private function allowedEntityKeys(IntentDefinition $definition): array
@@ -385,7 +393,18 @@ class LlmStructuredOutputValidator
 
         foreach ($definition->requirements as $req) {
             $keys[] = $req->key;
-            $keys[] = $req->entityType;
+
+            $type = $req->entityType;
+
+            if ($type === 'scalar') {
+                continue;
+            }
+
+            if (str_ends_with($type, '_query') && ! ProviderSandboxContract::allowsReferenceKey($type)) {
+                continue;
+            }
+
+            $keys[] = $type;
         }
 
         return array_values(array_unique($keys));

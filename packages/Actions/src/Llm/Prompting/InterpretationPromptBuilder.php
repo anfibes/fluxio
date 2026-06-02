@@ -4,6 +4,7 @@ namespace Fluxio\Actions\Llm\Prompting;
 
 use Fluxio\Actions\DTO\IntentDefinition;
 use Fluxio\Actions\Interpretation\DTO\InterpretationContext;
+use Fluxio\Actions\Interpretation\ProviderSandboxContract;
 use Fluxio\Actions\Registry\IntentRegistry;
 
 /**
@@ -12,8 +13,15 @@ use Fluxio\Actions\Registry\IntentRegistry;
  * The intent list and per-intent allowed entity keys are derived dynamically
  * from IntentRegistry / IntentDefinition / EntityRequirement — never hardcoded.
  * The allowed-key set mirrors LlmStructuredOutputValidator (requirement key +
- * entityType + the universal parser keys) so the prompt and the validator stay
- * in agreement.
+ * sandbox-legal entityType + the universal parser keys) so the prompt and the
+ * validator stay in agreement.
+ *
+ * Phase 9F.1A: the advertised surface is narrowed to the frozen
+ * ProviderSandboxContract. Resolver-backed reference keys (`*_query`) are
+ * advertised only when ProviderSandboxContract::allowsReferenceKey() permits them
+ * (today: lead_query only), so the prompt never invites a key the adapter sandbox
+ * would reject (participant_query, user_query). The generic `scalar` entityType
+ * marker is not a real entity key and is never advertised.
  *
  * This is intentionally a flat, readable string builder. It is not a prompt
  * DSL or a template engine; it carries no business logic beyond enumeration.
@@ -72,15 +80,34 @@ class InterpretationPromptBuilder
     }
 
     /**
+     * The entity keys advertised to the model for an intent: the canonical
+     * requirement keys, the universal parser keys, and only the sandbox-legal
+     * entityType markers. Public so a guardrail test can assert the advertised
+     * surface is a subset of the sandbox-legal provider surface.
+     *
      * @return list<string>
      */
-    private function allowedEntityKeys(IntentDefinition $definition): array
+    public function allowedEntityKeys(IntentDefinition $definition): array
     {
         $keys = self::UNIVERSAL_PARSER_KEYS;
 
         foreach ($definition->requirements as $req) {
             $keys[] = $req->key;
-            $keys[] = $req->entityType;
+
+            $type = $req->entityType;
+
+            // `scalar` is a generic type marker, not a real entity key — never advertise it.
+            if ($type === 'scalar') {
+                continue;
+            }
+
+            // Resolver-backed references (`*_query`) are advertised only when the
+            // sandbox allows them; participant_query / user_query are not honored yet.
+            if (str_ends_with($type, '_query') && ! ProviderSandboxContract::allowsReferenceKey($type)) {
+                continue;
+            }
+
+            $keys[] = $type;
         }
 
         return array_values(array_unique($keys));
