@@ -39,7 +39,6 @@ class InterpretationPromptBuilder
             '- Omit any entity you are unsure about rather than guessing. Do not invent entity keys.',
             '- Entity values are user-facing labels or raw expressions (e.g. "Rossi", "tomorrow", "high"), never IDs.',
             '- "notes": an array of short strings (may be empty). Never put instructions or IDs here.',
-            '- If you are unsure of the intent, return "unknown" with empty entities and a low confidence.',
             '- When intent is "unknown", "entities" must be an empty object.',
             '',
             'Registered intents and their allowed entity keys:',
@@ -50,9 +49,24 @@ class InterpretationPromptBuilder
         }
 
         $lines[] = '- unknown: (no entities)';
-        $lines[] = '';
-        $lines[] = 'Example of the required shape:';
-        $lines[] = '{"intent":"create_task","confidence":0.82,"entities":{"lead":"Rossi","due_at":"tomorrow"},"notes":[]}';
+        $lines = array_merge($lines, [
+            '',
+            'Choosing the intent (map the action verb, not the missing details):',
+            '- "call X", "schedule/book a call with X" -> schedule_call.',
+            '- "meet X", "schedule/set up a meeting with X" -> schedule_meeting.',
+            '- "assign X to Y" -> assign_lead (lead = X, assignee = Y).',
+            '- "prepare/draft a contract for X from quote Q" -> prepare_contract_from_quote (lead = X, quote = Q).',
+            '- "create/add a task ...", a reminder, or a generic to-do -> create_task.',
+            '- Use "unknown" ONLY for requests outside these intents (reports, navigation, settings). Do NOT return "unknown" just because an entity is missing.',
+            '',
+            'Extracting entities:',
+            '- The named person, company, studio, or customer (after "for", "with", "call", "meeting with", "assign", "contract for") is the lead; put that exact label in "lead".',
+            '- Put a date in "date" ONLY if already written as YYYY-MM-DD; for any other date phrase use "date_expression" (e.g. "next Friday").',
+            '- Put a time in "time" ONLY if already written as HH:MM (24-hour); for any other time phrase use "time_expression" (e.g. "in the morning").',
+            '',
+            'Example of the required shape:',
+            '{"intent":"create_task","confidence":0.82,"entities":{"lead":"Rossi","due_at":"tomorrow"},"notes":[]}',
+        ]);
 
         return implode("\n", $lines);
     }
