@@ -7,6 +7,8 @@ use Fluxio\Actions\Diagnostics\Evaluation\InterpretationDriftAnalyzer;
 use Fluxio\Actions\Diagnostics\Evaluation\InterpretationEvaluationService;
 use Fluxio\Actions\Interpretation\InterpretationGrammar;
 use Illuminate\Console\Command;
+use Symfony\Component\Console\Helper\ProgressBar;
+use Symfony\Component\Console\Output\ConsoleOutputInterface;
 
 /**
  * Development-only diagnostic command. Evaluates the interpretation corpus by
@@ -32,7 +34,8 @@ class EvaluateInterpretationCorpusCommand extends Command
                             {--json : Emit the full evaluation as pretty JSON instead of the summary table}
                             {--metrics : Print enriched drift metrics alongside the table summary}
                             {--fail-on-drift : Exit non-zero when provider intent agreement is below the threshold (opt-in, for CI experiments)}
-                            {--agreement-threshold=0.8 : Minimum provider intent agreement rate; only applies with --fail-on-drift}';
+                            {--agreement-threshold=0.8 : Minimum provider intent agreement rate; only applies with --fail-on-drift}
+                            {--progress : Show a per-case progress bar on stderr (on by default unless --json; never written to stdout)}';
 
     protected $description = 'Opt-in provider diagnostics: compare the deterministic baseline vs. the Ollama sandbox over the interpretation corpus, with optional drift metrics. NOT part of composer test:actions-corpora; may contact a model. Non-production.';
 
@@ -51,7 +54,23 @@ class EvaluateInterpretationCorpusCommand extends Command
         $path = (string) ($this->option('path') ?: InterpretationCorpusLoader::defaultCorpusPath());
         $cases = $loader->load($path);
 
-        $summary = $service->evaluate($cases);
+        // Progress is a stderr-only UX aid: it must never reach stdout or it would
+        // corrupt --json piped to jq. The bar is created only when a real stderr
+        // stream exists (skipped under buffered output, e.g. tests).
+        $progressBar = $this->makeProgressBar(count($cases));
+
+        $summary = $service->evaluate(
+            $cases,
+            $progressBar === null
+                ? null
+                : static fn (int $completed): mixed => $progressBar->setProgress($completed),
+        );
+
+        if ($progressBar !== null) {
+            $progressBar->finish();
+            $progressBar->clear();
+        }
+
         $metrics = $analyzer->analyze($summary);
 
         if ($this->option('json')) {
@@ -90,6 +109,34 @@ class EvaluateInterpretationCorpusCommand extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Build a progress bar on STDERR, or null when progress should not render.
+     *
+     * Progress shows by default unless --json (opt back in with --progress). It is
+     * always written to the error stream so it can never corrupt --json on stdout.
+     * When there is no real console error stream (buffered output under tests), it
+     * returns null rather than risk leaking into captured stdout.
+     */
+    private function makeProgressBar(int $max): ?ProgressBar
+    {
+        $wantProgress = $this->option('progress') || ! $this->option('json');
+
+        if (! $wantProgress || $max <= 0) {
+            return null;
+        }
+
+        $output = $this->output->getOutput();
+
+        if (! $output instanceof ConsoleOutputInterface) {
+            return null;
+        }
+
+        $bar = new ProgressBar($output->getErrorOutput(), $max);
+        $bar->start();
+
+        return $bar;
     }
 
     /**
@@ -174,6 +221,36 @@ class EvaluateInterpretationCorpusCommand extends Command
             $this->line('  regression cases:');
             foreach ($metrics['regression_cases'] as $case) {
                 $this->line(sprintf('    - %s (expected %s)', $case['id'], $case['expected_intent']));
+            }
+        }
+
+        $this->renderTiming($metrics['timing']);
+    }
+
+    /**
+     * Concise timing summary (diagnostics observability only).
+     *
+     * @param  array<string, mixed>  $timing
+     */
+    private function renderTiming(array $timing): void
+    {
+        $this->newLine();
+        $this->line('<info>Timing</info> <comment>(diagnostics only)</comment>');
+        foreach ([
+            'total_duration_ms' => 'total duration ms',
+            'average_deterministic_duration_ms' => 'avg deterministic ms',
+            'average_ollama_duration_ms' => 'avg ollama ms',
+            'max_ollama_duration_ms' => 'max ollama ms',
+        ] as $key => $label) {
+            $this->line(sprintf('  %-26s %s', $label.':', $this->scalar($timing[$key])));
+        }
+
+        if ($timing['slowest_ollama_cases'] === []) {
+            $this->line('  slowest ollama cases: (none)');
+        } else {
+            $this->line('  slowest ollama cases:');
+            foreach ($timing['slowest_ollama_cases'] as $case) {
+                $this->line(sprintf('    - %s (%s ms)', $case['id'], $this->scalar($case['duration_ms'])));
             }
         }
     }

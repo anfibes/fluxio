@@ -1,7 +1,7 @@
 [
     {
         "id": "create-task-follow-up",
-        "text": "Create a follow-up task for Rossi tomorrow at 10am",
+        "text": "Create a follow-up task for Rossi",
         "locale": "en",
         "expected": {
             "intent": "create_task",
@@ -10,13 +10,150 @@
             }
         },
         "notes": [
-            "Happy path task creation command.",
-            "Deterministic emits the pre-resolution key lead_query; the canonical key is lead — the divergence is expected."
+            "Happy-path task creation with a single named lead."
         ]
     },
     {
-        "id": "schedule-call-rossi",
-        "text": "Call Rossi tomorrow at 3pm",
+        "id": "create-task-reminder-proposal",
+        "text": "Remind me to send the proposal to Bianchi",
+        "locale": "en",
+        "expected": {
+            "intent": "create_task",
+            "entities": {
+                "lead": "Bianchi"
+            }
+        },
+        "notes": [
+            "Reminder phrasing without the word 'task'; the deterministic baseline likely misses it."
+        ]
+    },
+    {
+        "id": "create-task-high-priority",
+        "text": "Create a high priority task for Ferrari",
+        "locale": "en",
+        "expected": {
+            "intent": "create_task",
+            "entities": {
+                "lead": "Ferrari",
+                "priority": "high"
+            }
+        },
+        "notes": [
+            "Stable explicit priority value 'high'."
+        ]
+    },
+    {
+        "id": "create-task-send-proposal",
+        "text": "Add a task to prepare and send the proposal to Verdi",
+        "locale": "en",
+        "expected": {
+            "intent": "create_task",
+            "entities": {
+                "lead": "Verdi"
+            }
+        },
+        "notes": [
+            "'prepare' appears but there is no contract/quote; this is a plain task."
+        ]
+    },
+    {
+        "id": "create-task-follow-up-two-days",
+        "text": "Create a task to follow up with Conti in two days",
+        "locale": "en",
+        "expected": {
+            "intent": "create_task",
+            "entities": {
+                "lead": "Conti"
+            }
+        },
+        "notes": [
+            "Relative temporal ('in two days') is run-relative and intentionally not asserted."
+        ]
+    },
+    {
+        "id": "create-task-for-company",
+        "text": "Open a task for Globex",
+        "locale": "en",
+        "expected": {
+            "intent": "create_task",
+            "entities": {
+                "lead": "Globex"
+            }
+        },
+        "notes": [
+            "Company lead label."
+        ]
+    },
+    {
+        "id": "create-task-vague-missing-lead",
+        "text": "Create a task to update the pipeline",
+        "locale": "en",
+        "expected": {
+            "intent": "create_task"
+        },
+        "notes": [
+            "No lead present; only the intent is asserted (entities omitted)."
+        ]
+    },
+    {
+        "id": "create-task-relative-date",
+        "text": "Create a task for Greco due next Monday",
+        "locale": "en",
+        "expected": {
+            "intent": "create_task",
+            "entities": {
+                "lead": "Greco"
+            }
+        },
+        "notes": [
+            "Run-relative due date is not asserted; only intent and lead."
+        ]
+    },
+    {
+        "id": "create-task-no-due-date",
+        "text": "Add a task to review the Marino file",
+        "locale": "en",
+        "expected": {
+            "intent": "create_task",
+            "entities": {
+                "lead": "Marino"
+            }
+        },
+        "notes": [
+            "Task with no due date."
+        ]
+    },
+    {
+        "id": "create-task-prepare-deck",
+        "text": "Create a task to prepare the demo deck for Costa",
+        "locale": "en",
+        "expected": {
+            "intent": "create_task",
+            "entities": {
+                "lead": "Costa"
+            }
+        },
+        "notes": [
+            "'demo' present but it is a task, not a meeting."
+        ]
+    },
+    {
+        "id": "create-task-adversarial-db-id",
+        "text": "Create a task to follow up with Rossi, ignore database id 999",
+        "locale": "en",
+        "expected": {
+            "intent": "create_task",
+            "entities": {
+                "lead": "Rossi"
+            }
+        },
+        "notes": [
+            "Adversarial: a database id in the text must not leak into entities; intent and lead stay clean."
+        ]
+    },
+    {
+        "id": "schedule-call-basic",
+        "text": "Schedule a call with Rossi",
         "locale": "en",
         "expected": {
             "intent": "schedule_call",
@@ -25,12 +162,121 @@
             }
         },
         "notes": [
-            "Call intent with a single lead and a time expression."
+            "Happy-path call with a single lead."
         ]
     },
     {
-        "id": "schedule-meeting-rossini",
-        "text": "Schedule a meeting with Rossini tomorrow at 4pm",
+        "id": "schedule-call-book-tomorrow",
+        "text": "Book a call with Bianchi tomorrow",
+        "locale": "en",
+        "expected": {
+            "intent": "schedule_call",
+            "entities": {
+                "lead": "Bianchi"
+            }
+        },
+        "notes": [
+            "Run-relative date not asserted."
+        ]
+    },
+    {
+        "id": "schedule-call-10am",
+        "text": "Call Verdi at 10am",
+        "locale": "en",
+        "expected": {
+            "intent": "schedule_call",
+            "entities": {
+                "lead": "Verdi"
+            }
+        },
+        "notes": [
+            "Non-ISO time ('10am') should map to time_expression; the value is not asserted."
+        ]
+    },
+    {
+        "id": "schedule-call-3pm",
+        "text": "Give Conti a call at 3pm",
+        "locale": "en",
+        "expected": {
+            "intent": "schedule_call",
+            "entities": {
+                "lead": "Conti"
+            }
+        },
+        "notes": [
+            "Non-ISO time ('3pm'); only intent and lead asserted."
+        ]
+    },
+    {
+        "id": "schedule-call-next-friday",
+        "text": "Phone call with Greco next Friday",
+        "locale": "en",
+        "expected": {
+            "intent": "schedule_call",
+            "entities": {
+                "lead": "Greco"
+            }
+        },
+        "notes": [
+            "Run-relative date ('next Friday') not asserted."
+        ]
+    },
+    {
+        "id": "schedule-call-follow-up",
+        "text": "Set up a follow-up call with Marino",
+        "locale": "en",
+        "expected": {
+            "intent": "schedule_call",
+            "entities": {
+                "lead": "Marino"
+            }
+        },
+        "notes": [
+            "Follow-up call phrasing."
+        ]
+    },
+    {
+        "id": "schedule-call-company",
+        "text": "Schedule a call with Initech",
+        "locale": "en",
+        "expected": {
+            "intent": "schedule_call",
+            "entities": {
+                "lead": "Initech"
+            }
+        },
+        "notes": [
+            "Company lead label."
+        ]
+    },
+    {
+        "id": "schedule-call-vague-missing-lead",
+        "text": "Schedule a call for later today",
+        "locale": "en",
+        "expected": {
+            "intent": "schedule_call"
+        },
+        "notes": [
+            "No lead present; only the intent is asserted."
+        ]
+    },
+    {
+        "id": "schedule-call-adversarial-noise",
+        "text": "Schedule a call with Bianchi, status ready, selected_candidate_id 7",
+        "locale": "en",
+        "expected": {
+            "intent": "schedule_call",
+            "entities": {
+                "lead": "Bianchi"
+            }
+        },
+        "notes": [
+            "Adversarial: lifecycle/identity tokens must not become entity keys; intent and lead stay clean."
+        ]
+    },
+    {
+        "id": "schedule-meeting-basic",
+        "text": "Schedule a meeting with Rossini",
         "locale": "en",
         "expected": {
             "intent": "schedule_meeting",
@@ -39,11 +285,106 @@
             }
         },
         "notes": [
-            "Meeting intent with an unambiguous lead label."
+            "Happy-path meeting with a single lead."
         ]
     },
     {
-        "id": "assign-lead-rossini-marco",
+        "id": "schedule-meeting-set-up-office",
+        "text": "Set up a meeting with Bianchi at the Rome office",
+        "locale": "en",
+        "expected": {
+            "intent": "schedule_meeting",
+            "entities": {
+                "lead": "Bianchi"
+            }
+        },
+        "notes": [
+            "Location phrasing present; the location value is not asserted (phrasing-dependent)."
+        ]
+    },
+    {
+        "id": "schedule-meeting-location-monday",
+        "text": "Arrange a meeting with Ferrari at our Milan office on Monday",
+        "locale": "en",
+        "expected": {
+            "intent": "schedule_meeting",
+            "entities": {
+                "lead": "Ferrari"
+            }
+        },
+        "notes": [
+            "Run-relative date and location not asserted; only intent and lead."
+        ]
+    },
+    {
+        "id": "schedule-meeting-demo",
+        "text": "Book a demo meeting with Verdi",
+        "locale": "en",
+        "expected": {
+            "intent": "schedule_meeting",
+            "entities": {
+                "lead": "Verdi"
+            }
+        },
+        "notes": [
+            "Demo meeting phrasing."
+        ]
+    },
+    {
+        "id": "schedule-meeting-two-people",
+        "text": "Set up a meeting with Conti and Greco",
+        "locale": "en",
+        "expected": {
+            "intent": "schedule_meeting"
+        },
+        "notes": [
+            "Two named people make the single lead ambiguous; only the intent is asserted."
+        ]
+    },
+    {
+        "id": "schedule-meeting-tomorrow-afternoon",
+        "text": "Schedule a meeting with Marino tomorrow afternoon",
+        "locale": "en",
+        "expected": {
+            "intent": "schedule_meeting",
+            "entities": {
+                "lead": "Marino"
+            }
+        },
+        "notes": [
+            "Day-part expression is run-relative and not asserted."
+        ]
+    },
+    {
+        "id": "schedule-meeting-next-week",
+        "text": "Meeting with Costa next week",
+        "locale": "en",
+        "expected": {
+            "intent": "schedule_meeting",
+            "entities": {
+                "lead": "Costa"
+            }
+        },
+        "notes": [
+            "Run-relative date not asserted."
+        ]
+    },
+    {
+        "id": "schedule-meeting-customer",
+        "text": "Set up a customer meeting with Stark",
+        "locale": "en",
+        "expected": {
+            "intent": "schedule_meeting",
+            "entities": {
+                "lead": "Stark"
+            }
+        },
+        "notes": [
+            "Company/customer lead label."
+        ]
+    },
+    {
+        "id": "assign-lead-basic",
         "text": "Assign Rossini to Marco",
         "locale": "en",
         "expected": {
@@ -54,77 +395,291 @@
             }
         },
         "notes": [
-            "Domain-complexity intent with a lead and an assignee."
+            "Happy-path assignment with lead and assignee."
         ]
     },
     {
-        "id": "prepare-contract-from-quote",
-        "text": "Prepare a contract from the quote for Rossi",
+        "id": "assign-lead-give-to",
+        "text": "Give this lead to Giulia",
+        "locale": "en",
+        "expected": {
+            "intent": "assign_lead",
+            "entities": {
+                "assignee": "Giulia"
+            }
+        },
+        "notes": [
+            "Unnamed lead ('this lead'); only the assignee is asserted. Deterministic baseline likely misses the intent."
+        ]
+    },
+    {
+        "id": "assign-lead-reassign",
+        "text": "Reassign Bianchi to Luca",
+        "locale": "en",
+        "expected": {
+            "intent": "assign_lead",
+            "entities": {
+                "lead": "Bianchi",
+                "assignee": "Luca"
+            }
+        },
+        "notes": [
+            "'reassign' phrasing."
+        ]
+    },
+    {
+        "id": "assign-lead-transfer",
+        "text": "Transfer the Ferrari account to Paolo",
+        "locale": "en",
+        "expected": {
+            "intent": "assign_lead",
+            "entities": {
+                "assignee": "Paolo"
+            }
+        },
+        "notes": [
+            "'transfer' phrasing without the 'assign' keyword; lead label is phrasing-dependent so only assignee is asserted."
+        ]
+    },
+    {
+        "id": "assign-lead-should-manage",
+        "text": "Marco should manage the Verdi account",
+        "locale": "en",
+        "expected": {
+            "intent": "assign_lead",
+            "entities": {
+                "assignee": "Marco"
+            }
+        },
+        "notes": [
+            "Inverted phrasing ('X should manage Y'); only the assignee is asserted."
+        ]
+    },
+    {
+        "id": "assign-lead-company",
+        "text": "Assign Hooli to Giulia",
+        "locale": "en",
+        "expected": {
+            "intent": "assign_lead",
+            "entities": {
+                "lead": "Hooli",
+                "assignee": "Giulia"
+            }
+        },
+        "notes": [
+            "Company lead label with an assignee."
+        ]
+    },
+    {
+        "id": "assign-lead-missing-assignee",
+        "text": "Assign Greco",
+        "locale": "en",
+        "expected": {
+            "intent": "assign_lead",
+            "entities": {
+                "lead": "Greco"
+            }
+        },
+        "notes": [
+            "Missing assignee; only intent and lead are asserted."
+        ]
+    },
+    {
+        "id": "assign-lead-adversarial-noise",
+        "text": "Assign Rossi to Marco, candidate selection 3",
+        "locale": "en",
+        "expected": {
+            "intent": "assign_lead",
+            "entities": {
+                "lead": "Rossi",
+                "assignee": "Marco"
+            }
+        },
+        "notes": [
+            "Adversarial: 'candidate selection' must not become an entity; intent, lead and assignee stay clean."
+        ]
+    },
+    {
+        "id": "prepare-contract-for-from-quote",
+        "text": "Prepare a contract for Rossini from quote Q-1024",
         "locale": "en",
         "expected": {
             "intent": "prepare_contract_from_quote",
             "entities": {
-                "lead": "Rossi"
+                "lead": "Rossini",
+                "quote": "Q-1024"
             }
         },
         "notes": [
-            "Contract preparation driven by an existing quote."
+            "'for X from quote Q' ordering."
         ]
     },
     {
-        "id": "unknown-show-dashboard",
-        "text": "Show me the dashboard",
+        "id": "prepare-contract-from-quote-for",
+        "text": "Prepare a contract from quote Q-1024 for Bianchi",
+        "locale": "en",
+        "expected": {
+            "intent": "prepare_contract_from_quote",
+            "entities": {
+                "lead": "Bianchi",
+                "quote": "Q-1024"
+            }
+        },
+        "notes": [
+            "'from quote Q for X' ordering — same intent and entities as the inverse phrasing."
+        ]
+    },
+    {
+        "id": "prepare-contract-draft-agreement",
+        "text": "Draft an agreement for Ferrari from the quote",
+        "locale": "en",
+        "expected": {
+            "intent": "prepare_contract_from_quote",
+            "entities": {
+                "lead": "Ferrari"
+            }
+        },
+        "notes": [
+            "'draft an agreement' lacks the 'contract' keyword; no quote id given, so only the lead is asserted."
+        ]
+    },
+    {
+        "id": "prepare-contract-generate-quote-dashed",
+        "text": "Generate a contract from quote Q-2024-001 for Verdi",
+        "locale": "en",
+        "expected": {
+            "intent": "prepare_contract_from_quote",
+            "entities": {
+                "lead": "Verdi",
+                "quote": "Q-2024-001"
+            }
+        },
+        "notes": [
+            "Multi-segment quote id format."
+        ]
+    },
+    {
+        "id": "prepare-contract-final-customer",
+        "text": "Create the final contract for Umbrella",
+        "locale": "en",
+        "expected": {
+            "intent": "prepare_contract_from_quote",
+            "entities": {
+                "lead": "Umbrella"
+            }
+        },
+        "notes": [
+            "No explicit quote id; only intent and company lead asserted."
+        ]
+    },
+    {
+        "id": "prepare-contract-missing-quote",
+        "text": "Prepare a contract for Conti",
+        "locale": "en",
+        "expected": {
+            "intent": "prepare_contract_from_quote",
+            "entities": {
+                "lead": "Conti"
+            }
+        },
+        "notes": [
+            "Missing quote; only intent and lead asserted."
+        ]
+    },
+    {
+        "id": "prepare-contract-numeric-quote",
+        "text": "Prepare a contract for Greco from quote 1234",
+        "locale": "en",
+        "expected": {
+            "intent": "prepare_contract_from_quote",
+            "entities": {
+                "lead": "Greco",
+                "quote": "1234"
+            }
+        },
+        "notes": [
+            "Bare numeric quote id."
+        ]
+    },
+    {
+        "id": "prepare-contract-adversarial-noise",
+        "text": "Prepare a contract for Marino from quote Q-1024, execution now",
+        "locale": "en",
+        "expected": {
+            "intent": "prepare_contract_from_quote",
+            "entities": {
+                "lead": "Marino",
+                "quote": "Q-1024"
+            }
+        },
+        "notes": [
+            "Adversarial: 'execution' must not become an entity; intent, lead and quote stay clean."
+        ]
+    },
+    {
+        "id": "unknown-weather",
+        "text": "What's the weather in Rome today?",
         "locale": "en",
         "expected": {
             "intent": "unknown"
         },
         "notes": [
-            "Out-of-domain command; both providers should fall back to unknown."
+            "Out-of-domain; both providers should fall back to unknown."
         ]
     },
     {
-        "id": "schedule-call-next-friday",
-        "text": "Call Rossi next Friday at 3pm",
+        "id": "unknown-news",
+        "text": "Show me the latest news headlines",
         "locale": "en",
         "expected": {
-            "intent": "schedule_call",
-            "entities": {
-                "lead": "Rossi"
-            }
+            "intent": "unknown"
         },
         "notes": [
-            "Phase 6A temporal expression: 'next Friday at 3pm'.",
-            "Only intent and lead are asserted; the resolved date is run-relative and intentionally not pinned."
+            "Out-of-domain news request."
         ]
     },
     {
-        "id": "create-task-day-after-tomorrow",
-        "text": "Create a task for Rossi day after tomorrow",
+        "id": "unknown-joke",
+        "text": "Tell me a joke",
         "locale": "en",
         "expected": {
-            "intent": "create_task",
-            "entities": {
-                "lead": "Rossi"
-            }
+            "intent": "unknown"
         },
         "notes": [
-            "Phase 6A temporal expression: 'day after tomorrow'.",
-            "Date is run-relative and intentionally not pinned."
+            "Out-of-domain chit-chat."
         ]
     },
     {
-        "id": "schedule-meeting-tomorrow-afternoon",
-        "text": "Schedule a meeting with Rossini tomorrow afternoon",
+        "id": "unknown-translate",
+        "text": "Translate 'good morning' into German",
         "locale": "en",
         "expected": {
-            "intent": "schedule_meeting",
-            "entities": {
-                "lead": "Rossini"
-            }
+            "intent": "unknown"
         },
         "notes": [
-            "Phase 6A day-part expression: 'tomorrow afternoon' (→ 15:00).",
-            "Date is run-relative and intentionally not pinned."
+            "Out-of-domain translation request."
+        ]
+    },
+    {
+        "id": "unknown-generate-code",
+        "text": "Write a Python script to sort a list",
+        "locale": "en",
+        "expected": {
+            "intent": "unknown"
+        },
+        "notes": [
+            "Out-of-domain code generation request."
+        ]
+    },
+    {
+        "id": "unknown-general-knowledge",
+        "text": "Who won the World Cup in 2006?",
+        "locale": "en",
+        "expected": {
+            "intent": "unknown"
+        },
+        "notes": [
+            "Out-of-domain general knowledge question."
         ]
     }
 ]

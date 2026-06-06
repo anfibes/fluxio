@@ -204,6 +204,43 @@ class InterpretationComparisonServiceTest extends TestCase
         $this->assertTrue($result->ollama->success);
     }
 
+    public function test_provider_durations_are_captured(): void
+    {
+        $service = new InterpretationComparisonService(
+            $this->commandProvider('create_task', 0.9),
+            $this->commandProvider('create_task', 0.8),
+        );
+
+        $result = $service->compare('Create a task');
+
+        // hrtime-based timing is captured per provider (>= 0) and is unaffected by Carbon::setTestNow.
+        $this->assertNotNull($result->deterministic->durationMs);
+        $this->assertNotNull($result->ollama->durationMs);
+        $this->assertGreaterThanOrEqual(0.0, $result->deterministic->durationMs);
+        $this->assertGreaterThanOrEqual(0.0, $result->ollama->durationMs);
+
+        // Per-case total is the sum of the two provider durations.
+        $this->assertEqualsWithDelta(
+            $result->deterministic->durationMs + $result->ollama->durationMs,
+            $result->caseDurationMs,
+            0.01,
+        );
+    }
+
+    public function test_duration_is_captured_even_when_a_provider_fails(): void
+    {
+        $service = new InterpretationComparisonService(
+            $this->commandProvider('create_task', 0.9),
+            $this->throwingProvider(new RuntimeException('llm down')),
+        );
+
+        $result = $service->compare('Create a task');
+
+        $this->assertFalse($result->ollama->success);
+        $this->assertNotNull($result->ollama->durationMs);
+        $this->assertGreaterThanOrEqual(0.0, $result->ollama->durationMs);
+    }
+
     public function test_ollama_failure_is_captured_as_provider_result(): void
     {
         $service = new InterpretationComparisonService(

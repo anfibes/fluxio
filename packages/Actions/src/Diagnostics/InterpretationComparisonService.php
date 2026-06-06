@@ -72,6 +72,7 @@ class InterpretationComparisonService
             entityDiff: $entityDiff,
             warningDiff: $warningDiff,
             notes: $notes,
+            caseDurationMs: round((float) $deterministic->durationMs + (float) $ollama->durationMs, 3),
         );
     }
 
@@ -81,11 +82,22 @@ class InterpretationComparisonService
         string $text,
         InterpretationContext $context,
     ): InterpretationProviderResult {
+        // hrtime is monotonic and unaffected by Carbon::setTestNow; it measures real
+        // wall-clock elapsed in the provider call only (diagnostics observability).
+        $startedAt = hrtime(true);
+
         try {
-            return InterpretationProviderResult::fromCommand($providerKey, $provider->interpret($text, $context));
+            $command = $provider->interpret($text, $context);
+
+            return InterpretationProviderResult::fromCommand($providerKey, $command, $this->elapsedMs($startedAt));
         } catch (Throwable $e) {
-            return InterpretationProviderResult::fromFailure($providerKey, $e);
+            return InterpretationProviderResult::fromFailure($providerKey, $e, $this->elapsedMs($startedAt));
         }
+    }
+
+    private function elapsedMs(int $startedAt): float
+    {
+        return round((hrtime(true) - $startedAt) / 1_000_000, 3);
     }
 
     /**

@@ -180,6 +180,37 @@ class EvaluateInterpretationCorpusMetricsCommandTest extends TestCase
         $this->assertStringContainsString('Baseline-relative outcomes', Artisan::output());
     }
 
+    public function test_metrics_table_shows_timing_summary(): void
+    {
+        $this->fakeLlmReturning(['intent' => 'create_task', 'confidence' => 0.8, 'entities' => [], 'notes' => []]);
+
+        Artisan::call('actions:evaluate-interpretation-corpus', [
+            '--path' => $this->createTaskCorpus(),
+            '--metrics' => true,
+        ]);
+        $output = Artisan::output();
+
+        $this->assertStringContainsString('Timing', $output);
+        $this->assertStringContainsString('total duration ms', $output);
+        $this->assertStringContainsString('avg ollama ms', $output);
+    }
+
+    public function test_json_includes_timing_aggregates(): void
+    {
+        $this->fakeLlmReturning(['intent' => 'create_task', 'confidence' => 0.8, 'entities' => [], 'notes' => []]);
+
+        Artisan::call('actions:evaluate-interpretation-corpus', [
+            '--path' => $this->createTaskCorpus(),
+            '--json' => true,
+        ]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        $this->assertArrayHasKey('total_duration_ms', $decoded);
+        $this->assertArrayHasKey('timing', $decoded['metrics']);
+        $this->assertArrayHasKey('average_ollama_duration_ms', $decoded['metrics']['timing']);
+        $this->assertArrayHasKey('slowest_ollama_cases', $decoded['metrics']['timing']);
+    }
+
     public function test_fail_on_drift_exits_success_when_agreement_above_threshold(): void
     {
         // Both providers produce create_task → agreement 1.0 ≥ 0.8.

@@ -28,9 +28,13 @@ final class InterpretationProviderResult
         public readonly array $warnings = [],
         public readonly ?string $errorClass = null,
         public readonly ?string $errorMessage = null,
+        // Diagnostics timing only: wall-clock ms spent in this provider's interpret()
+        // call (success or failure). Observability for local-model comparison; never
+        // consulted by runtime interpretation.
+        public readonly ?float $durationMs = null,
     ) {}
 
-    public static function fromCommand(string $providerKey, NormalizedCommand $command): self
+    public static function fromCommand(string $providerKey, NormalizedCommand $command, ?float $durationMs = null): self
     {
         return new self(
             providerKey: $providerKey,
@@ -39,16 +43,18 @@ final class InterpretationProviderResult
             confidence: $command->confidence,
             entities: $command->entities,
             warnings: $command->warnings,
+            durationMs: $durationMs,
         );
     }
 
-    public static function fromFailure(string $providerKey, Throwable $e): self
+    public static function fromFailure(string $providerKey, Throwable $e, ?float $durationMs = null): self
     {
         return new self(
             providerKey: $providerKey,
             success: false,
             errorClass: $e::class,
             errorMessage: $e->getMessage(),
+            durationMs: $durationMs,
         );
     }
 
@@ -66,6 +72,7 @@ final class InterpretationProviderResult
             'warnings' => $this->warnings,
             'error_class' => $this->errorClass,
             'error_message' => $this->errorMessage,
+            'duration_ms' => $this->durationMs,
         ];
     }
 }

@@ -21,6 +21,9 @@ class InterpretationDriftAnalyzer
     /** How many top |confidence delta| cases to surface. */
     private const TOP_DELTA_CASES = 3;
 
+    /** How many slowest provider cases to surface in the timing summary. */
+    private const SLOWEST_CASES = 5;
+
     public function analyze(InterpretationEvaluationSummary $summary): InterpretationEvaluationMetrics
     {
         $total = $summary->total;
@@ -34,6 +37,11 @@ class InterpretationDriftAnalyzer
         $detConfidences = [];
         $ollamaConfidences = [];
         $deltas = [];
+
+        // Timing aggregates (diagnostics observability only).
+        $detDurations = [];
+        $ollamaDurations = [];
+        $ollamaDurationCases = [];
 
         // Baseline-relative outcomes: the deterministic provider is the oracle; classify
         // the configured provider against it, per case, on the expected corpus result.
@@ -70,6 +78,15 @@ class InterpretationDriftAnalyzer
             if ($comparison->confidenceDelta !== null) {
                 $deltas[] = $comparison->confidenceDelta;
                 $deltaCases[] = $this->deltaCaseRow($case);
+            }
+
+            // Per-provider durations (captured regardless of success/failure).
+            if ($det->durationMs !== null) {
+                $detDurations[] = $det->durationMs;
+            }
+            if ($ollama->durationMs !== null) {
+                $ollamaDurations[] = $ollama->durationMs;
+                $ollamaDurationCases[] = ['id' => $case->id, 'duration_ms' => $ollama->durationMs];
             }
 
             // Intent mismatch between providers (only meaningful when both succeeded).
@@ -130,6 +147,10 @@ class InterpretationDriftAnalyzer
         usort($deltaCases, static fn (array $a, array $b): int => abs($b['confidence_delta']) <=> abs($a['confidence_delta']));
         $highestConfidenceDeltaCases = array_slice($deltaCases, 0, self::TOP_DELTA_CASES);
 
+        // Slowest provider cases (descending by ollama duration).
+        usort($ollamaDurationCases, static fn (array $a, array $b): int => $b['duration_ms'] <=> $a['duration_ms']);
+        $slowestOllamaCases = array_slice($ollamaDurationCases, 0, self::SLOWEST_CASES);
+
         return new InterpretationEvaluationMetrics(
             totalCases: $total,
             deterministicSuccessRate: $this->rate($summary->deterministicSuccessCount, $total),
@@ -161,6 +182,13 @@ class InterpretationDriftAnalyzer
                 'parity_miss' => $baselineParityMiss,
             ],
             regressionCases: $regressionCases,
+            timing: [
+                'total_duration_ms' => $summary->totalDurationMs,
+                'average_deterministic_duration_ms' => $this->average($detDurations),
+                'average_ollama_duration_ms' => $this->average($ollamaDurations),
+                'max_ollama_duration_ms' => $ollamaDurations === [] ? null : max($ollamaDurations),
+                'slowest_ollama_cases' => $slowestOllamaCases,
+            ],
         );
     }
 

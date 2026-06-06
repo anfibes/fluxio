@@ -165,6 +165,45 @@ class InterpretationEvaluationServiceTest extends TestCase
         $this->assertTrue($summary->cases[0]->ollamaEntityMatch);
     }
 
+    public function test_total_duration_is_captured_on_the_summary(): void
+    {
+        $service = $this->service(
+            $this->commandProvider('create_task', 0.9),
+            $this->commandProvider('create_task', 0.8),
+        );
+
+        $summary = $service->evaluate([
+            $this->case('a', 'Create a task', 'create_task'),
+        ]);
+
+        $this->assertGreaterThanOrEqual(0.0, $summary->totalDurationMs);
+        $this->assertArrayHasKey('total_duration_ms', $summary->toArray());
+    }
+
+    public function test_progress_callback_is_invoked_once_per_case(): void
+    {
+        $service = $this->service(
+            $this->commandProvider('create_task', 0.9),
+            $this->commandProvider('create_task', 0.8),
+        );
+
+        $progress = [];
+
+        $service->evaluate(
+            [
+                $this->case('a', 'Create a task', 'create_task'),
+                $this->case('b', 'Create another task', 'create_task'),
+                $this->case('c', 'Create a third task', 'create_task'),
+            ],
+            function (int $completed, int $total) use (&$progress): void {
+                $progress[] = [$completed, $total];
+            },
+        );
+
+        // One monotonically increasing callback per case, each reporting the fixed total.
+        $this->assertSame([[1, 3], [2, 3], [3, 3]], $progress);
+    }
+
     public function test_provider_failure_is_counted_but_does_not_abort_evaluation(): void
     {
         // Ollama throws for every case; deterministic succeeds. The loop must

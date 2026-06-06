@@ -28,6 +28,7 @@ final class InterpretationEvaluationMetrics
      * @param  array<string, int>  $divergentEntityKeys
      * @param  array{improved: int, regressed: int, parity_match: int, parity_miss: int}  $baselineRelativeOutcomes
      * @param  list<array{id: string, expected_intent: string}>  $regressionCases
+     * @param  array{total_duration_ms: float, average_deterministic_duration_ms: float|null, average_ollama_duration_ms: float|null, max_ollama_duration_ms: float|null, slowest_ollama_cases: list<array{id: string, duration_ms: float|null}>}  $timing
      */
     public function __construct(
         public readonly int $totalCases,
@@ -50,6 +51,14 @@ final class InterpretationEvaluationMetrics
         public readonly array $divergentEntityKeys,
         public readonly array $baselineRelativeOutcomes,
         public readonly array $regressionCases,
+        // Diagnostics timing aggregates (grouped to keep existing keys stable/additive).
+        public readonly array $timing = [
+            'total_duration_ms' => 0.0,
+            'average_deterministic_duration_ms' => null,
+            'average_ollama_duration_ms' => null,
+            'max_ollama_duration_ms' => null,
+            'slowest_ollama_cases' => [],
+        ],
     ) {}
 
     /**
@@ -78,6 +87,7 @@ final class InterpretationEvaluationMetrics
             'divergent_entity_keys' => $this->divergentEntityKeys,
             'baseline_relative_outcomes' => $this->baselineRelativeOutcomes,
             'regression_cases' => $this->regressionCases,
+            'timing' => $this->timing,
         ];
     }
 }

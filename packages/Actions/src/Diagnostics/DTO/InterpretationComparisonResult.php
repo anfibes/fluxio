@@ -27,6 +27,9 @@ final class InterpretationComparisonResult
         public readonly array $entityDiff,
         public readonly array $warningDiff,
         public readonly array $notes,
+        // Diagnostics timing only: total wall-clock ms for this case (deterministic +
+        // provider interpret() calls). Observability for local-model comparison.
+        public readonly float $caseDurationMs = 0.0,
     ) {}
 
     /**
@@ -45,6 +48,7 @@ final class InterpretationComparisonResult
             'entity_diff' => $this->entityDiff,
             'warning_diff' => $this->warningDiff,
             'notes' => $this->notes,
+            'duration_ms' => $this->caseDurationMs,
         ];
     }
 }

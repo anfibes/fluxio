@@ -107,4 +107,56 @@ class EvaluateInterpretationCorpusCommandTest extends TestCase
 
         $this->app['env'] = 'testing';
     }
+
+    public function test_json_output_includes_timing_fields_additively(): void
+    {
+        $this->fakeValidLlm();
+
+        Artisan::call('actions:evaluate-interpretation-corpus', ['--json' => true]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        $this->assertIsArray($decoded);
+
+        // Top-level evaluation duration (additive — existing keys still present).
+        $this->assertArrayHasKey('total_duration_ms', $decoded);
+        $this->assertArrayHasKey('total', $decoded);
+        $this->assertIsNumeric($decoded['total_duration_ms']);
+        $this->assertGreaterThanOrEqual(0, $decoded['total_duration_ms']);
+
+        // Per-case + per-provider durations.
+        $case = $decoded['cases'][0];
+        $this->assertArrayHasKey('duration_ms', $case['comparison']);
+        $this->assertArrayHasKey('duration_ms', $case['comparison']['deterministic']);
+        $this->assertArrayHasKey('duration_ms', $case['comparison']['ollama']);
+        $this->assertGreaterThanOrEqual(0, $case['comparison']['deterministic']['duration_ms']);
+
+        // Aggregate timing metrics grouped under metrics.timing.
+        $timing = $decoded['metrics']['timing'];
+        $this->assertArrayHasKey('total_duration_ms', $timing);
+        $this->assertArrayHasKey('average_deterministic_duration_ms', $timing);
+        $this->assertArrayHasKey('average_ollama_duration_ms', $timing);
+        $this->assertArrayHasKey('max_ollama_duration_ms', $timing);
+        $this->assertArrayHasKey('slowest_ollama_cases', $timing);
+        $this->assertIsArray($timing['slowest_ollama_cases']);
+    }
+
+    public function test_progress_flag_does_not_corrupt_json_stdout(): void
+    {
+        $this->fakeValidLlm();
+
+        // --json together with --progress: progress must go to stderr only, so stdout
+        // stays a single valid JSON document that json_decode can parse cleanly.
+        $exitCode = Artisan::call('actions:evaluate-interpretation-corpus', [
+            '--json' => true,
+            '--progress' => true,
+        ]);
+        $output = Artisan::output();
+
+        $this->assertSame(0, $exitCode);
+
+        $decoded = json_decode($output, true);
+        $this->assertSame(JSON_ERROR_NONE, json_last_error(), 'stdout is not pure JSON: '.$output);
+        $this->assertIsArray($decoded);
+        $this->assertArrayHasKey('total', $decoded);
+    }
 }

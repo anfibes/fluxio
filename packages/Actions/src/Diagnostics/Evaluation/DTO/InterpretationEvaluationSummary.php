@@ -26,6 +26,8 @@ final class InterpretationEvaluationSummary
         public readonly int $intentMismatchCountBetweenProviders,
         public readonly int $providerFailureCount,
         public readonly array $cases,
+        // Diagnostics timing only: total wall-clock ms for the whole corpus pass.
+        public readonly float $totalDurationMs = 0.0,
     ) {}
 
     /**
@@ -43,6 +45,7 @@ final class InterpretationEvaluationSummary
             'ollama_entity_match_count' => $this->ollamaEntityMatchCount,
             'intent_mismatch_count_between_providers' => $this->intentMismatchCountBetweenProviders,
             'provider_failure_count' => $this->providerFailureCount,
+            'total_duration_ms' => $this->totalDurationMs,
             'cases' => array_map(
                 static fn (InterpretationEvaluationResult $case): array => $case->toArray(),
                 $this->cases,

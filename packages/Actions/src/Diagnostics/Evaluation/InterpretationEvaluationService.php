@@ -33,9 +33,16 @@ class InterpretationEvaluationService
 
     /**
      * @param  list<InterpretationCorpusCase>  $cases
+     * @param  (callable(int $completed, int $total): void)|null  $onProgress  Per-case progress hook (diagnostics UX only): invoked after each case with the count completed and the total; never affects evaluation outcomes.
      */
-    public function evaluate(array $cases): InterpretationEvaluationSummary
+    public function evaluate(array $cases, ?callable $onProgress = null): InterpretationEvaluationSummary
     {
+        // Monotonic wall-clock for the whole corpus pass (diagnostics observability).
+        $startedAt = hrtime(true);
+
+        $total = count($cases);
+        $completed = 0;
+
         $results = [];
 
         $deterministicSuccess = 0;
@@ -85,6 +92,11 @@ class InterpretationEvaluationService
                 deterministicEntityMatch: $detEntityMatch,
                 ollamaEntityMatch: $ollamaEntityMatchD,
             );
+
+            $completed++;
+            if ($onProgress !== null) {
+                $onProgress($completed, $total);
+            }
         }
 
         return new InterpretationEvaluationSummary(
@@ -98,6 +110,7 @@ class InterpretationEvaluationService
             intentMismatchCountBetweenProviders: $intentMismatchBetween,
             providerFailureCount: $providerFailures,
             cases: $results,
+            totalDurationMs: round((hrtime(true) - $startedAt) / 1_000_000, 3),
         );
     }
 
