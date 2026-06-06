@@ -108,6 +108,114 @@ class EvaluateInterpretationCorpusCommandTest extends TestCase
         $this->app['env'] = 'testing';
     }
 
+    // ── --case / --limit filtering ────────────────────────────────────────────
+
+    public function test_case_filter_returns_only_the_selected_case(): void
+    {
+        $this->fakeValidLlm();
+
+        Artisan::call('actions:evaluate-interpretation-corpus', [
+            '--case' => 'schedule-meeting-two-people',
+            '--json' => true,
+        ]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        // Same JSON shape, narrowed to one case; metrics + grammar still present.
+        $this->assertSame(1, $decoded['total']);
+        $this->assertCount(1, $decoded['cases']);
+        $this->assertSame('schedule-meeting-two-people', $decoded['cases'][0]['id']);
+        $this->assertSame(1, $decoded['metrics']['total_cases']);
+        $this->assertArrayHasKey('grammar', $decoded);
+    }
+
+    public function test_case_filter_only_evaluates_the_single_case(): void
+    {
+        // A counting client proves only ONE provider call happens (not 50).
+        $client = new class implements LlmClientInterface
+        {
+            public int $calls = 0;
+
+            public function generateStructured(LlmRequest $request): LlmResponse
+            {
+                $this->calls++;
+
+                return new LlmResponse(
+                    rawText: json_encode(['intent' => 'create_task', 'confidence' => 0.8, 'entities' => [], 'notes' => []]),
+                    parsedJson: ['intent' => 'create_task', 'confidence' => 0.8, 'entities' => [], 'notes' => []],
+                );
+            }
+        };
+        $this->app->bind(LlmClientInterface::class, fn () => $client);
+
+        $exit = Artisan::call('actions:evaluate-interpretation-corpus', [
+            '--case' => 'schedule-meeting-two-people',
+            '--metrics' => true,
+        ]);
+
+        $this->assertSame(0, $exit);
+        $this->assertSame(1, $client->calls);
+    }
+
+    public function test_case_filter_with_unknown_id_fails_with_clear_error(): void
+    {
+        $this->fakeValidLlm();
+
+        $this->artisan('actions:evaluate-interpretation-corpus', ['--case' => 'does-not-exist'])
+            ->assertFailed()
+            ->expectsOutputToContain('No corpus case with id [does-not-exist].');
+    }
+
+    public function test_limit_returns_only_the_first_n_cases(): void
+    {
+        $this->fakeValidLlm();
+
+        Artisan::call('actions:evaluate-interpretation-corpus', [
+            '--limit' => 3,
+            '--json' => true,
+        ]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        $this->assertSame(3, $decoded['total']);
+        $this->assertCount(3, $decoded['cases']);
+        $this->assertSame(3, $decoded['metrics']['total_cases']);
+    }
+
+    public function test_limit_greater_than_corpus_evaluates_all_cases(): void
+    {
+        $this->fakeValidLlm();
+
+        Artisan::call('actions:evaluate-interpretation-corpus', [
+            '--limit' => 100000,
+            '--json' => true,
+        ]);
+        $decoded = json_decode(Artisan::output(), true);
+
+        // Slice past the end just yields the whole corpus (> 0, never an error).
+        $this->assertGreaterThan(3, $decoded['total']);
+        $this->assertCount($decoded['total'], $decoded['cases']);
+    }
+
+    public function test_limit_zero_fails_with_clear_error(): void
+    {
+        $this->fakeValidLlm();
+
+        $this->artisan('actions:evaluate-interpretation-corpus', ['--limit' => 0])
+            ->assertFailed()
+            ->expectsOutputToContain('--limit must be a positive integer.');
+    }
+
+    public function test_case_and_limit_together_fails(): void
+    {
+        $this->fakeValidLlm();
+
+        $this->artisan('actions:evaluate-interpretation-corpus', [
+            '--case' => 'schedule-meeting-two-people',
+            '--limit' => 2,
+        ])
+            ->assertFailed()
+            ->expectsOutputToContain('--case and --limit cannot be used together.');
+    }
+
     public function test_json_output_includes_timing_fields_additively(): void
     {
         $this->fakeValidLlm();

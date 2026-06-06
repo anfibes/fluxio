@@ -33,6 +33,8 @@ class EvaluateInterpretationCorpusCommand extends Command
                             {--path= : Path to a custom corpus JSON file (defaults to the shipped corpus)}
                             {--json : Emit the full evaluation as pretty JSON instead of the summary table}
                             {--metrics : Print enriched drift metrics alongside the table summary}
+                            {--case= : Evaluate only the single corpus case with this id (cannot be combined with --limit)}
+                            {--limit= : Evaluate only the first N corpus cases (must be a positive integer; cannot be combined with --case)}
                             {--fail-on-drift : Exit non-zero when provider intent agreement is below the threshold (opt-in, for CI experiments)}
                             {--agreement-threshold=0.8 : Minimum provider intent agreement rate; only applies with --fail-on-drift}
                             {--progress : Show a per-case progress bar on stderr (on by default unless --json; never written to stdout)}';
@@ -53,6 +55,14 @@ class EvaluateInterpretationCorpusCommand extends Command
 
         $path = (string) ($this->option('path') ?: InterpretationCorpusLoader::defaultCorpusPath());
         $cases = $loader->load($path);
+
+        // Diagnostics-only filtering: narrow the loaded corpus BEFORE evaluation so a
+        // single-case inspection does not pay for 50 model calls. Filtering happens here
+        // only — the loader, services, and DTOs are untouched.
+        $cases = $this->filterCases($cases);
+        if ($cases === null) {
+            return self::FAILURE;
+        }
 
         // Progress is a stderr-only UX aid: it must never reach stdout or it would
         // corrupt --json piped to jq. The bar is created only when a real stderr
@@ -109,6 +119,52 @@ class EvaluateInterpretationCorpusCommand extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Apply the diagnostics-only --case / --limit filters to the loaded corpus.
+     *
+     * Returns the (possibly narrowed) list of cases, or null when the options are
+     * invalid — in which case a clear error has already been printed and the caller
+     * should return FAILURE. Without either option the corpus is returned unchanged.
+     *
+     * @param  list<\Fluxio\Actions\Diagnostics\Evaluation\DTO\InterpretationCorpusCase>  $cases
+     * @return list<\Fluxio\Actions\Diagnostics\Evaluation\DTO\InterpretationCorpusCase>|null
+     */
+    private function filterCases(array $cases): ?array
+    {
+        $caseId = $this->option('case');
+        $limit = $this->option('limit');
+
+        if ($caseId !== null && $limit !== null) {
+            $this->error('--case and --limit cannot be used together.');
+
+            return null;
+        }
+
+        if ($caseId !== null) {
+            foreach ($cases as $case) {
+                if ($case->id === $caseId) {
+                    return [$case];
+                }
+            }
+
+            $this->error("No corpus case with id [{$caseId}].");
+
+            return null;
+        }
+
+        if ($limit !== null) {
+            if (! is_numeric($limit) || (int) $limit != $limit || (int) $limit <= 0) {
+                $this->error('--limit must be a positive integer.');
+
+                return null;
+            }
+
+            return array_slice($cases, 0, (int) $limit);
+        }
+
+        return $cases;
     }
 
     /**
