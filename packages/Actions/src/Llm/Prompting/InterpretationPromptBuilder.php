@@ -65,6 +65,11 @@ class InterpretationPromptBuilder
             '- Put a time in "time" ONLY if already a 24-hour HH:MM value (e.g. "15:00"); if the phrase has am/pm, or words like morning/afternoon/evening/night/sometime/around/at (e.g. "3pm", "at 10am", "in the morning"), use "time_expression".',
             '- Never copy key names out of the user text. If the text mentions lead id, selected_candidate_id, id, status, readiness, execution, failure, or candidates, ignore them: they are never entity keys, and forbidden runtime/identity keys must not appear in "entities".',
             '',
+            'Entity values (omit instead of guessing):',
+            '- If you do not have a concrete value for a key, OMIT the key. Never emit null, an empty string "", an empty array [], an empty object {}, or placeholder text.',
+            '- Every key you include must carry a real value taken from the message.',
+            '- participants (when allowed): include it ONLY if concrete participant names are present, as a non-empty list of name strings (e.g. ["Marco","Giulia"]). Never emit participants as an empty array, and never as objects — omit it when there are none.',
+            '',
             'Example of the required shape:',
             '{"intent":"create_task","confidence":0.82,"entities":{"lead":"Rossi","due_at":"tomorrow"},"notes":[]}',
         ]);

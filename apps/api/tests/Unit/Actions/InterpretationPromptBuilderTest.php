@@ -80,4 +80,24 @@ class InterpretationPromptBuilderTest extends TestCase
             $this->prompt,
         );
     }
+
+    // ── Phase 9F.3E: omit-instead-of-placeholder guidance (compliance, not validation) ─
+
+    public function test_prompt_requires_omitting_unknown_keys_instead_of_emitting_empty_values(): void
+    {
+        $this->assertStringContainsString('OMIT the key', $this->prompt);
+        // The four empty/placeholder forms the small model tends to echo.
+        $this->assertStringContainsString('Never emit null', $this->prompt);
+        $this->assertStringContainsString('an empty string ""', $this->prompt);
+        $this->assertStringContainsString('an empty array []', $this->prompt);
+        $this->assertStringContainsString('an empty object {}', $this->prompt);
+        $this->assertStringContainsString('placeholder text', $this->prompt);
+    }
+
+    public function test_prompt_constrains_participants_to_non_empty_string_lists_or_omission(): void
+    {
+        $this->assertStringContainsString('non-empty list of name strings', $this->prompt);
+        $this->assertStringContainsString('Never emit participants as an empty array', $this->prompt);
+        $this->assertStringContainsString('never as objects', $this->prompt);
+    }
 }
