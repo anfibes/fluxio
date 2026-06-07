@@ -260,16 +260,108 @@ class IntentNarrationTest extends TestCase
         $this->assertSame($before, $proposal->getAttributes());
     }
 
-    // ── 6. Slice boundary: narration is not exposed via the resource ──────────
+    // ── 6. Slice 2: additive canonical_phrase on the resource ─────────────────
 
-    public function test_action_proposal_resource_does_not_expose_narration(): void
+    public function test_resource_includes_canonical_phrase_key(): void
     {
         $proposal = $this->fullScheduleMeeting();
 
         $array = (new ActionProposalResource($proposal))->toArray(Request::create('/'));
 
-        $this->assertArrayNotHasKey('narration', $array);
-        $this->assertArrayNotHasKey('canonical_phrase', $array);
+        $this->assertArrayHasKey('canonical_phrase', $array);
+    }
+
+    public function test_resource_canonical_phrase_is_null_for_incomplete_proposal(): void
+    {
+        $proposal = new ActionProposal([
+            'intent' => 'schedule_meeting',
+            'status' => 'draft',
+            'editable_fields' => [
+                ['key' => 'lead', 'label' => 'Lead', 'value' => 'Rossi SRL', 'source' => 'resolved', 'required' => true],
+            ],
+        ]);
+
+        $array = (new ActionProposalResource($proposal))->toArray(Request::create('/'));
+
+        $this->assertArrayHasKey('canonical_phrase', $array);
+        $this->assertNull($array['canonical_phrase']);
+    }
+
+    public function test_resource_canonical_phrase_is_null_for_unsupported_intent(): void
+    {
+        $proposal = new ActionProposal([
+            'intent' => 'archive_record',
+            'status' => 'ready',
+            'editable_fields' => [
+                ['key' => 'lead', 'label' => 'Lead', 'value' => 'Rossi SRL', 'source' => 'resolved', 'required' => true],
+            ],
+        ]);
+
+        $array = (new ActionProposalResource($proposal))->toArray(Request::create('/'));
+
+        $this->assertNull($array['canonical_phrase']);
+    }
+
+    public function test_resource_canonical_phrase_contains_expected_english_phrase(): void
+    {
+        $proposal = $this->fullScheduleMeeting();
+
+        $array = (new ActionProposalResource($proposal))->toArray(Request::create('/'));
+
+        $this->assertSame(
+            'Schedule a meeting with Rossi SRL on 2026-05-11 at 10:00.',
+            $array['canonical_phrase'],
+        );
+    }
+
+    public function test_resource_canonical_phrase_respects_italian_locale(): void
+    {
+        $proposal = $this->fullScheduleMeeting();
+
+        $previous = $this->app->getLocale();
+        $this->app->setLocale('it');
+
+        try {
+            $array = (new ActionProposalResource($proposal))->toArray(Request::create('/'));
+        } finally {
+            $this->app->setLocale($previous);
+        }
+
+        $this->assertSame(
+            'Pianifica un appuntamento con Rossi SRL il 2026-05-11 alle 10:00.',
+            $array['canonical_phrase'],
+        );
+    }
+
+    public function test_resource_preserves_existing_response_shape(): void
+    {
+        $proposal = $this->fullScheduleMeeting();
+
+        $array = (new ActionProposalResource($proposal))->toArray(Request::create('/'));
+
+        // Every pre-slice-2 key must still be present (additive-only guarantee).
+        foreach ([
+            'id', 'intent', 'status', 'confidence', 'source_text', 'entities',
+            'missing', 'warnings', 'editable_fields', 'changes', 'needs_confirmation',
+            'confirmed_at', 'executed_at', 'failed_at', 'failure_reason',
+            'execution_failure', 'execution_result', 'last_refinement', 'ambiguities',
+            'capabilities',
+        ] as $key) {
+            $this->assertArrayHasKey($key, $array, "Existing response key [{$key}] must remain.");
+        }
+
+        // canonical_phrase is the only addition.
+        $this->assertArrayHasKey('canonical_phrase', $array);
+    }
+
+    public function test_resource_serialization_does_not_mutate_proposal(): void
+    {
+        $proposal = $this->fullScheduleMeeting();
+        $before = $proposal->getAttributes();
+
+        (new ActionProposalResource($proposal))->toArray(Request::create('/'));
+
+        $this->assertSame($before, $proposal->getAttributes());
     }
 
     private function fullScheduleMeeting(): ActionProposal

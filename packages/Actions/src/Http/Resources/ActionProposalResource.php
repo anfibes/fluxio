@@ -4,6 +4,7 @@ namespace Fluxio\Actions\Http\Resources;
 
 use Fluxio\Actions\Models\ActionProposal;
 use Fluxio\Actions\Registry\IntentCapabilityRegistry;
+use Fluxio\Actions\Services\NarrationProjectionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -27,6 +28,13 @@ class ActionProposalResource extends JsonResource
             ? (new IntentCapabilityResource($capability))->resolve()
             : IntentCapabilityResource::empty();
 
+        // Additive, read-only projection (Intent Narration — slice 2). Derived
+        // purely from proposal state via NarrationProjectionService; null for
+        // incomplete proposals and unknown/unsupported intents. Localized via the
+        // app locale (set by SetApiLocale), the same mechanism as other atoms.
+        // Never authoritative: it never feeds readiness, validation, or execution.
+        $canonicalPhrase = app(NarrationProjectionService::class)->canonicalPhrase($proposal);
+
         return [
             'id' => $proposal->id,
             'intent' => $proposal->intent,
@@ -48,6 +56,7 @@ class ActionProposalResource extends JsonResource
             'last_refinement' => $proposal->last_refinement,
             'ambiguities' => $proposal->ambiguities ?? [],
             'capabilities' => $capabilities,
+            'canonical_phrase' => $canonicalPhrase,
         ];
     }
 
