@@ -403,6 +403,12 @@ Current capabilities:
 - refinement warning deduplication
 - typed, atomic execution (a deterministic execution authority: at-most-once,
   confirmed-only, transactional, with a typed result and a typed/sanitized failure)
+- canonical proposal narration (an additive, read-only `canonical_phrase`: a
+  deterministic, locale-aware sentence projected purely from proposal state —
+  never authoritative, `null` for incomplete or unsupported proposals)
+- declarative intent examples (a backend-only, read-only multilingual library of
+  expression patterns per intent; describes phrasings, not behavior, and is not
+  wired into the runtime)
 
 ---
 
@@ -646,6 +652,8 @@ Implemented frontend capabilities:
 - contextual refinements
 - capability panel (operational metadata from the backend)
 - contextual refinement hints (gated by capabilities and proposal state)
+- proposal canonical-phrase summary near the command input (renders the
+  backend `canonical_phrase`; read-only, hidden when absent)
 - locale-aware API calls (`Accept-Language`)
 - responsive/mobile-safe shell
 - dark/light/system themes

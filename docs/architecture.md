@@ -998,6 +998,58 @@ accumulate duplicate warnings on the proposal.
 
 ---
 
+# Intent Narration Layer
+
+A read-only projection that renders a human-readable **canonical phrase** from
+proposal state. It is the OUTPUT counterpart to the interpretation INPUT: where
+interpretation turns text into a proposal, narration turns a proposal back into a
+sentence — deterministically, never via an LLM and never from conversation history.
+
+Components:
+
+- `IntentNarrationRegistry` + `Support\DefaultIntentNarration` declare a canonical
+  template key per intent (parallel to `IntentCapabilityRegistry`); the localized
+  strings live in the `actions::actions.narration.*` namespace (`en`, `it`).
+- `Services\NarrationProjectionService` is a pure function
+  `(ActionProposal, locale) -> ?string`. It fills template slots **only** from the
+  proposal's resolved `editable_fields` (labels, never IDs), returns `null` when any
+  required slot is missing, and follows the request locale (`SetApiLocale`).
+- `ActionProposalResource` exposes the result as an additive, read-only
+  `canonical_phrase` field; the frontend renders it as a summary near the composer.
+
+Invariant: `canonical_phrase` is a **projection, not a source of truth**. It never
+feeds readiness, validation, ambiguity, resolution, confirmation, or execution, and
+its slot placeholders are validated against `IntentDefinition` requirement keys (the
+same authoritative vocabulary as capabilities). Detailed design lives in
+`.docs/intent-narration-first-slice-review.md`.
+
+---
+
+# Intent Examples Layer
+
+A declarative, **multilingual** library describing *how users may naturally express*
+each intent — the INPUT counterpart to narration. It is **backend-only and not wired
+into the runtime**: it describes expression patterns, it does not interpret input.
+
+Components:
+
+- `resources/intent-examples/{en,it}.json` hold literal and template examples per
+  intent and locale.
+- `Examples\IntentExampleLoader` is a fail-closed JSON loader that validates each
+  record's intent against `IntentRegistry`, its slot `entity_key`s against
+  `IntentDefinition` requirement keys (plus the universal `date`/`time` parser keys),
+  and rejects forbidden runtime/authority fields (ids, status, execution flags, …).
+- `Examples\IntentExampleRegistry` is a read-only registry (query by locale/intent/id).
+
+Invariant: examples never interpret, build proposals, resolve entities, emit IDs, or
+decide readiness/ambiguity/execution; **no runtime code depends on the registry**
+(enforced by test). The layer exists to seed future, separately-reviewed consumers —
+evaluation-corpus generation, few-shot prompting, embedding retrieval,
+confirmed-interpretation memory, and documentation. Design rationale:
+`.docs/intent-examples-layer-analysis.md`.
+
+---
+
 # Action Proposal Lifecycle
 
 Current lifecycle:
@@ -1056,11 +1108,11 @@ Example:
     "executed_at": null,
     "failed_at": null,
     "failure_reason": null,
-    "failure_reason_code": null,
     "execution_failure": null,
     "execution_result": null,
     "last_refinement": null,
-    "capabilities": {}
+    "capabilities": {},
+    "canonical_phrase": null
 }
 ```
 
@@ -1076,8 +1128,14 @@ Execution outcome fields are typed and consistent across intents:
 - `execution_failure` (on `failed`): `{ "reason": "unsupported_intent" |
   "execution_failed", "message": string }` — a closed reason taxonomy plus a
   sanitized, localized message. `failure_reason` keeps the same message string for
-  compatibility; `failure_reason_code` persists the reason. Raw exception text is
+  compatibility; the reason code is persisted internally and surfaced only through
+  `execution_failure.reason`, never as a separate payload field. Raw exception text is
   never exposed.
+
+`canonical_phrase` is an additive, read-only narration projection (see the
+Intent Narration layer below): a deterministic, locale-aware sentence derived purely
+from proposal state, `null` for incomplete or unsupported proposals and never
+authoritative.
 
 ---
 

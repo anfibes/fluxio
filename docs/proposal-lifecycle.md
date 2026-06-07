@@ -129,7 +129,6 @@ Example:
     "executed_at": null,
     "failed_at": null,
     "failure_reason": null,
-    "failure_reason_code": null,
     "execution_failure": null,
     "execution_result": null,
     "last_refinement": null
@@ -137,7 +136,11 @@ Example:
 ```
 
 (The serialized payload also carries a read-only `capabilities` block; see the
-Architecture doc's Intent Capability Layer.)
+Architecture doc's Intent Capability Layer. It additionally carries a read-only,
+additive `canonical_phrase` — a deterministic, locale-aware narration projection of
+the proposal state, `null` for incomplete or unsupported proposals and never
+authoritative. The reason code behind a failure is internal and surfaced only via
+`execution_failure.reason`, not as a separate field.)
 
 The proposal acts as:
 - execution contract

@@ -469,18 +469,36 @@ These endpoints use the same standardized response envelope used by the rest of 
         "executed_at": null,
         "failed_at": null,
         "failure_reason": null,
-        "failure_reason_code": null,
         "execution_failure": null,
         "execution_result": null,
-        "last_refinement": null
+        "last_refinement": null,
+        "capabilities": {
+            "supports_contextual_references": false,
+            "supports_ambiguity_resolution": false,
+            "supports_collection_mutations": false,
+            "mutations": [],
+            "refinements": []
+        },
+        "canonical_phrase": null
     }
 }
 ```
 
 On `executed`, `execution_result` is a typed `{ "summary": string, "details": { … } }`.
 On `failed`, `execution_failure` is `{ "reason": "unsupported_intent" | "execution_failed",
-"message": string }`, with `failure_reason_code` mirroring the reason and `failure_reason`
-holding the same sanitized message. Raw exception text is never exposed.
+"message": string }`; `failure_reason` holds the same sanitized message. The reason code is
+persisted internally and surfaced only through `execution_failure.reason`, never as a separate
+response field. Raw exception text is never exposed.
+
+`capabilities` is a read-only, per-intent projection of refinement/mutation legality (the
+shape above is the empty fallback for an unregistered intent); see
+[Proposal Lifecycle](proposal-lifecycle.md) and `.docs/intent-narration-first-slice-review.md`.
+
+`canonical_phrase` is an additive, read-only narration projection: a deterministic,
+human-readable rendering of the proposal derived purely from proposal state, localized via the
+request locale (`Accept-Language`). It is `null` for incomplete proposals and unknown or
+unsupported intents, and is **never authoritative** — it never feeds readiness, validation,
+confirmation, or execution.
 
 ---
 
