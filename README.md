@@ -741,6 +741,7 @@ notes and working documents live in `.docs/`.
 - [Architecture](docs/architecture.md)
 - [Frontend Vision](docs/frontend-vision.md)
 - [Proposal Lifecycle](docs/proposal-lifecycle.md)
+- [LLM Interpretation Evaluation](docs/llm-interpretation-evaluation.md)
 - [API Response Standard](docs/api-response-standard.md)
 - [Getting Started](docs/getting-started.md)
 
