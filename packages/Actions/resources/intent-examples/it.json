@@ -1,0 +1,113 @@
+[
+  {
+    "id": "it-create-task-basic",
+    "locale": "it",
+    "intent": "create_task",
+    "text": "Crea un'attività per Rossini",
+    "source": "seed",
+    "tags": ["basic", "literal"],
+    "notes": ["Italian create_task literal with a single lead reference."]
+  },
+  {
+    "id": "it-create-task-template",
+    "locale": "it",
+    "intent": "create_task",
+    "template": "Crea un'attività per {lead}",
+    "slots": {
+      "lead": { "placeholder": "{lead}", "entity_key": "lead" }
+    },
+    "source": "seed",
+    "tags": ["template"],
+    "notes": ["Italian create_task template covering the lead slot."]
+  },
+  {
+    "id": "it-schedule-call-basic",
+    "locale": "it",
+    "intent": "schedule_call",
+    "text": "Pianifica una chiamata con Rossini domani alle 10",
+    "source": "seed",
+    "tags": ["basic", "literal"],
+    "notes": ["Italian schedule_call literal with lead and a relative date/time."]
+  },
+  {
+    "id": "it-schedule-call-template",
+    "locale": "it",
+    "intent": "schedule_call",
+    "template": "Pianifica una chiamata con {lead} il {date} alle {time}",
+    "slots": {
+      "lead": { "placeholder": "{lead}", "entity_key": "lead" },
+      "date": { "placeholder": "{date}", "entity_key": "date" },
+      "time": { "placeholder": "{time}", "entity_key": "time" }
+    },
+    "source": "seed",
+    "tags": ["template"],
+    "notes": ["Italian schedule_call template covering the required lead, date and time slots."]
+  },
+  {
+    "id": "it-schedule-meeting-basic",
+    "locale": "it",
+    "intent": "schedule_meeting",
+    "text": "Pianifica un appuntamento con Rossini domani alle 10",
+    "source": "seed",
+    "tags": ["basic", "literal"],
+    "notes": ["Italian schedule_meeting literal with lead and a relative date/time."]
+  },
+  {
+    "id": "it-schedule-meeting-template",
+    "locale": "it",
+    "intent": "schedule_meeting",
+    "template": "Pianifica un appuntamento con {lead} il {date} alle {time}",
+    "slots": {
+      "lead": { "placeholder": "{lead}", "entity_key": "lead" },
+      "date": { "placeholder": "{date}", "entity_key": "date" },
+      "time": { "placeholder": "{time}", "entity_key": "time" }
+    },
+    "source": "seed",
+    "tags": ["template"],
+    "notes": ["Italian schedule_meeting template covering the required lead, date and time slots."]
+  },
+  {
+    "id": "it-assign-lead-basic",
+    "locale": "it",
+    "intent": "assign_lead",
+    "text": "Assegna Rossini a Marco",
+    "source": "seed",
+    "tags": ["basic", "literal"],
+    "notes": ["Italian assign_lead literal with a lead and an assignee."]
+  },
+  {
+    "id": "it-assign-lead-template",
+    "locale": "it",
+    "intent": "assign_lead",
+    "template": "Assegna {lead} a {assignee}",
+    "slots": {
+      "lead": { "placeholder": "{lead}", "entity_key": "lead" },
+      "assignee": { "placeholder": "{assignee}", "entity_key": "assignee" }
+    },
+    "source": "seed",
+    "tags": ["template"],
+    "notes": ["Italian assign_lead template covering the required lead and assignee slots."]
+  },
+  {
+    "id": "it-prepare-contract-basic",
+    "locale": "it",
+    "intent": "prepare_contract_from_quote",
+    "text": "Prepara un contratto per Rossini dal preventivo Q-1024",
+    "source": "seed",
+    "tags": ["basic", "literal"],
+    "notes": ["Italian prepare_contract_from_quote literal with a lead and a quote reference."]
+  },
+  {
+    "id": "it-prepare-contract-template",
+    "locale": "it",
+    "intent": "prepare_contract_from_quote",
+    "template": "Prepara un contratto per {lead} dal preventivo {quote}",
+    "slots": {
+      "lead": { "placeholder": "{lead}", "entity_key": "lead" },
+      "quote": { "placeholder": "{quote}", "entity_key": "quote" }
+    },
+    "source": "seed",
+    "tags": ["template"],
+    "notes": ["Italian prepare_contract_from_quote template covering the lead and quote slots."]
+  }
+]
