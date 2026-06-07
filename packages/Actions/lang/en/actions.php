@@ -25,6 +25,28 @@ return [
         'execution_failed' => 'The action could not be completed. No changes were made.',
     ],
 
+    // Canonical command phrases (Intent Narration — slice 1).
+    // Placeholders MUST be requirement keys of the matching IntentDefinition.
+    // Values are filled deterministically from resolved proposal state; an
+    // incomplete proposal yields no phrase (the projection returns null).
+    'narration' => [
+        'create_task' => [
+            'canonical' => 'Create a task for :lead.',
+        ],
+        'schedule_call' => [
+            'canonical' => 'Schedule a call with :lead on :date at :time.',
+        ],
+        'schedule_meeting' => [
+            'canonical' => 'Schedule a meeting with :lead on :date at :time.',
+        ],
+        'assign_lead' => [
+            'canonical' => 'Assign :lead to :assignee.',
+        ],
+        'prepare_contract_from_quote' => [
+            'canonical' => 'Prepare a contract for :lead from quote :quote.',
+        ],
+    ],
+
     'capabilities' => [
         'operations' => [
             'replace' => 'Update',

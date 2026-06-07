@@ -32,9 +32,11 @@ use Fluxio\Actions\Llm\Contracts\LlmClientInterface;
 use Fluxio\Actions\Llm\Prompting\InterpretationPromptBuilder;
 use Fluxio\Actions\Llm\Validation\LlmStructuredOutputValidator;
 use Fluxio\Actions\Registry\IntentCapabilityRegistry;
+use Fluxio\Actions\Registry\IntentNarrationRegistry;
 use Fluxio\Actions\Registry\IntentRegistry;
 use Fluxio\Actions\Resolvers\RuleBasedIntentResolver;
 use Fluxio\Actions\Support\DefaultIntentCapabilities;
+use Fluxio\Actions\Support\DefaultIntentNarration;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -164,6 +166,21 @@ class ActionsServiceProvider extends ServiceProvider
 
             foreach (DefaultIntentCapabilities::all() as $capability) {
                 $registry->register($capability);
+            }
+
+            return $registry;
+        });
+
+        // Intent narration registry — static, in-memory presentation metadata
+        // declaring the canonical-phrase template key per intent. Parallel to the
+        // capability registry; consumed only by NarrationProjectionService and
+        // tests. Not authoritative runtime state, not exposed via the API.
+        // Narration definitions live in DefaultIntentNarration::all().
+        $this->app->singleton(IntentNarrationRegistry::class, function () {
+            $registry = new IntentNarrationRegistry;
+
+            foreach (DefaultIntentNarration::all() as $narration) {
+                $registry->register($narration);
             }
 
             return $registry;

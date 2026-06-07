@@ -25,6 +25,29 @@ return [
         'execution_failed' => 'Non è stato possibile completare l\'azione. Nessuna modifica è stata applicata.',
     ],
 
+    // Frasi canoniche dei comandi (Intent Narration — slice 1).
+    // I segnaposto DEVONO essere chiavi di requisito della relativa IntentDefinition.
+    // I valori sono riempiti in modo deterministico dallo stato risolto della
+    // proposta; una proposta incompleta non produce alcuna frase (la proiezione
+    // restituisce null).
+    'narration' => [
+        'create_task' => [
+            'canonical' => 'Crea un\'attività per :lead.',
+        ],
+        'schedule_call' => [
+            'canonical' => 'Pianifica una chiamata con :lead il :date alle :time.',
+        ],
+        'schedule_meeting' => [
+            'canonical' => 'Pianifica un appuntamento con :lead il :date alle :time.',
+        ],
+        'assign_lead' => [
+            'canonical' => 'Assegna :lead a :assignee.',
+        ],
+        'prepare_contract_from_quote' => [
+            'canonical' => 'Prepara un contratto per :lead dal preventivo :quote.',
+        ],
+    ],
+
     'capabilities' => [
         'operations' => [
             'replace' => 'Aggiorna',
