@@ -74,7 +74,8 @@
     "hint": "↵ per proporre · ⇧↵ per a capo · Esc per cancellare",
     "propose": "Proponi",
     "interpreting": "Interpretazione in corso…",
-    "recent": "Recenti"
+    "recent": "Recenti",
+    "summary": "Riepilogo"
   },
   "auth": {
     "email": "Email",

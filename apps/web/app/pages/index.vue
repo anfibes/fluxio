@@ -112,6 +112,9 @@ function handleReset() {
         @clear="handleClear"
       />
 
+      <!-- Canonical phrase summary (read-only narration projection, near the input) -->
+      <CommandCanonicalSummary :canonical-phrase="displayProposal?.canonical_phrase ?? null" />
+
       <!-- Recent command history -->
       <CommandRecentHistory
         :history="history"

@@ -195,4 +195,11 @@ export interface ActionProposal {
   last_refinement: ActionProposalRefinement | null
   ambiguities: ProposalAmbiguity[]
   capabilities?: ProposalCapabilities
+  /**
+   * Human-readable canonical command phrase, a deterministic backend projection
+   * of proposal state (Intent Narration). Read-only and non-authoritative:
+   * the frontend only displays it and never reconstructs or infers it. Null for
+   * incomplete proposals and unknown/unsupported intents.
+   */
+  canonical_phrase: string | null
 }

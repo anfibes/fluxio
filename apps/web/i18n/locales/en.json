@@ -74,7 +74,8 @@
     "hint": "↵ to propose · ⇧↵ for newline · Esc to clear",
     "propose": "Propose",
     "interpreting": "Interpreting…",
-    "recent": "Recent"
+    "recent": "Recent",
+    "summary": "Summary"
   },
   "auth": {
     "email": "Email",

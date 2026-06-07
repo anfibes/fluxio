@@ -35,6 +35,7 @@ export const mockProposalReady: ActionProposal = {
   execution_result: null,
   last_refinement: null,
   ambiguities: [],
+  canonical_phrase: 'Create a task for Rossini.',
 }
 
 export const mockProposalDraft: ActionProposal = {
@@ -73,6 +74,7 @@ export const mockProposalDraft: ActionProposal = {
   execution_result: null,
   last_refinement: null,
   ambiguities: [],
+  canonical_phrase: null,
 }
 
 export const mockProposalExecuted: ActionProposal = {
@@ -118,4 +120,5 @@ export const mockProposalExecuted: ActionProposal = {
   },
   last_refinement: null,
   ambiguities: [],
+  canonical_phrase: null,
 }
