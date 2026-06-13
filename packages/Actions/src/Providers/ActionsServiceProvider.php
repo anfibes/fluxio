@@ -7,6 +7,7 @@ use Fluxio\Actions\Console\EvaluateCommandInterpretationCorpusCommand;
 use Fluxio\Actions\Console\EvaluateInterpretationCorpusCommand;
 use Fluxio\Actions\Console\EvaluateRefinementCorpusCommand;
 use Fluxio\Actions\Console\ExportInterpretationGrammarCommand;
+use Fluxio\Actions\Console\ObserveIntentExamplesCommand;
 use Fluxio\Actions\Console\ObserveLlmInterpretationCommand;
 use Fluxio\Actions\Contracts\CommandInterpreterInterface;
 use Fluxio\Actions\Contracts\IntentResolverInterface;
@@ -246,6 +247,7 @@ class ActionsServiceProvider extends ServiceProvider
                 EvaluateCommandInterpretationCorpusCommand::class,
                 ExportInterpretationGrammarCommand::class,
                 ObserveLlmInterpretationCommand::class,
+                ObserveIntentExamplesCommand::class,
             ]);
         }
     }

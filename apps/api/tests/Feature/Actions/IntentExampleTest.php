@@ -282,14 +282,27 @@ class IntentExampleTest extends TestCase
         ]]);
     }
 
-    // ── 10. No runtime code imports/uses the Examples subsystem ────────────────
+    // ── 10. Examples are consumed ONLY from the diagnostics namespace ──────────
 
-    public function test_no_runtime_code_references_the_examples_subsystem(): void
+    /**
+     * Scans every PHP file under packages/Actions/src that references the Examples
+     * subsystem and returns the offenders that live OUTSIDE the allowed consumer
+     * namespaces. Allowed consumers: the Examples subsystem itself, and Diagnostics
+     * (Slice A1 — IntentExampleObservationService). Everything else (resolvers,
+     * interpretation runtime/providers, lifecycle/services, executors, controllers,
+     * resources, prompting) is a runtime path and must NOT reference Examples.
+     *
+     * @return list<string>
+     */
+    private function exampleReferencesOutsideAllowedConsumers(string &$srcDir): array
     {
-        $srcDir = realpath(__DIR__.'/../../../../../packages/Actions/src');
-        $this->assertNotFalse($srcDir, 'Could not locate packages/Actions/src.');
+        $srcDir = (string) realpath(__DIR__.'/../../../../../packages/Actions/src');
+        $this->assertNotSame('', $srcDir, 'Could not locate packages/Actions/src.');
 
-        $examplesDir = $srcDir.DIRECTORY_SEPARATOR.'Examples';
+        $allowedDirs = [
+            $srcDir.DIRECTORY_SEPARATOR.'Examples'.DIRECTORY_SEPARATOR,
+            $srcDir.DIRECTORY_SEPARATOR.'Diagnostics'.DIRECTORY_SEPARATOR,
+        ];
 
         $offenders = [];
         $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($srcDir, \FilesystemIterator::SKIP_DOTS));
@@ -301,27 +314,68 @@ class IntentExampleTest extends TestCase
 
             $realPath = $file->getRealPath();
 
-            // The Examples subsystem itself is allowed to reference its own classes.
-            if (str_starts_with($realPath, $examplesDir.DIRECTORY_SEPARATOR)) {
+            $contents = (string) file_get_contents($realPath);
+
+            $referencesExamples = str_contains($contents, 'Fluxio\\Actions\\Examples')
+                || str_contains($contents, 'IntentExampleRegistry')
+                || str_contains($contents, 'IntentExampleLoader');
+
+            if (! $referencesExamples) {
                 continue;
             }
 
-            $contents = (string) file_get_contents($realPath);
+            $allowed = false;
+            foreach ($allowedDirs as $allowedDir) {
+                if (str_starts_with($realPath, $allowedDir)) {
+                    $allowed = true;
+                    break;
+                }
+            }
 
-            if (
-                str_contains($contents, 'Fluxio\\Actions\\Examples')
-                || str_contains($contents, 'IntentExampleRegistry')
-                || str_contains($contents, 'IntentExampleLoader')
-            ) {
+            if (! $allowed) {
                 $offenders[] = $realPath;
             }
         }
 
+        return $offenders;
+    }
+
+    public function test_no_runtime_code_references_the_examples_subsystem(): void
+    {
+        $srcDir = '';
+        $offenders = $this->exampleReferencesOutsideAllowedConsumers($srcDir);
+
         $this->assertSame(
             [],
             $offenders,
-            "Intent Examples must not be wired into runtime code yet. Offending files: \n".implode("\n", $offenders),
+            "Intent Examples may only be consumed from the Examples or Diagnostics namespaces. Offending runtime files: \n".implode("\n", $offenders),
         );
+    }
+
+    public function test_examples_are_consumed_from_the_diagnostics_namespace(): void
+    {
+        // Slice A1 wired the first consumer (IntentExampleObservationService) under
+        // src/Diagnostics. Prove the consumer actually lives there, so the guard above is
+        // meaningfully exercised (and would catch a move out of the allowed namespace).
+        $srcDir = '';
+        $this->exampleReferencesOutsideAllowedConsumers($srcDir);
+
+        $diagnosticsDir = $srcDir.DIRECTORY_SEPARATOR.'Diagnostics';
+        $found = false;
+        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($diagnosticsDir, \FilesystemIterator::SKIP_DOTS));
+
+        foreach ($iterator as $file) {
+            if ($file->getExtension() !== 'php') {
+                continue;
+            }
+
+            if (str_contains((string) file_get_contents($file->getRealPath()), 'IntentExampleRegistry')) {
+                $found = true;
+                break;
+            }
+        }
+
+        $this->assertTrue($found, 'Expected a diagnostics consumer of IntentExampleRegistry under src/Diagnostics.');
     }
 
     public function test_registry_is_resolvable_and_queryable(): void
