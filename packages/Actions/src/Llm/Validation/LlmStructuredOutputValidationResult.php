@@ -11,10 +11,10 @@ namespace Fluxio\Actions\Llm\Validation;
 final readonly class LlmStructuredOutputValidationResult
 {
     /**
-     * @param list<string> $errors
+     * @param  list<string>  $errors
      */
     public function __construct(
-        public bool  $valid,
+        public bool $valid,
         public array $errors = [],
     ) {}
 
@@ -24,7 +24,7 @@ final readonly class LlmStructuredOutputValidationResult
     }
 
     /**
-     * @param list<string> $errors
+     * @param  list<string>  $errors
      */
     public static function invalid(array $errors): self
     {

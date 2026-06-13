@@ -90,7 +90,7 @@ class LlmStructuredOutputValidator
     public function __construct(private readonly InterpretationGrammar $grammar) {}
 
     /**
-     * @param array<int|string, mixed> $payload
+     * @param  array<int|string, mixed>  $payload
      */
     public function validate(array $payload): LlmStructuredOutputValidationResult
     {
@@ -104,9 +104,9 @@ class LlmStructuredOutputValidator
 
         $this->validateRootKeys($payload, $errors);
 
-        $intentValid    = $this->validateIntent($payload, $errors);
+        $intentValid = $this->validateIntent($payload, $errors);
         $this->validateConfidence($payload, $errors);
-        $entitiesValid  = $this->validateEntitiesShape($payload, $errors);
+        $entitiesValid = $this->validateEntitiesShape($payload, $errors);
         $this->validateNotes($payload, $errors);
 
         if ($entitiesValid) {
@@ -123,7 +123,7 @@ class LlmStructuredOutputValidator
     }
 
     /**
-     * @param array<int|string, mixed> $payload
+     * @param  array<int|string, mixed>  $payload
      *
      * @throws InvalidLlmStructuredOutputException
      */
@@ -139,19 +139,21 @@ class LlmStructuredOutputValidator
     // ── Internal rules ───────────────────────────────────────────────────────
 
     /**
-     * @param array<int|string, mixed> $payload
-     * @param list<string>             $errors
+     * @param  array<int|string, mixed>  $payload
+     * @param  list<string>  $errors
      */
     private function validateRootKeys(array $payload, array &$errors): void
     {
         foreach (array_keys($payload) as $key) {
             if (! is_string($key)) {
                 $errors[] = 'Root keys must be strings.';
+
                 continue;
             }
 
             if (in_array($key, self::FORBIDDEN_ROOT_KEYS, true)) {
                 $errors[] = "Root key [{$key}] is forbidden in LLM structured output.";
+
                 continue;
             }
 
@@ -162,13 +164,14 @@ class LlmStructuredOutputValidator
     }
 
     /**
-     * @param array<int|string, mixed> $payload
-     * @param list<string>             $errors
+     * @param  array<int|string, mixed>  $payload
+     * @param  list<string>  $errors
      */
     private function validateIntent(array $payload, array &$errors): bool
     {
         if (! array_key_exists('intent', $payload)) {
             $errors[] = 'Field [intent] is required.';
+
             return false;
         }
 
@@ -176,6 +179,7 @@ class LlmStructuredOutputValidator
 
         if (! is_string($intent) || trim($intent) === '') {
             $errors[] = 'Field [intent] must be a non-empty string.';
+
             return false;
         }
 
@@ -185,6 +189,7 @@ class LlmStructuredOutputValidator
 
         if (! $this->grammar->hasIntent($intent)) {
             $errors[] = "Intent [{$intent}] is not registered.";
+
             return false;
         }
 
@@ -192,13 +197,14 @@ class LlmStructuredOutputValidator
     }
 
     /**
-     * @param array<int|string, mixed> $payload
-     * @param list<string>             $errors
+     * @param  array<int|string, mixed>  $payload
+     * @param  list<string>  $errors
      */
     private function validateConfidence(array $payload, array &$errors): void
     {
         if (! array_key_exists('confidence', $payload)) {
             $errors[] = 'Field [confidence] is required.';
+
             return;
         }
 
@@ -206,6 +212,7 @@ class LlmStructuredOutputValidator
 
         if (! is_int($confidence) && ! is_float($confidence)) {
             $errors[] = 'Field [confidence] must be numeric.';
+
             return;
         }
 
@@ -215,13 +222,14 @@ class LlmStructuredOutputValidator
     }
 
     /**
-     * @param array<int|string, mixed> $payload
-     * @param list<string>             $errors
+     * @param  array<int|string, mixed>  $payload
+     * @param  list<string>  $errors
      */
     private function validateEntitiesShape(array $payload, array &$errors): bool
     {
         if (! array_key_exists('entities', $payload)) {
             $errors[] = 'Field [entities] is required.';
+
             return false;
         }
 
@@ -229,6 +237,7 @@ class LlmStructuredOutputValidator
 
         if (! is_array($entities) || ! $this->isAssociative($entities, allowEmpty: true)) {
             $errors[] = 'Field [entities] must be a JSON object.';
+
             return false;
         }
 
@@ -236,24 +245,27 @@ class LlmStructuredOutputValidator
     }
 
     /**
-     * @param array<int|string, mixed> $entities
-     * @param list<string>             $errors
+     * @param  array<int|string, mixed>  $entities
+     * @param  list<string>  $errors
      */
     private function validateEntityValues(array $entities, array &$errors): void
     {
         foreach ($entities as $key => $value) {
             if (! is_string($key) || trim($key) === '') {
                 $errors[] = 'Entity keys must be non-empty strings.';
+
                 continue;
             }
 
             if (in_array($key, self::FORBIDDEN_ENTITY_KEYS, true)) {
                 $errors[] = "Entity key [{$key}] is forbidden in LLM structured output.";
+
                 continue;
             }
 
             if (str_ends_with($key, '_id')) {
                 $errors[] = "Entity key [{$key}] looks like a database identifier and is not allowed.";
+
                 continue;
             }
 
@@ -262,12 +274,13 @@ class LlmStructuredOutputValidator
     }
 
     /**
-     * @param list<string> $errors
+     * @param  list<string>  $errors
      */
     private function validateEntityValue(string $key, mixed $value, array &$errors): void
     {
         if ($value === null) {
             $errors[] = "Entity [{$key}] must not be null.";
+
             return;
         }
 
@@ -277,37 +290,44 @@ class LlmStructuredOutputValidator
             // omit the field entirely instead.
             if ($value === []) {
                 $errors[] = "Entity [{$key}] must not be an empty array.";
+
                 return;
             }
 
             if (! array_is_list($value)) {
                 $errors[] = "Entity [{$key}] must not contain nested objects.";
+
                 return;
             }
 
             foreach ($value as $i => $item) {
                 if (is_array($item) || is_object($item)) {
                     $errors[] = "Entity [{$key}][{$i}] must be a scalar value.";
+
                     continue;
                 }
                 if ($item === null) {
                     $errors[] = "Entity [{$key}][{$i}] must not be null.";
+
                     continue;
                 }
                 if (is_string($item) && trim($item) === '') {
                     $errors[] = "Entity [{$key}][{$i}] must not be empty.";
                 }
             }
+
             return;
         }
 
         if (is_object($value)) {
             $errors[] = "Entity [{$key}] must not contain nested objects.";
+
             return;
         }
 
         if (! is_scalar($value)) {
             $errors[] = "Entity [{$key}] must be a scalar value.";
+
             return;
         }
 
@@ -317,8 +337,8 @@ class LlmStructuredOutputValidator
     }
 
     /**
-     * @param array<int|string, mixed> $payload
-     * @param list<string>             $errors
+     * @param  array<int|string, mixed>  $payload
+     * @param  list<string>  $errors
      */
     private function validateNotes(array $payload, array &$errors): void
     {
@@ -330,6 +350,7 @@ class LlmStructuredOutputValidator
 
         if (! is_array($notes) || ($notes !== [] && ! array_is_list($notes))) {
             $errors[] = 'Field [notes] must be a list of strings.';
+
             return;
         }
 
@@ -341,18 +362,19 @@ class LlmStructuredOutputValidator
     }
 
     /**
-     * @param array<int|string, mixed> $payload
-     * @param list<string>             $errors
+     * @param  array<int|string, mixed>  $payload
+     * @param  list<string>  $errors
      */
     private function validateIntentEntityCompatibility(array $payload, array &$errors): void
     {
-        $intent   = $payload['intent'];
+        $intent = $payload['intent'];
         $entities = $payload['entities'];
 
         if ($intent === 'unknown') {
             if ($entities !== []) {
                 $errors[] = 'Intent [unknown] must be paired with empty entities.';
             }
+
             return;
         }
 
@@ -370,7 +392,7 @@ class LlmStructuredOutputValidator
     }
 
     /**
-     * @param array<int|string, mixed> $value
+     * @param  array<int|string, mixed>  $value
      */
     private function isAssociative(array $value, bool $allowEmpty = false): bool
     {

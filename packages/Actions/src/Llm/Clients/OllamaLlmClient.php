@@ -28,15 +28,15 @@ class OllamaLlmClient implements LlmClientInterface
 {
     public function __construct(
         private readonly HttpFactory $http,
-        private readonly string      $baseUrl,
-        private readonly string      $defaultModel,
-        private readonly int         $timeout = 10,
+        private readonly string $baseUrl,
+        private readonly string $defaultModel,
+        private readonly int $timeout = 10,
     ) {}
 
     public function generateStructured(LlmRequest $request): LlmResponse
     {
         $payload = [
-            'model'  => $request->model ?? $this->defaultModel,
+            'model' => $request->model ?? $this->defaultModel,
             'prompt' => $request->prompt,
             'stream' => false,
         ];
@@ -47,6 +47,12 @@ class OllamaLlmClient implements LlmClientInterface
 
         if ($request->jsonSchema !== null) {
             $payload['format'] = 'json';
+        }
+
+        // Reasoning toggle for "thinking" models. Unset by default (null) so the wire payload is
+        // byte-identical to before; only diagnostics that explicitly opt in send `think`.
+        if ($request->think !== null) {
+            $payload['think'] = $request->think;
         }
 
         $options = [];
@@ -114,20 +120,23 @@ class OllamaLlmClient implements LlmClientInterface
         }
 
         return new LlmResponse(
-            rawText:          $rawText,
-            parsedJson:       $parsedJson,
-            usage:            $this->extractUsage($body),
+            rawText: $rawText,
+            parsedJson: $parsedJson,
+            usage: $this->extractUsage($body),
             providerMetadata: $this->extractProviderMetadata($body),
+            // Full body for diagnostics tracing — surfaces fields outside the whitelist (e.g. a
+            // reasoning model's `thinking`). Runtime ignores it; only diagnostics read it.
+            rawBody: $body,
         );
     }
 
     private function endpoint(): string
     {
-        return rtrim($this->baseUrl, '/') . '/api/generate';
+        return rtrim($this->baseUrl, '/').'/api/generate';
     }
 
     /**
-     * @param  array<string, mixed> $body
+     * @param  array<string, mixed>  $body
      * @return array<string, mixed>
      */
     private function extractUsage(array $body): array
@@ -143,7 +152,7 @@ class OllamaLlmClient implements LlmClientInterface
     }
 
     /**
-     * @param  array<string, mixed> $body
+     * @param  array<string, mixed>  $body
      * @return array<string, mixed>
      */
     private function extractProviderMetadata(array $body): array

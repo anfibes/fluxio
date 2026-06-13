@@ -6,6 +6,7 @@ use Fluxio\Actions\Diagnostics\Examples\ItalianCorpusObservationService;
 use Fluxio\Actions\Llm\Contracts\LlmClientInterface;
 use Fluxio\Actions\Llm\DTO\LlmRequest;
 use Fluxio\Actions\Llm\DTO\LlmResponse;
+use Fluxio\Actions\Llm\Exceptions\LlmTransportException;
 use Fluxio\Actions\Models\ActionProposal;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -210,5 +211,188 @@ class ObserveItalianCorpusCommandTest extends TestCase
         foreach ($exemplars as $exemplar) {
             $this->assertNotContains($exemplar->inputText, $corpusTexts, 'A few-shot exemplar duplicated a held-out corpus input.');
         }
+    }
+
+    // ── Slice A7: model comparison ────────────────────────────────────────────
+
+    /**
+     * Records every request->model and returns a constant valid create_task. A non-null model not
+     * in $available throws a transport failure (simulating an unknown local model / HTTP 404).
+     */
+    private function fakeModels(array $available): object
+    {
+        $client = new class($available) implements LlmClientInterface
+        {
+            /** @var list<?string> */
+            public array $seen = [];
+
+            public function __construct(private readonly array $available) {}
+
+            public function generateStructured(LlmRequest $request): LlmResponse
+            {
+                $this->seen[] = $request->model;
+
+                if ($request->model !== null && ! in_array($request->model, $this->available, true)) {
+                    throw new LlmTransportException('Ollama returned HTTP 404.');
+                }
+
+                $payload = ['intent' => 'create_task', 'confidence' => 0.8, 'entities' => ['lead' => 'Bianchi'], 'notes' => []];
+
+                return new LlmResponse(rawText: (string) json_encode($payload), parsedJson: $payload);
+            }
+        };
+
+        $this->app->instance(LlmClientInterface::class, $client);
+
+        return $client;
+    }
+
+    public function test_default_run_uses_configured_model_and_does_not_override_the_request(): void
+    {
+        $client = $this->fakeModels([]);
+
+        $decoded = $this->runJson(['--case' => 'it-create-task-followup-ferrari']);
+
+        // Reports the configured model; the request carries no override (null) and no probe runs.
+        $this->assertSame((string) config('actions.llm.model'), $decoded['model']);
+        $this->assertStringContainsString('it-interpretation-corpus.json', $decoded['corpus']);
+        $this->assertSame([null], $client->seen);
+    }
+
+    public function test_model_override_is_passed_to_the_request_and_reported(): void
+    {
+        $client = $this->fakeModels(['qwen3:1.7b']);
+
+        $decoded = $this->runJson(['--case' => 'it-create-task-followup-ferrari', '--model' => 'qwen3:1.7b']);
+
+        $this->assertSame('qwen3:1.7b', $decoded['model']);
+        // Probe (1) + single-case run (1), both with the overridden model.
+        $this->assertSame(['qwen3:1.7b', 'qwen3:1.7b'], $client->seen);
+    }
+
+    public function test_unavailable_single_model_fails_clearly(): void
+    {
+        $this->fakeModels(['qwen3:0.6b']);
+
+        $this->artisan('actions:observe-italian-corpus', ['--model' => 'ghost-model'])
+            ->assertFailed()
+            ->expectsOutputToContain('Model [ghost-model] is not available');
+    }
+
+    public function test_multi_model_comparison_reports_per_model_with_availability(): void
+    {
+        $this->fakeModels(['model-good']);
+
+        $decoded = $this->runJson(['--models' => 'model-good,model-missing', '--limit' => '3']);
+
+        $this->assertStringContainsString('it-interpretation-corpus.json', $decoded['corpus']);
+        $this->assertFalse($decoded['few_shot']);
+        $this->assertFalse($decoded['compare']);
+        $this->assertCount(2, $decoded['models']);
+
+        $good = $decoded['models'][0];
+        $this->assertSame('model-good', $good['model']);
+        $this->assertTrue($good['available']);
+        $this->assertArrayHasKey('metrics', $good);
+        $this->assertSame(3, $good['evaluated']);
+
+        $missing = $decoded['models'][1];
+        $this->assertSame('model-missing', $missing['model']);
+        $this->assertFalse($missing['available']);
+        $this->assertStringContainsString('HTTP 404', $missing['reason']);
+    }
+
+    public function test_compare_works_with_a_model_override(): void
+    {
+        $client = $this->fakeModels(['m1']);
+
+        $decoded = $this->runJson(['--compare' => true, '--model' => 'm1', '--limit' => '4']);
+
+        $this->assertSame('m1', $decoded['model']);
+        $this->assertArrayHasKey('baseline', $decoded);
+        $this->assertArrayHasKey('few_shot_result', $decoded);
+        $this->assertArrayHasKey('delta', $decoded);
+        // Every request (probe + baseline pass + few-shot pass) used the override.
+        $this->assertTrue(collect($client->seen)->every(fn ($m) => $m === 'm1'));
+    }
+
+    // ── Slice A7.1: diagnostics experiment flags ──────────────────────────────
+
+    /** Records every LlmRequest and returns a constant valid create_task. */
+    private function fakeRecordingRequests(): object
+    {
+        $client = new class implements LlmClientInterface
+        {
+            /** @var list<LlmRequest> */
+            public array $requests = [];
+
+            public function generateStructured(LlmRequest $request): LlmResponse
+            {
+                $this->requests[] = $request;
+
+                $payload = ['intent' => 'create_task', 'confidence' => 0.8, 'entities' => ['lead' => 'Bianchi'], 'notes' => []];
+
+                return new LlmResponse(
+                    rawText: (string) json_encode($payload),
+                    parsedJson: $request->jsonSchema !== null ? $payload : null,
+                    rawBody: ['response' => (string) json_encode($payload), 'done' => true],
+                );
+            }
+        };
+
+        $this->app->instance(LlmClientInterface::class, $client);
+
+        return $client;
+    }
+
+    public function test_default_command_run_forces_json_and_sends_no_thinking_override(): void
+    {
+        $client = $this->fakeRecordingRequests();
+
+        $this->runJson(['--case' => 'it-create-task-followup-ferrari']);
+
+        $this->assertNotEmpty($client->requests);
+        $request = $client->requests[0];
+        $this->assertNull($request->think);
+        $this->assertSame(['type' => 'object'], $request->jsonSchema);
+        $this->assertNull($request->maxTokens);
+    }
+
+    public function test_no_think_flag_disables_thinking_on_the_request(): void
+    {
+        $client = $this->fakeRecordingRequests();
+
+        $this->runJson(['--case' => 'it-create-task-followup-ferrari', '--no-think' => true]);
+
+        $this->assertFalse($client->requests[0]->think);
+        $this->assertSame(['type' => 'object'], $client->requests[0]->jsonSchema);
+    }
+
+    public function test_free_text_flag_drops_forced_json_on_the_request(): void
+    {
+        $client = $this->fakeRecordingRequests();
+
+        $this->runJson(['--case' => 'it-create-task-followup-ferrari', '--free-text' => true]);
+
+        $this->assertNull($client->requests[0]->jsonSchema);
+    }
+
+    public function test_num_predict_flag_sets_the_generation_budget(): void
+    {
+        $client = $this->fakeRecordingRequests();
+
+        $this->runJson(['--case' => 'it-create-task-followup-ferrari', '--num-predict' => '256']);
+
+        $this->assertSame(256, $client->requests[0]->maxTokens);
+    }
+
+    public function test_raw_body_is_present_in_case_output(): void
+    {
+        $this->fakeRecordingRequests();
+
+        $decoded = $this->runJson(['--case' => 'it-create-task-followup-ferrari']);
+
+        $this->assertArrayHasKey('raw_body', $decoded['cases'][0]);
+        $this->assertSame(['response' => '{"intent":"create_task","confidence":0.8,"entities":{"lead":"Bianchi"},"notes":[]}', 'done' => true], $decoded['cases'][0]['raw_body']);
     }
 }

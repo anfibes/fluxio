@@ -16,16 +16,22 @@ namespace Fluxio\Actions\Llm\DTO;
 final readonly class LlmResponse
 {
     /**
-     * @param array<string, mixed>|null $parsedJson      Decoded JSON when structured output
-     *                                                   was requested and parsing succeeded.
-     * @param array<string, mixed>      $usage           Token / timing usage metadata.
-     * @param array<string, mixed>      $providerMetadata Opaque provider-specific fields
-     *                                                   (model name, eval counts, …).
+     * @param  array<string, mixed>|null  $parsedJson  Decoded JSON when structured output
+     *                                                 was requested and parsing succeeded.
+     * @param  array<string, mixed>  $usage  Token / timing usage metadata.
+     * @param  array<string, mixed>  $providerMetadata  Opaque provider-specific fields
+     *                                                  (model name, eval counts, …).
+     * @param  array<string, mixed>|null  $rawBody  Full decoded provider response body for
+     *                                              diagnostics tracing (e.g. a reasoning
+     *                                              model's `thinking` field that the whitelisted
+     *                                              metadata would otherwise drop). Diagnostics
+     *                                              only; never consumed by the runtime.
      */
     public function __construct(
         public string $rawText,
-        public ?array $parsedJson       = null,
-        public array  $usage            = [],
-        public array  $providerMetadata = [],
+        public ?array $parsedJson = null,
+        public array $usage = [],
+        public array $providerMetadata = [],
+        public ?array $rawBody = null,
     ) {}
 }

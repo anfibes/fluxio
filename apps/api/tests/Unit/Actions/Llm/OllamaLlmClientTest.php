@@ -23,10 +23,10 @@ class OllamaLlmClientTest extends TestCase
     private function client(string $model = 'qwen3:0.6b', int $timeout = 10): OllamaLlmClient
     {
         return new OllamaLlmClient(
-            http:         $this->app->make(HttpFactory::class),
-            baseUrl:      'http://127.0.0.1:11434',
+            http: $this->app->make(HttpFactory::class),
+            baseUrl: 'http://127.0.0.1:11434',
             defaultModel: $model,
-            timeout:      $timeout,
+            timeout: $timeout,
         );
     }
 
@@ -35,18 +35,18 @@ class OllamaLlmClientTest extends TestCase
         Http::fake([
             '127.0.0.1:11434/api/generate' => Http::response([
                 'response' => 'hello',
-                'model'    => 'qwen3:0.6b',
-                'done'     => true,
+                'model' => 'qwen3:0.6b',
+                'done' => true,
             ]),
         ]);
 
         $client = $this->client();
         $client->generateStructured(new LlmRequest(
-            prompt:       'say hi',
+            prompt: 'say hi',
             systemPrompt: 'you are concise',
-            model:        'qwen3:0.6b',
-            temperature:  0.2,
-            maxTokens:    16,
+            model: 'qwen3:0.6b',
+            temperature: 0.2,
+            maxTokens: 16,
         ));
 
         Http::assertSent(function ($request) {
@@ -69,14 +69,14 @@ class OllamaLlmClientTest extends TestCase
         Http::fake([
             '*' => Http::response([
                 'response' => '{"intent":"create_task","confidence":0.8,"entities":{}}',
-                'model'    => 'qwen3:0.6b',
-                'done'     => true,
+                'model' => 'qwen3:0.6b',
+                'done' => true,
             ]),
         ]);
 
         $client = $this->client();
         $response = $client->generateStructured(new LlmRequest(
-            prompt:     'irrelevant',
+            prompt: 'irrelevant',
             jsonSchema: ['type' => 'object'],
         ));
 
@@ -89,12 +89,12 @@ class OllamaLlmClientTest extends TestCase
     {
         Http::fake([
             '*' => Http::response([
-                'response'         => 'plain answer',
-                'model'            => 'qwen3:0.6b',
-                'done'             => true,
+                'response' => 'plain answer',
+                'model' => 'qwen3:0.6b',
+                'done' => true,
                 'prompt_eval_count' => 4,
-                'eval_count'       => 12,
-                'total_duration'   => 123456,
+                'eval_count' => 12,
+                'total_duration' => 123456,
             ]),
         ]);
 
@@ -114,15 +114,15 @@ class OllamaLlmClientTest extends TestCase
         Http::fake([
             '*' => Http::response([
                 'response' => 'this is not json',
-                'model'    => 'qwen3:0.6b',
-                'done'     => true,
+                'model' => 'qwen3:0.6b',
+                'done' => true,
             ]),
         ]);
 
         $this->expectException(InvalidLlmResponseException::class);
 
         $this->client()->generateStructured(new LlmRequest(
-            prompt:     'irrelevant',
+            prompt: 'irrelevant',
             jsonSchema: ['type' => 'object'],
         ));
     }
@@ -132,7 +132,7 @@ class OllamaLlmClientTest extends TestCase
         Http::fake([
             '*' => Http::response([
                 'model' => 'qwen3:0.6b',
-                'done'  => true,
+                'done' => true,
             ]),
         ]);
 
@@ -179,13 +179,60 @@ class OllamaLlmClientTest extends TestCase
         Http::fake([
             '*' => Http::response([
                 'response' => 'ok',
-                'model'    => 'llama3.2:3b',
-                'done'     => true,
+                'model' => 'llama3.2:3b',
+                'done' => true,
             ]),
         ]);
 
         $this->client('llama3.2:3b')->generateStructured(new LlmRequest(prompt: 'hi'));
 
         Http::assertSent(fn ($request) => $request->data()['model'] === 'llama3.2:3b');
+    }
+
+    // ── A7.1/E0.5: full raw body capture ──────────────────────────────────────
+
+    public function test_captures_the_full_raw_body_for_diagnostics(): void
+    {
+        Http::fake([
+            '*' => Http::response([
+                'response' => 'plain',
+                'model' => 'qwen3:1.7b',
+                'done' => true,
+                // Fields outside the whitelist — must still be visible for diagnostics.
+                'thinking' => 'let me reason about this...',
+                'context' => [1, 2, 3],
+            ]),
+        ]);
+
+        $response = $this->client()->generateStructured(new LlmRequest(prompt: 'hi'));
+
+        $this->assertIsArray($response->rawBody);
+        $this->assertSame('let me reason about this...', $response->rawBody['thinking']);
+        $this->assertSame([1, 2, 3], $response->rawBody['context']);
+        $this->assertSame('plain', $response->rawBody['response']);
+    }
+
+    // ── A7.1/E1: thinking toggle ──────────────────────────────────────────────
+
+    public function test_omits_think_from_the_payload_by_default(): void
+    {
+        Http::fake(['*' => Http::response(['response' => 'ok', 'model' => 'm', 'done' => true])]);
+
+        $this->client()->generateStructured(new LlmRequest(prompt: 'hi'));
+
+        Http::assertSent(fn ($request) => ! array_key_exists('think', $request->data()));
+    }
+
+    public function test_sends_think_false_only_when_explicitly_requested(): void
+    {
+        Http::fake(['*' => Http::response(['response' => '{}', 'model' => 'm', 'done' => true])]);
+
+        $this->client()->generateStructured(new LlmRequest(
+            prompt: 'hi',
+            jsonSchema: ['type' => 'object'],
+            think: false,
+        ));
+
+        Http::assertSent(fn ($request) => ($request->data()['think'] ?? '__absent__') === false);
     }
 }

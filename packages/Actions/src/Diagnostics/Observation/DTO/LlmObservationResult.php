@@ -41,6 +41,7 @@ final class LlmObservationResult
         public readonly array $normalizedValidationErrors,
         public readonly ?bool $intentMatch,
         public readonly ?bool $entityMatch,
+        public readonly ?array $rawBody = null,
     ) {}
 
     /**
@@ -77,6 +78,9 @@ final class LlmObservationResult
                 'intent' => $this->intentMatch,
                 'entities' => $this->entityMatch,
             ],
+            // E0.5 raw capture: the full provider body (incl. any reasoning/thinking field the
+            // whitelisted metadata drops). Diagnostics-only; null when the provider call threw.
+            'raw_body' => $this->rawBody,
         ];
     }
 }

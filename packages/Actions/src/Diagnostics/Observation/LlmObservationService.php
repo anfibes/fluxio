@@ -4,6 +4,7 @@ namespace Fluxio\Actions\Diagnostics\Observation;
 
 use Fluxio\Actions\Diagnostics\Evaluation\DTO\InterpretationCorpusCase;
 use Fluxio\Actions\Diagnostics\Observation\DTO\LlmObservationResult;
+use Fluxio\Actions\Diagnostics\Observation\DTO\ObservationOptions;
 use Fluxio\Actions\DTO\NormalizedCommand;
 use Fluxio\Actions\Interpretation\DTO\InterpretationContext;
 use Fluxio\Actions\Interpretation\ProviderSandboxContract;
@@ -56,17 +57,28 @@ class LlmObservationService
      * @param  list<\Fluxio\Actions\Llm\Prompting\PromptExemplar>  $exemplars  Optional few-shot
      *                                                                         exemplars. Empty (default) keeps the system prompt byte-identical to the runtime
      *                                                                         path; supplying them is an opt-in diagnostics affordance.
+     * @param  string|null  $model  Optional per-request model override (diagnostics-only). Null (default)
+     *                              leaves the request's model unset, so the client uses its configured
+     *                              default — byte-identical to the runtime path.
+     * @param  ObservationOptions|null  $options  Diagnostics-only transport knobs (A7.1 experiments).
+     *                                            Null (default) = forced JSON, no thinking override, default budget —
+     *                                            byte-identical to the runtime path. Never relaxes validation.
      */
-    public function observe(InterpretationCorpusCase $case, array $exemplars = []): LlmObservationResult
+    public function observe(InterpretationCorpusCase $case, array $exemplars = [], ?string $model = null, ?ObservationOptions $options = null): LlmObservationResult
     {
+        $options ??= new ObservationOptions;
         $context = new InterpretationContext(locale: $case->locale);
 
         $request = new LlmRequest(
             prompt: $this->promptBuilder->buildUserPrompt($case->text, $context),
             systemPrompt: $this->promptBuilder->buildSystemPrompt($exemplars),
+            model: $model,
             temperature: 0.0,
+            maxTokens: $options->maxTokens,
             // Signals structured JSON to the transport; the contract is enforced by the validator.
-            jsonSchema: ['type' => 'object'],
+            // E2 (forceJson=false) drops format=json so a reasoning model can emit free text.
+            jsonSchema: $options->forceJson ? ['type' => 'object'] : null,
+            think: $options->think,
         );
 
         try {
@@ -76,16 +88,26 @@ class LlmObservationService
         }
 
         $raw = $response->rawText;
-        $parsed = is_array($response->parsedJson) ? $response->parsedJson : null;
+        $rawBody = $response->rawBody;
+
+        // When JSON is forced the client decodes it; otherwise (E2) extract the first JSON object
+        // from the free text. Either way the SAME validator judges the candidate — no relaxation.
+        if ($options->forceJson) {
+            $parsed = is_array($response->parsedJson) ? $response->parsedJson : null;
+            $emptyMessage = 'Provider returned no structured JSON object.';
+        } else {
+            $parsed = JsonObjectExtractor::extract($raw);
+            $emptyMessage = 'Provider returned no extractable JSON object in free-text mode.';
+        }
 
         if ($parsed === null) {
-            return $this->completed($case, $raw, null, false, ['Provider returned no structured JSON object.'], null, [], []);
+            return $this->completed($case, $raw, null, false, [$emptyMessage], null, [], [], $rawBody);
         }
 
         $validation = $this->structuredValidator->validate($parsed);
 
         if (! $validation->valid) {
-            return $this->completed($case, $raw, $parsed, false, $validation->errors, null, [], []);
+            return $this->completed($case, $raw, $parsed, false, $validation->errors, null, [], [], $rawBody);
         }
 
         // Mirror the provider's validated-payload → NormalizedCommand mapping (shared DTO).
@@ -103,7 +125,7 @@ class LlmObservationService
         $normalizedErrors = $this->normalizedValidator->validate($command)->errors;
         $sandboxViolations = $this->sandbox->violations($command);
 
-        return $this->completed($case, $raw, $parsed, true, [], $command, $sandboxViolations, $normalizedErrors);
+        return $this->completed($case, $raw, $parsed, true, [], $command, $sandboxViolations, $normalizedErrors, $rawBody);
     }
 
     private function failure(InterpretationCorpusCase $case, Throwable $e): LlmObservationResult
@@ -135,6 +157,7 @@ class LlmObservationService
      * @param  list<string>  $structuredErrors
      * @param  list<string>  $sandboxViolations
      * @param  list<string>  $normalizedErrors
+     * @param  array<string, mixed>|null  $rawBody
      */
     private function completed(
         InterpretationCorpusCase $case,
@@ -145,6 +168,7 @@ class LlmObservationService
         ?NormalizedCommand $command,
         array $sandboxViolations,
         array $normalizedErrors,
+        ?array $rawBody = null,
     ): LlmObservationResult {
         $normalized = $command === null ? null : [
             'intent' => $command->intent,
@@ -172,6 +196,7 @@ class LlmObservationService
             normalizedValidationErrors: $normalizedErrors,
             intentMatch: $command === null ? null : $command->intent === $case->expectedIntent,
             entityMatch: $command === null ? null : $this->entitiesMatch($command->entities, $case->expectedEntities),
+            rawBody: $rawBody,
         );
     }
 

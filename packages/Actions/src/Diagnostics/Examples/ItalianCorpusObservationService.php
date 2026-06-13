@@ -7,7 +7,9 @@ use Fluxio\Actions\Diagnostics\Evaluation\InterpretationCorpusLoader;
 use Fluxio\Actions\Diagnostics\Examples\DTO\IntentExampleObservationReport;
 use Fluxio\Actions\Diagnostics\Examples\DTO\ItalianCorpusComparisonReport;
 use Fluxio\Actions\Diagnostics\Observation\DTO\LlmObservationResult;
+use Fluxio\Actions\Diagnostics\Observation\DTO\ObservationOptions;
 use Fluxio\Actions\Diagnostics\Observation\LlmObservationService;
+use Fluxio\Actions\Llm\Exceptions\LlmTransportException;
 use Fluxio\Actions\Llm\Prompting\PromptExemplar;
 
 /**
@@ -94,10 +96,12 @@ class ItalianCorpusObservationService
      * @param  list<InterpretationCorpusCase>  $cases
      * @param  list<PromptExemplar>  $exemplars
      * @param  (callable(int $completed, int $total): void)|null  $onProgress
+     * @param  string|null  $model  Diagnostics-only per-request model override (A7). Null = configured default.
+     * @param  ObservationOptions|null  $options  Diagnostics-only transport knobs (A7.1). Null = default.
      */
-    public function observe(array $cases, array $exemplars = [], string $locale = 'it', bool $fewShot = false, ?callable $onProgress = null): IntentExampleObservationReport
+    public function observe(array $cases, array $exemplars = [], string $locale = 'it', bool $fewShot = false, ?callable $onProgress = null, ?string $model = null, ?ObservationOptions $options = null): IntentExampleObservationReport
     {
-        $results = $this->run($cases, $exemplars, $onProgress);
+        $results = $this->run($cases, $exemplars, $onProgress, $model, $options);
 
         return $this->examples->report($locale, $results, $fewShot, $this->exampleIds($exemplars));
     }
@@ -107,8 +111,9 @@ class ItalianCorpusObservationService
      *
      * @param  list<InterpretationCorpusCase>  $cases
      * @param  (callable(int $completed, int $total): void)|null  $onProgress
+     * @param  string|null  $model  Diagnostics-only per-request model override (A7). Null = configured default.
      */
-    public function compare(array $cases, string $locale = 'it', ?int $fewShotLimit = null, ?callable $onProgress = null): ItalianCorpusComparisonReport
+    public function compare(array $cases, string $locale = 'it', ?int $fewShotLimit = null, ?callable $onProgress = null, ?string $model = null): ItalianCorpusComparisonReport
     {
         $exemplars = $this->exemplarsFor($locale, $cases, $fewShotLimit);
 
@@ -121,10 +126,31 @@ class ItalianCorpusObservationService
             }
         };
 
-        $baseline = $this->run($cases, [], $tick);
-        $fewShot = $this->run($cases, $exemplars, $tick);
+        $baseline = $this->run($cases, [], $tick, $model);
+        $fewShot = $this->run($cases, $exemplars, $tick, $model);
 
         return ItalianCorpusComparisonReport::build($locale, $cases, $baseline, $fewShot, $this->exampleIds($exemplars));
+    }
+
+    /**
+     * Diagnostics-only model availability probe (A7). Runs a single case through the given model
+     * and reports whether the model is reachable. "Unavailable" is specifically a transport-level
+     * failure (e.g. Ollama HTTP 404 for an unknown model) — a model that responds but produces
+     * contract-invalid output is still "available" (it ran). One model call; never throws.
+     *
+     * @return array{available: bool, reason: ?string}
+     */
+    public function checkModel(InterpretationCorpusCase $probeCase, string $model): array
+    {
+        $result = $this->observation->observe($probeCase, [], $model);
+
+        $unavailable = $result->providerSucceeded === false
+            && $result->failureClass === LlmTransportException::class;
+
+        return [
+            'available' => ! $unavailable,
+            'reason' => $unavailable ? $result->failureMessage : null,
+        ];
     }
 
     /**
@@ -133,13 +159,13 @@ class ItalianCorpusObservationService
      * @param  (callable(int $completed, int $total): void)|null  $onProgress
      * @return list<LlmObservationResult>
      */
-    private function run(array $cases, array $exemplars, ?callable $onProgress): array
+    private function run(array $cases, array $exemplars, ?callable $onProgress, ?string $model = null, ?ObservationOptions $options = null): array
     {
         $results = [];
         $total = count($cases);
 
         foreach ($cases as $index => $case) {
-            $results[] = $this->observation->observe($case, $exemplars);
+            $results[] = $this->observation->observe($case, $exemplars, $model, $options);
 
             if ($onProgress !== null) {
                 $onProgress($index + 1, $total);

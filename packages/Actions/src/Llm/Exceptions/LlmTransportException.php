@@ -15,6 +15,4 @@ use RuntimeException;
  * rendered by ApiExceptionRenderer in Phase 2; it is meant to be caught
  * (or surfaced) by future LLM-backed interpretation providers.
  */
-class LlmTransportException extends RuntimeException
-{
-}
+class LlmTransportException extends RuntimeException {}

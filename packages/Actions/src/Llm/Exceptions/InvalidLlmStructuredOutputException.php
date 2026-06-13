@@ -20,12 +20,12 @@ use RuntimeException;
 class InvalidLlmStructuredOutputException extends RuntimeException
 {
     /**
-     * @param list<string> $errors
+     * @param  list<string>  $errors
      */
     public function __construct(public readonly array $errors, ?string $message = null)
     {
         parent::__construct(
-            $message ?? 'LLM structured output is invalid: ' . implode('; ', $errors),
+            $message ?? 'LLM structured output is invalid: '.implode('; ', $errors),
         );
     }
 }

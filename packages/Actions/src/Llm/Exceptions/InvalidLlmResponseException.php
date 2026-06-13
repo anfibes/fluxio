@@ -16,6 +16,4 @@ use RuntimeException;
  * range) remain the responsibility of NormalizedCommandValidator and the
  * future LLM-backed interpretation provider.
  */
-class InvalidLlmResponseException extends RuntimeException
-{
-}
+class InvalidLlmResponseException extends RuntimeException {}
