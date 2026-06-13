@@ -112,8 +112,11 @@ class ItalianCorpusObservationService
      * @param  list<InterpretationCorpusCase>  $cases
      * @param  (callable(int $completed, int $total): void)|null  $onProgress
      * @param  string|null  $model  Diagnostics-only per-request model override (A7). Null = configured default.
+     * @param  ObservationOptions|null  $options  Diagnostics-only transport knobs (A7.1/A7.2). Null = default.
+     *                                            The SAME options drive both the baseline and few-shot passes, so a
+     *                                            resolved profile (e.g. reasoning → think=false) applies to --compare too.
      */
-    public function compare(array $cases, string $locale = 'it', ?int $fewShotLimit = null, ?callable $onProgress = null, ?string $model = null): ItalianCorpusComparisonReport
+    public function compare(array $cases, string $locale = 'it', ?int $fewShotLimit = null, ?callable $onProgress = null, ?string $model = null, ?ObservationOptions $options = null): ItalianCorpusComparisonReport
     {
         $exemplars = $this->exemplarsFor($locale, $cases, $fewShotLimit);
 
@@ -126,8 +129,8 @@ class ItalianCorpusObservationService
             }
         };
 
-        $baseline = $this->run($cases, [], $tick, $model);
-        $fewShot = $this->run($cases, $exemplars, $tick, $model);
+        $baseline = $this->run($cases, [], $tick, $model, $options);
+        $fewShot = $this->run($cases, $exemplars, $tick, $model, $options);
 
         return ItalianCorpusComparisonReport::build($locale, $cases, $baseline, $fewShot, $this->exampleIds($exemplars));
     }

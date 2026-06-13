@@ -395,4 +395,146 @@ class ObserveItalianCorpusCommandTest extends TestCase
         $this->assertArrayHasKey('raw_body', $decoded['cases'][0]);
         $this->assertSame(['response' => '{"intent":"create_task","confidence":0.8,"entities":{"lead":"Bianchi"},"notes":[]}', 'done' => true], $decoded['cases'][0]['raw_body']);
     }
+
+    // ── Slice A7.2: capability-class profiles auto-selected per model ──────────
+
+    public function test_default_model_auto_selects_instruction_following_profile(): void
+    {
+        $client = $this->fakeRecordingRequests();
+
+        $decoded = $this->runJson(['--case' => 'it-create-task-followup-ferrari']);
+
+        // Configured default model (qwen3:0.6b) → instruction-following → byte-identical request.
+        $this->assertSame('instruction-following', $decoded['profile']['id']);
+        $this->assertNull($decoded['profile']['think']);
+        $this->assertTrue($decoded['profile']['force_json']);
+        $this->assertNull(end($client->requests)->think);
+        $this->assertSame(['type' => 'object'], end($client->requests)->jsonSchema);
+    }
+
+    public function test_reasoning_model_auto_selects_reasoning_profile_and_disables_thinking(): void
+    {
+        $client = $this->fakeRecordingRequests();
+
+        // No flags: qwen3:1.7b → reasoning profile → think=false automatically.
+        $decoded = $this->runJson(['--case' => 'it-create-task-followup-ferrari', '--model' => 'qwen3:1.7b']);
+
+        $this->assertSame('reasoning', $decoded['profile']['id']);
+        $this->assertFalse($decoded['profile']['think']);
+        $this->assertTrue($decoded['profile']['force_json']);
+        // The actual evaluation request (last; the probe ran first) was driven think=false.
+        $this->assertFalse(end($client->requests)->think);
+        $this->assertSame(['type' => 'object'], end($client->requests)->jsonSchema);
+    }
+
+    public function test_cli_no_think_overrides_an_instruction_following_profile(): void
+    {
+        $client = $this->fakeRecordingRequests();
+
+        // qwen3:0.6b's profile is think=null; --no-think must override it to false.
+        $this->runJson(['--case' => 'it-create-task-followup-ferrari', '--model' => 'qwen3:0.6b', '--no-think' => true]);
+
+        $this->assertFalse(end($client->requests)->think);
+    }
+
+    public function test_cli_free_text_only_controls_force_json_and_keeps_profile_thinking(): void
+    {
+        $client = $this->fakeRecordingRequests();
+
+        // qwen3:1.7b reasoning profile = think=false + forceJson=true. --free-text drops forced JSON
+        // ONLY; thinking must stay at the profile's choice (false) — this is NOT A7.1 E2.
+        $decoded = $this->runJson(['--case' => 'it-create-task-followup-ferrari', '--model' => 'qwen3:1.7b', '--free-text' => true]);
+
+        $this->assertSame('reasoning', $decoded['profile']['id']);
+        $this->assertNull(end($client->requests)->jsonSchema, 'free-text override must drop forced JSON.');
+        $this->assertFalse(end($client->requests)->think, 'free-text must not change thinking.');
+
+        $this->assertFalse($decoded['effective']['think']);
+        $this->assertSame('profile', $decoded['effective']['think_source']);
+        $this->assertFalse($decoded['effective']['force_json']);
+        $this->assertSame('cli:--free-text', $decoded['effective']['force_json_source']);
+    }
+
+    public function test_think_plus_free_text_reproduces_a71_e2(): void
+    {
+        $client = $this->fakeRecordingRequests();
+
+        // A7.1 E2 = thinking ON + free-text + extract. --think forces thinking back on over the
+        // reasoning profile's think=false; --free-text drops forced JSON.
+        $decoded = $this->runJson(['--case' => 'it-create-task-followup-ferrari', '--model' => 'qwen3:1.7b', '--free-text' => true, '--think' => true]);
+
+        $this->assertTrue(end($client->requests)->think, '--think must force thinking on.');
+        $this->assertNull(end($client->requests)->jsonSchema, '--free-text must drop forced JSON.');
+
+        $this->assertTrue($decoded['effective']['think']);
+        $this->assertSame('cli:--think', $decoded['effective']['think_source']);
+        $this->assertFalse($decoded['effective']['force_json']);
+    }
+
+    public function test_think_flag_overrides_a_reasoning_profile(): void
+    {
+        $client = $this->fakeRecordingRequests();
+
+        // Reasoning profile defaults think=false; --think forces it back on (format still forced JSON).
+        $decoded = $this->runJson(['--case' => 'it-create-task-followup-ferrari', '--model' => 'qwen3:1.7b', '--think' => true]);
+
+        $this->assertTrue(end($client->requests)->think);
+        $this->assertSame(['type' => 'object'], end($client->requests)->jsonSchema);
+        $this->assertSame('cli:--think', $decoded['effective']['think_source']);
+    }
+
+    public function test_think_and_no_think_together_fail_clearly(): void
+    {
+        $this->fakeRecordingRequests();
+
+        $this->artisan('actions:observe-italian-corpus', ['--think' => true, '--no-think' => true])
+            ->assertFailed()
+            ->expectsOutputToContain('--think and --no-think cannot be used together');
+    }
+
+    public function test_compare_uses_the_resolved_reasoning_profile(): void
+    {
+        $client = $this->fakeRecordingRequests();
+
+        // --compare with qwen3:1.7b must drive every evaluation request think=false (reasoning profile),
+        // not just the (default-options) availability probe.
+        $decoded = $this->runJson(['--compare' => true, '--model' => 'qwen3:1.7b', '--limit' => '2']);
+
+        $this->assertSame('reasoning', $decoded['profile']['id']);
+        $this->assertFalse($decoded['effective']['think']);
+
+        // First request is the availability probe (default options, think=null); every subsequent
+        // baseline + few-shot request must carry the profile's think=false.
+        $evaluationRequests = array_slice($client->requests, 1);
+        $this->assertNotEmpty($evaluationRequests);
+        $this->assertTrue(collect($evaluationRequests)->every(fn ($r) => $r->think === false));
+    }
+
+    public function test_compare_honors_cli_overrides_over_the_profile(): void
+    {
+        $client = $this->fakeRecordingRequests();
+
+        // --compare + --think + --free-text must thread think=true / forceJson=false into both passes.
+        $this->runJson(['--compare' => true, '--model' => 'qwen3:1.7b', '--think' => true, '--free-text' => true, '--limit' => '2']);
+
+        $evaluationRequests = array_slice($client->requests, 1);
+        $this->assertNotEmpty($evaluationRequests);
+        $this->assertTrue(collect($evaluationRequests)->every(fn ($r) => $r->think === true && $r->jsonSchema === null));
+    }
+
+    public function test_multi_model_reports_a_resolved_profile_and_effective_per_model(): void
+    {
+        $this->fakeRecordingRequests();
+
+        $decoded = $this->runJson(['--models' => 'qwen3:0.6b,qwen3:1.7b', '--limit' => '2']);
+
+        $this->assertCount(2, $decoded['models']);
+        $this->assertSame('instruction-following', $decoded['models'][0]['profile']['id']);
+        $this->assertNull($decoded['models'][0]['effective']['think']);
+        $this->assertSame('profile', $decoded['models'][0]['effective']['think_source']);
+
+        $this->assertSame('reasoning', $decoded['models'][1]['profile']['id']);
+        $this->assertFalse($decoded['models'][1]['profile']['think']);
+        $this->assertFalse($decoded['models'][1]['effective']['think']);
+    }
 }

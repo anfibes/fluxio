@@ -6,6 +6,8 @@ use Fluxio\Actions\Diagnostics\Evaluation\DTO\InterpretationCorpusCase;
 use Fluxio\Actions\Diagnostics\Evaluation\Exceptions\InvalidInterpretationCorpusException;
 use Fluxio\Actions\Diagnostics\Examples\ItalianCorpusObservationService;
 use Fluxio\Actions\Diagnostics\Observation\DTO\ObservationOptions;
+use Fluxio\Actions\Diagnostics\Profiles\ObservationProfile;
+use Fluxio\Actions\Diagnostics\Profiles\ObservationProfileResolver;
 use Illuminate\Console\Command;
 
 /**
@@ -18,6 +20,14 @@ use Illuminate\Console\Command;
  * Model override (A7) is a diagnostics-only, per-request override threaded into the LlmRequest; it
  * never mutates config and never affects the runtime/default path. With no `--model`/`--models` the
  * configured model is used and behavior is unchanged.
+ *
+ * Capability-class profiles (A7.2): each model auto-selects a diagnostics profile via
+ * ObservationProfileResolver (model → capability class → transport strategy), so a reasoning model
+ * (e.g. qwen3:1.7b) is driven think=false by default while an instruction-following model
+ * (e.g. qwen3:0.6b) keeps the byte-identical forced-JSON default. CLI flags (--think / --no-think,
+ * --free-text, --num-predict) still override the profile: CLI > profile > hardcoded. Thinking and
+ * format are independent knobs — `--free-text --think` reproduces A7.1 E2 (thinking on + free-text +
+ * extract); `--free-text` alone composes with the profile's thinking choice.
  *
  * The corpus is the held-out measurement set; the IntentExamples library is the few-shot source.
  * They never overlap (leakage guard). It builds no proposals, calls no ActionInterpreterService,
@@ -36,8 +46,9 @@ class ObserveItalianCorpusCommand extends Command
                             {--compare : Run baseline vs few-shot over the corpus and emit a per-case delta (A5)}
                             {--model= : Diagnostics-only model override for this run (e.g. qwen3:1.7b). Default = configured model}
                             {--models= : Comma-separated models to compare side by side (A7); takes precedence over --model}
-                            {--no-think : A7.1/E1 — disable reasoning ("thinking") on the model for this diagnostic run}
-                            {--free-text : A7.1/E2 — do not force JSON; extract a JSON object from free text, then validate with the same validator}
+                            {--no-think : Force thinking OFF for this diagnostic run (overrides the profile)}
+                            {--think : Force thinking ON for this diagnostic run (overrides the profile); cannot combine with --no-think}
+                            {--free-text : Do not force JSON; extract a JSON object from free text, then validate with the same validator (composes with the profile/think; add --think to reproduce A7.1 E2)}
                             {--num-predict= : A7.1/E3 — raise the generation budget (Ollama num_predict) for this run}
                             {--case= : Observe only the corpus case with this id}
                             {--limit= : Observe at most N corpus cases}
@@ -47,10 +58,16 @@ class ObserveItalianCorpusCommand extends Command
 
     protected $description = 'Opt-in diagnostics: run the held-out Italian interpretation corpus through the LLM sandbox and report metrics as JSON. Add --few-shot for IntentExamples exemplars, --compare for an A1-vs-A2 delta, or --model/--models to compare local models (A7). Real model, no proposals, NOT a CI gate. Non-production.';
 
-    public function handle(ItalianCorpusObservationService $service): int
+    public function handle(ItalianCorpusObservationService $service, ObservationProfileResolver $resolver): int
     {
         if ($this->getLaravel()->environment('production')) {
             $this->error('actions:observe-italian-corpus is a diagnostics command and is disabled in production.');
+
+            return self::FAILURE;
+        }
+
+        if ($this->option('think') && $this->option('no-think')) {
+            $this->error('--think and --no-think cannot be used together.');
 
             return self::FAILURE;
         }
@@ -85,21 +102,15 @@ class ObserveItalianCorpusCommand extends Command
         $showProgress = (bool) $this->option('progress');
         $stderr = $this->output->getErrorStyle();
         $onProgress = $showProgress
-            ? static fn (int $done, int $total): mixed => $stderr->writeln(sprintf('[%d/%d] …', $done, $total))
-            : null;
+            ? static function (int $done, int $total) use ($stderr): void {
+                $stderr->writeln(sprintf('[%d/%d] …', $done, $total));
+            }
+        : null;
 
         $flags = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
         if (! $this->option('compact')) {
             $flags |= JSON_PRETTY_PRINT;
         }
-
-        // A7.1 diagnostics knobs. Defaults (no flags) = forced JSON, no thinking override, default
-        // budget — byte-identical to the prior observation behavior.
-        $options = new ObservationOptions(
-            think: $this->option('no-think') ? false : null,
-            forceJson: ! $this->option('free-text'),
-            maxTokens: ($rawNumPredict = $this->option('num-predict')) !== null ? max(1, (int) $rawNumPredict) : null,
-        );
 
         $models = $this->parseModels();
 
@@ -119,8 +130,17 @@ class ObserveItalianCorpusCommand extends Command
                     continue;
                 }
 
+                // A7.2: each model auto-selects its capability-class profile; CLI flags still override.
+                $profile = $resolver->resolve($model);
+                $options = $this->effectiveOptions($profile);
+
                 $perModel[] = array_merge(
-                    ['model' => $model, 'available' => true],
+                    [
+                        'model' => $model,
+                        'available' => true,
+                        'profile' => $profile->toArray(),
+                        'effective' => $this->effectiveMeta($options),
+                    ],
                     $this->bodyForModel($service, $cases, $locale, $fewShotLimit, $fewShot, $compare, $onProgress, $model, $options),
                 );
             }
@@ -138,6 +158,12 @@ class ObserveItalianCorpusCommand extends Command
         // ── Single model (configured default, or explicit --model override) ───
         $model = ($rawModel = $this->option('model')) !== null && trim((string) $rawModel) !== '' ? trim((string) $rawModel) : null;
         $effectiveModel = $model ?? (string) config('actions.llm.model');
+
+        // A7.2: resolve the profile from the EFFECTIVE model (configured default when no override).
+        // For the default model (instruction-following) the profile is think=null + format=json, so
+        // the default run stays byte-identical to before; CLI flags still override.
+        $profile = $resolver->resolve($effectiveModel);
+        $options = $this->effectiveOptions($profile);
 
         // Only probe when a model is explicitly overridden — the default path stays untouched.
         if ($model !== null) {
@@ -159,7 +185,12 @@ class ObserveItalianCorpusCommand extends Command
         $body = $this->bodyForModel($service, $cases, $locale, $fewShotLimit, $fewShot, $compare, $onProgress, $model, $options);
 
         $this->line((string) json_encode(
-            array_merge(['model' => $effectiveModel, 'corpus' => $corpusPath], $body),
+            array_merge([
+                'model' => $effectiveModel,
+                'corpus' => $corpusPath,
+                'profile' => $profile->toArray(),
+                'effective' => $this->effectiveMeta($options),
+            ], $body),
             $flags,
         ));
 
@@ -167,7 +198,57 @@ class ObserveItalianCorpusCommand extends Command
     }
 
     /**
-     * Run one model's observation (compare or single-mode) and return the report body.
+     * Build the effective transport knobs: start from the resolved profile, then apply any explicit
+     * CLI overrides. Precedence: CLI flags > profile defaults > hardcoded defaults.
+     *
+     * Thinking: profile default, unless forced by --no-think (false) or --think (true). The two
+     * cannot be combined (rejected in handle()). --free-text only controls forceJson; it never
+     * changes thinking.
+     */
+    private function effectiveOptions(ObservationProfile $profile): ObservationOptions
+    {
+        $think = $profile->think;
+        if ($this->option('no-think')) {
+            $think = false;
+        }
+        if ($this->option('think')) {
+            $think = true;
+        }
+
+        return new ObservationOptions(
+            think: $think,
+            forceJson: $this->option('free-text') ? false : $profile->forceJson,
+            // Budget is a pure CLI concern; profiles do not own it.
+            maxTokens: ($rawNumPredict = $this->option('num-predict')) !== null ? max(1, (int) $rawNumPredict) : null,
+        );
+    }
+
+    /**
+     * Effective-options metadata for the report, so a reader can distinguish profile defaults from
+     * explicit overrides (profile / cli:--think / cli:--no-think / cli:--free-text).
+     *
+     * @return array<string, mixed>
+     */
+    private function effectiveMeta(ObservationOptions $options): array
+    {
+        $thinkSource = match (true) {
+            (bool) $this->option('think') => 'cli:--think',
+            (bool) $this->option('no-think') => 'cli:--no-think',
+            default => 'profile',
+        };
+
+        return [
+            'think' => $options->think,
+            'think_source' => $thinkSource,
+            'force_json' => $options->forceJson,
+            'force_json_source' => $this->option('free-text') ? 'cli:--free-text' : 'profile',
+            'max_tokens' => $options->maxTokens,
+        ];
+    }
+
+    /**
+     * Run one model's observation (compare or single-mode) and return the report body. The same
+     * effective $options drive both paths — so --compare honors the resolved profile / CLI overrides.
      *
      * @param  list<InterpretationCorpusCase>  $cases
      * @param  (callable(int $completed, int $total): void)|null  $onProgress
@@ -185,7 +266,7 @@ class ObserveItalianCorpusCommand extends Command
         ObservationOptions $options,
     ): array {
         if ($compare) {
-            return $service->compare($cases, $locale, $fewShotLimit, $onProgress, $model)->toArray();
+            return $service->compare($cases, $locale, $fewShotLimit, $onProgress, $model, $options)->toArray();
         }
 
         $exemplars = $fewShot ? $service->exemplarsFor($locale, $cases, $fewShotLimit) : [];
