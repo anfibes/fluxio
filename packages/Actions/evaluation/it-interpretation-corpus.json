@@ -1,0 +1,364 @@
+[
+    {
+        "id": "it-create-task-followup-ferrari",
+        "text": "Crea un task di follow-up per Ferrari",
+        "locale": "it",
+        "expected": { "intent": "create_task", "entities": { "lead": "Ferrari" } },
+        "notes": ["Held-out: differs from the IntentExamples literal \"Crea un'attività per Rossini\"."]
+    },
+    {
+        "id": "it-create-task-richiama-verdi",
+        "text": "Aggiungi un'attività per richiamare Verdi",
+        "locale": "it",
+        "expected": { "intent": "create_task", "entities": { "lead": "Verdi" } },
+        "notes": ["Different verb \"Aggiungi\" and a call-back framing."]
+    },
+    {
+        "id": "it-create-task-reminder-conti",
+        "text": "Ricordami di inviare la proposta a Conti",
+        "locale": "it",
+        "expected": { "intent": "create_task", "entities": { "lead": "Conti" } },
+        "notes": ["Reminder phrasing without the word \"attività\"/\"task\"."]
+    },
+    {
+        "id": "it-create-task-promemoria-greco",
+        "text": "Inserisci un promemoria per contattare Greco",
+        "locale": "it",
+        "expected": { "intent": "create_task", "entities": { "lead": "Greco" } },
+        "notes": ["\"promemoria\" framing."]
+    },
+    {
+        "id": "it-create-task-priorita-marino",
+        "text": "Segna un'attività ad alta priorità per Marino",
+        "locale": "it",
+        "expected": { "intent": "create_task", "entities": { "lead": "Marino" } },
+        "notes": ["Priority is present (\"alta\") but deliberately not asserted (value normalization is brittle)."]
+    },
+    {
+        "id": "it-create-task-documenti-costa",
+        "text": "Apri un task per preparare i documenti di Costa",
+        "locale": "it",
+        "expected": { "intent": "create_task", "entities": { "lead": "Costa" } },
+        "notes": ["\"preparare\" appears but there is no contract/quote; plain task."]
+    },
+    {
+        "id": "it-create-task-cliente-esposito",
+        "text": "Crea un'attività per la cliente Esposito",
+        "locale": "it",
+        "expected": { "intent": "create_task", "entities": { "lead": "Esposito" } },
+        "notes": ["Same verb as the IntentExamples literal but different lead and wording."]
+    },
+    {
+        "id": "it-create-task-pratica-bruno",
+        "text": "Aggiungi un compito per seguire la pratica di Bruno",
+        "locale": "it",
+        "expected": { "intent": "create_task", "entities": { "lead": "Bruno" } },
+        "notes": ["\"compito\" synonym for task."]
+    },
+    {
+        "id": "it-create-task-chiamare-gallo",
+        "text": "Registra un'attività per chiamare più tardi la signora Gallo",
+        "locale": "it",
+        "expected": { "intent": "create_task", "entities": { "lead": "Gallo" } },
+        "notes": ["Mentions \"chiamare\" inside a task; intent is create_task, not schedule_call (no scheduling)."]
+    },
+
+    {
+        "id": "it-schedule-call-domani-ferrari",
+        "text": "Fissa una chiamata con Ferrari per domani mattina",
+        "locale": "it",
+        "expected": { "intent": "schedule_call", "entities": { "lead": "Ferrari" } },
+        "notes": ["Verb \"Fissa\"; relative time not asserted."]
+    },
+    {
+        "id": "it-schedule-call-lunedi-verdi",
+        "text": "Programma una telefonata con Verdi lunedì alle 15",
+        "locale": "it",
+        "expected": { "intent": "schedule_call", "entities": { "lead": "Verdi" } },
+        "notes": ["\"telefonata\" synonym; date/time not asserted (brittle)."]
+    },
+    {
+        "id": "it-schedule-call-mercoledi-conti",
+        "text": "Organizza una call con il cliente Conti mercoledì pomeriggio",
+        "locale": "it",
+        "expected": { "intent": "schedule_call", "entities": { "lead": "Conti" } },
+        "notes": ["Anglicism \"call\"."]
+    },
+    {
+        "id": "it-schedule-call-venerdi-greco",
+        "text": "Prenota una chiamata con Greco venerdì alle 9:30",
+        "locale": "it",
+        "expected": { "intent": "schedule_call", "entities": { "lead": "Greco" } },
+        "notes": ["Verb \"Prenota\"."]
+    },
+    {
+        "id": "it-schedule-call-prossima-settimana-marino",
+        "text": "Imposta una telefonata con la dottoressa Marino la prossima settimana",
+        "locale": "it",
+        "expected": { "intent": "schedule_call", "entities": { "lead": "Marino" } },
+        "notes": ["Title \"dottoressa\" precedes the lead; run-relative date not asserted."]
+    },
+    {
+        "id": "it-schedule-call-chiama-costa",
+        "text": "Chiama Costa domani per discutere il preventivo",
+        "locale": "it",
+        "expected": { "intent": "schedule_call", "entities": { "lead": "Costa" } },
+        "notes": ["Bare imperative \"Chiama\"; mentions \"preventivo\" but the action is a call, not a contract."]
+    },
+    {
+        "id": "it-schedule-call-giovedi-esposito",
+        "text": "Metti in agenda una chiamata con Esposito giovedì alle 11",
+        "locale": "it",
+        "expected": { "intent": "schedule_call", "entities": { "lead": "Esposito" } },
+        "notes": ["\"Metti in agenda\" framing for a call."]
+    },
+    {
+        "id": "it-schedule-call-aggiornamento-bruno",
+        "text": "Fissa una telefonata di aggiornamento con Bruno",
+        "locale": "it",
+        "expected": { "intent": "schedule_call", "entities": { "lead": "Bruno" } },
+        "notes": ["No explicit date/time."]
+    },
+    {
+        "id": "it-schedule-call-martedi-gallo",
+        "text": "Organizza una chiamata con la signora Gallo per martedì alle 16",
+        "locale": "it",
+        "expected": { "intent": "schedule_call", "entities": { "lead": "Gallo" } },
+        "notes": ["Title \"signora\" precedes the lead."]
+    },
+
+    {
+        "id": "it-schedule-meeting-domani-rossini",
+        "text": "Fissa una riunione con Rossini domani alle 10",
+        "locale": "it",
+        "expected": { "intent": "schedule_meeting", "entities": { "lead": "Rossini" } },
+        "notes": ["Held-out: \"Fissa una riunione\" differs from the IntentExamples \"Pianifica un appuntamento con Rossini domani alle 10\"."]
+    },
+    {
+        "id": "it-schedule-meeting-lunedi-bianchi",
+        "text": "Organizza un incontro con Bianchi lunedì alle 15",
+        "locale": "it",
+        "expected": { "intent": "schedule_meeting", "entities": { "lead": "Bianchi" } },
+        "notes": ["\"incontro\" synonym for meeting."]
+    },
+    {
+        "id": "it-schedule-meeting-venerdi-ferrari",
+        "text": "Metti in agenda un appuntamento con Ferrari venerdì mattina",
+        "locale": "it",
+        "expected": { "intent": "schedule_meeting", "entities": { "lead": "Ferrari" } },
+        "notes": ["Day-part \"mattina\" not asserted."]
+    },
+    {
+        "id": "it-schedule-meeting-team-verdi",
+        "text": "Prenota una riunione con il team e Verdi mercoledì alle 14",
+        "locale": "it",
+        "expected": { "intent": "schedule_meeting", "entities": { "lead": "Verdi" } },
+        "notes": ["Participants present (\"il team\") but not asserted; only the named lead is stable."]
+    },
+    {
+        "id": "it-schedule-meeting-prossima-settimana-conti",
+        "text": "Programma un meeting con Conti la prossima settimana",
+        "locale": "it",
+        "expected": { "intent": "schedule_meeting", "entities": { "lead": "Conti" } },
+        "notes": ["Anglicism \"meeting\"; run-relative date not asserted."]
+    },
+    {
+        "id": "it-schedule-meeting-giovedi-greco",
+        "text": "Fissa un incontro con la dottoressa Greco giovedì pomeriggio",
+        "locale": "it",
+        "expected": { "intent": "schedule_meeting", "entities": { "lead": "Greco" } },
+        "notes": ["Title before lead."]
+    },
+    {
+        "id": "it-schedule-meeting-sede-marino",
+        "text": "Organizza una riunione in sede con Marino martedì alle 9",
+        "locale": "it",
+        "expected": { "intent": "schedule_meeting", "entities": { "lead": "Marino" } },
+        "notes": ["Location \"in sede\" present but not asserted (brittle)."]
+    },
+    {
+        "id": "it-schedule-meeting-calendario-costa",
+        "text": "Metti in calendario un appuntamento con Costa per venerdì alle 17",
+        "locale": "it",
+        "expected": { "intent": "schedule_meeting", "entities": { "lead": "Costa" } },
+        "notes": ["\"Metti in calendario\" framing."]
+    },
+    {
+        "id": "it-schedule-meeting-mezzogiorno-esposito",
+        "text": "Fissa una riunione con Esposito domani a mezzogiorno",
+        "locale": "it",
+        "expected": { "intent": "schedule_meeting", "entities": { "lead": "Esposito" } },
+        "notes": ["\"a mezzogiorno\" day-part not asserted."]
+    },
+
+    {
+        "id": "it-assign-lead-affida-ferrari",
+        "text": "Affida il contatto Ferrari a Marco",
+        "locale": "it",
+        "expected": { "intent": "assign_lead", "entities": { "lead": "Ferrari", "assignee": "Marco" } },
+        "notes": ["Verb \"Affida\"; both lead and assignee stand alone."]
+    },
+    {
+        "id": "it-assign-lead-verdi-giulia",
+        "text": "Assegna la lead Verdi a Giulia",
+        "locale": "it",
+        "expected": { "intent": "assign_lead", "entities": { "lead": "Verdi", "assignee": "Giulia" } },
+        "notes": ["Same verb as IntentExamples literal but different names and wording."]
+    },
+    {
+        "id": "it-assign-lead-passa-conti",
+        "text": "Passa il cliente Conti a Luca",
+        "locale": "it",
+        "expected": { "intent": "assign_lead", "entities": { "lead": "Conti", "assignee": "Luca" } },
+        "notes": ["Verb \"Passa\"."]
+    },
+    {
+        "id": "it-assign-lead-gira-greco",
+        "text": "Gira la pratica di Greco a Marco",
+        "locale": "it",
+        "expected": { "intent": "assign_lead", "entities": { "lead": "Greco", "assignee": "Marco" } },
+        "notes": ["Verb \"Gira\"."]
+    },
+    {
+        "id": "it-assign-lead-attribuisci-marino",
+        "text": "Attribuisci il contatto Marino a Sara",
+        "locale": "it",
+        "expected": { "intent": "assign_lead", "entities": { "lead": "Marino", "assignee": "Sara" } },
+        "notes": ["Verb \"Attribuisci\"."]
+    },
+    {
+        "id": "it-assign-lead-commerciale-costa",
+        "text": "Assegna Costa al commerciale Paolo",
+        "locale": "it",
+        "expected": { "intent": "assign_lead", "entities": { "lead": "Costa" } },
+        "notes": ["Assignee phrased as \"al commerciale Paolo\" is ambiguous; only the lead is asserted."]
+    },
+    {
+        "id": "it-assign-lead-esposito-giovanni",
+        "text": "Affida la lead Esposito a Giovanni",
+        "locale": "it",
+        "expected": { "intent": "assign_lead", "entities": { "lead": "Esposito", "assignee": "Giovanni" } },
+        "notes": ["Clean lead + assignee."]
+    },
+    {
+        "id": "it-assign-lead-bruno-chiara",
+        "text": "Passa Bruno a Chiara per la gestione",
+        "locale": "it",
+        "expected": { "intent": "assign_lead", "entities": { "lead": "Bruno", "assignee": "Chiara" } },
+        "notes": ["Trailing reason clause does not affect lead/assignee."]
+    },
+    {
+        "id": "it-assign-lead-gallo-davide",
+        "text": "Assegna la cliente Gallo a Davide",
+        "locale": "it",
+        "expected": { "intent": "assign_lead", "entities": { "lead": "Gallo", "assignee": "Davide" } },
+        "notes": ["Clean lead + assignee."]
+    },
+
+    {
+        "id": "it-prepare-contract-ferrari-q2048",
+        "text": "Prepara un contratto per Ferrari usando il preventivo Q-2048",
+        "locale": "it",
+        "expected": { "intent": "prepare_contract_from_quote", "entities": { "lead": "Ferrari", "quote": "Q-2048" } },
+        "notes": ["Held-out: \"usando il preventivo\" instead of the IntentExamples \"dal preventivo\"."]
+    },
+    {
+        "id": "it-prepare-contract-verdi-q3001",
+        "text": "Genera il contratto per Verdi a partire dal preventivo Q-3001",
+        "locale": "it",
+        "expected": { "intent": "prepare_contract_from_quote", "entities": { "lead": "Verdi", "quote": "Q-3001" } },
+        "notes": ["Verb \"Genera\"."]
+    },
+    {
+        "id": "it-prepare-contract-conti-q1090",
+        "text": "Redigi un contratto per Conti basato sul preventivo Q-1090",
+        "locale": "it",
+        "expected": { "intent": "prepare_contract_from_quote", "entities": { "lead": "Conti", "quote": "Q-1090" } },
+        "notes": ["Verb \"Redigi\"."]
+    },
+    {
+        "id": "it-prepare-contract-greco-q4500",
+        "text": "Crea il contratto per Greco dal preventivo numero Q-4500",
+        "locale": "it",
+        "expected": { "intent": "prepare_contract_from_quote", "entities": { "lead": "Greco", "quote": "Q-4500" } },
+        "notes": ["\"numero\" precedes the quote code."]
+    },
+    {
+        "id": "it-prepare-contract-marino-q2210",
+        "text": "Imposta un contratto per Marino partendo dal preventivo Q-2210",
+        "locale": "it",
+        "expected": { "intent": "prepare_contract_from_quote", "entities": { "lead": "Marino", "quote": "Q-2210" } },
+        "notes": ["Verb \"Imposta\"."]
+    },
+    {
+        "id": "it-prepare-contract-costa-q3333",
+        "text": "Prepara la bozza di contratto per Costa dal preventivo Q-3333",
+        "locale": "it",
+        "expected": { "intent": "prepare_contract_from_quote", "entities": { "lead": "Costa", "quote": "Q-3333" } },
+        "notes": ["\"la bozza di contratto\" wording."]
+    },
+    {
+        "id": "it-prepare-contract-esposito-q5005",
+        "text": "Genera un contratto per la cliente Esposito dal preventivo Q-5005",
+        "locale": "it",
+        "expected": { "intent": "prepare_contract_from_quote", "entities": { "lead": "Esposito", "quote": "Q-5005" } },
+        "notes": ["\"la cliente\" before the lead."]
+    },
+    {
+        "id": "it-prepare-contract-bruno-q1234",
+        "text": "Redigi il contratto per Bruno sulla base del preventivo Q-1234",
+        "locale": "it",
+        "expected": { "intent": "prepare_contract_from_quote", "entities": { "lead": "Bruno", "quote": "Q-1234" } },
+        "notes": ["\"sulla base del preventivo\" wording."]
+    },
+    {
+        "id": "it-prepare-contract-gallo-q7777",
+        "text": "Prepara un contratto per Gallo a partire dall'offerta Q-7777",
+        "locale": "it",
+        "expected": { "intent": "prepare_contract_from_quote", "entities": { "lead": "Gallo", "quote": "Q-7777" } },
+        "notes": ["\"offerta\" as a synonym for the quote."]
+    },
+
+    {
+        "id": "it-unknown-fatturato",
+        "text": "Mostrami il fatturato del mese scorso",
+        "locale": "it",
+        "expected": { "intent": "unknown" },
+        "notes": ["Reporting request, out of the supported intents."]
+    },
+    {
+        "id": "it-unknown-impostazioni-profilo",
+        "text": "Apri le impostazioni del profilo",
+        "locale": "it",
+        "expected": { "intent": "unknown" },
+        "notes": ["Settings/navigation, out of domain."]
+    },
+    {
+        "id": "it-unknown-meteo",
+        "text": "Qual è il meteo di domani a Milano?",
+        "locale": "it",
+        "expected": { "intent": "unknown" },
+        "notes": ["Completely off-topic question."]
+    },
+    {
+        "id": "it-unknown-esporta-clienti",
+        "text": "Esporta l'elenco dei clienti in PDF",
+        "locale": "it",
+        "expected": { "intent": "unknown" },
+        "notes": ["Export/reporting, out of domain."]
+    },
+    {
+        "id": "it-unknown-dashboard",
+        "text": "Vai alla dashboard principale",
+        "locale": "it",
+        "expected": { "intent": "unknown" },
+        "notes": ["Navigation, out of domain."]
+    },
+    {
+        "id": "it-unknown-notifiche",
+        "text": "Disattiva le notifiche email",
+        "locale": "it",
+        "expected": { "intent": "unknown" },
+        "notes": ["Settings toggle, out of domain."]
+    }
+]
