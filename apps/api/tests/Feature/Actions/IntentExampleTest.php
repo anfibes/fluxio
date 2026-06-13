@@ -287,10 +287,11 @@ class IntentExampleTest extends TestCase
     /**
      * Scans every PHP file under packages/Actions/src that references the Examples
      * subsystem and returns the offenders that live OUTSIDE the allowed consumer
-     * namespaces. Allowed consumers: the Examples subsystem itself, and Diagnostics
-     * (Slice A1 — IntentExampleObservationService). Everything else (resolvers,
-     * interpretation runtime/providers, lifecycle/services, executors, controllers,
-     * resources, prompting) is a runtime path and must NOT reference Examples.
+     * namespaces. Allowed consumers: the Examples subsystem itself, Diagnostics
+     * (Slice A1 — IntentExampleObservationService), and Llm/Prompting (Slice A2 — the
+     * few-shot exemplar boundary). Everything else (resolvers, interpretation
+     * runtime/providers, lifecycle/services, executors, controllers, resources) is a
+     * runtime path and must NOT reference Examples.
      *
      * @return list<string>
      */
@@ -302,6 +303,7 @@ class IntentExampleTest extends TestCase
         $allowedDirs = [
             $srcDir.DIRECTORY_SEPARATOR.'Examples'.DIRECTORY_SEPARATOR,
             $srcDir.DIRECTORY_SEPARATOR.'Diagnostics'.DIRECTORY_SEPARATOR,
+            $srcDir.DIRECTORY_SEPARATOR.'Llm'.DIRECTORY_SEPARATOR.'Prompting'.DIRECTORY_SEPARATOR,
         ];
 
         $offenders = [];

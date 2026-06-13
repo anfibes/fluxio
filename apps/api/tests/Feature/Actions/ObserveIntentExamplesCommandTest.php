@@ -8,6 +8,8 @@ use Fluxio\Actions\Llm\Contracts\LlmClientInterface;
 use Fluxio\Actions\Llm\DTO\LlmRequest;
 use Fluxio\Actions\Llm\DTO\LlmResponse;
 use Fluxio\Actions\Llm\Exceptions\LlmTransportException;
+use Fluxio\Actions\Llm\Prompting\PromptExemplar;
+use Fluxio\Actions\Llm\Validation\LlmStructuredOutputValidator;
 use Fluxio\Actions\Models\ActionProposal;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -240,5 +242,137 @@ class ObserveIntentExamplesCommandTest extends TestCase
         $this->assertNull($case['normalized_command']);
         $this->assertSame(1, $decoded['metrics']['validation_failures']);
         $this->assertSame(0, $decoded['metrics']['contract_valid']['count']);
+    }
+
+    // ── Slice A2: few-shot exemplars ──────────────────────────────────────────
+
+    /** Captures the last system prompt the client received, so we can assert prompt content. */
+    private function capturingFakeLlm(array $parsedJson): object
+    {
+        $client = new class($parsedJson) implements LlmClientInterface
+        {
+            public ?string $lastSystemPrompt = null;
+
+            public function __construct(private readonly array $parsedJson) {}
+
+            public function generateStructured(LlmRequest $request): LlmResponse
+            {
+                $this->lastSystemPrompt = $request->systemPrompt;
+
+                return new LlmResponse(rawText: (string) json_encode($this->parsedJson), parsedJson: $this->parsedJson);
+            }
+        };
+
+        $this->app->instance(LlmClientInterface::class, $client);
+
+        return $client;
+    }
+
+    public function test_default_run_does_not_enable_few_shot(): void
+    {
+        $client = $this->capturingFakeLlm($this->validCreateTask());
+
+        $decoded = $this->runJson(['--case' => 'it-create-task-basic']);
+
+        $this->assertFalse($decoded['few_shot']['enabled']);
+        $this->assertSame(0, $decoded['few_shot']['count']);
+        $this->assertSame([], $decoded['few_shot']['example_ids']);
+        // Baseline prompt carries no worked-examples block.
+        $this->assertStringNotContainsString('Worked examples', (string) $client->lastSystemPrompt);
+    }
+
+    public function test_few_shot_option_enables_template_exemplars_in_the_prompt(): void
+    {
+        $client = $this->capturingFakeLlm($this->validCreateTask());
+
+        $decoded = $this->runJson(['--case' => 'it-schedule-call-basic', '--few-shot' => true]);
+
+        $this->assertTrue($decoded['few_shot']['enabled']);
+        $this->assertGreaterThan(0, $decoded['few_shot']['count']);
+        // Exemplars are sourced from TEMPLATE examples, never the evaluated literals.
+        foreach ($decoded['few_shot']['example_ids'] as $id) {
+            $this->assertStringContainsString('-template', $id);
+        }
+
+        $prompt = (string) $client->lastSystemPrompt;
+        $this->assertStringContainsString('Worked examples', $prompt);
+        $this->assertStringContainsString('"intent":"schedule_call"', $prompt);
+    }
+
+    public function test_few_shot_does_not_leak_the_evaluated_literal_verbatim(): void
+    {
+        $client = $this->capturingFakeLlm($this->validCreateTask());
+
+        // Evaluated input is the Italian schedule_call literal.
+        $this->runJson(['--case' => 'it-schedule-call-basic', '--few-shot' => true]);
+
+        $literal = 'Pianifica una chiamata con Rossini domani alle 10';
+        $prompt = (string) $client->lastSystemPrompt;
+
+        // The literal appears once — as the evaluated user message is NOT in the system prompt;
+        // the few-shot block (system prompt) must not contain the evaluated literal at all.
+        $this->assertStringNotContainsString($literal, $prompt);
+    }
+
+    public function test_few_shot_exemplars_are_provider_contract_safe(): void
+    {
+        $service = $this->app->make(IntentExampleObservationService::class);
+        $validator = $this->app->make(LlmStructuredOutputValidator::class);
+
+        foreach (['it', 'en'] as $locale) {
+            $exemplars = $service->fewShotExemplars($locale);
+
+            $this->assertNotEmpty($exemplars, "Expected few-shot exemplars for locale [{$locale}].");
+            $this->assertLessThanOrEqual(5, count($exemplars));
+
+            foreach ($exemplars as $exemplar) {
+                $this->assertInstanceOf(PromptExemplar::class, $exemplar);
+                // Each exemplar output must pass the SAME contract validator the sandbox uses.
+                $this->assertTrue(
+                    $validator->validate($exemplar->output)->valid,
+                    "Exemplar [{$exemplar->sourceId}] output is not contract-safe.",
+                );
+                // No forbidden identity/lifecycle keys in the exemplar entities.
+                $forbidden = ['id', 'lead_id', 'selected_candidate_id', 'status', 'executed'];
+                foreach (array_keys($exemplar->output['entities']) as $key) {
+                    $this->assertNotContains($key, $forbidden);
+                }
+            }
+        }
+    }
+
+    public function test_few_shot_excludes_the_evaluated_literal_text_from_exemplars(): void
+    {
+        $service = $this->app->make(IntentExampleObservationService::class);
+
+        $literals = array_map(
+            static fn (IntentExample $e): string => (string) $e->text,
+            $service->select('it'),
+        );
+
+        $exemplars = $service->fewShotExemplars('it', null, $literals);
+
+        foreach ($exemplars as $exemplar) {
+            $this->assertNotContains($exemplar->inputText, $literals, 'A few-shot exemplar duplicated an evaluated literal.');
+        }
+    }
+
+    public function test_few_shot_limit_is_respected(): void
+    {
+        $service = $this->app->make(IntentExampleObservationService::class);
+
+        $this->assertCount(2, $service->fewShotExemplars('it', 2));
+    }
+
+    public function test_few_shot_report_metadata_is_present_in_json(): void
+    {
+        $this->capturingFakeLlm($this->validCreateTask());
+
+        $decoded = $this->runJson(['--locale' => 'it', '--few-shot' => true]);
+
+        $this->assertArrayHasKey('few_shot', $decoded);
+        $this->assertTrue($decoded['few_shot']['enabled']);
+        $this->assertSame(count($decoded['few_shot']['example_ids']), $decoded['few_shot']['count']);
+        $this->assertNotEmpty($decoded['few_shot']['example_ids']);
     }
 }

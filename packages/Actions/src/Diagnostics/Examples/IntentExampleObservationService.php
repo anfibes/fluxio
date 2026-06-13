@@ -9,29 +9,49 @@ use Fluxio\Actions\Diagnostics\Observation\DTO\LlmObservationResult;
 use Fluxio\Actions\Diagnostics\Observation\LlmObservationService;
 use Fluxio\Actions\Examples\IntentExample;
 use Fluxio\Actions\Examples\IntentExampleRegistry;
+use Fluxio\Actions\Llm\Prompting\PromptExemplar;
+use Fluxio\Actions\Llm\Validation\LlmStructuredOutputValidator;
 
 /**
- * Diagnostics-only baseline observation of literal Intent Examples through the existing
- * LLM sandbox (Slice A1).
+ * Diagnostics-only observation of literal Intent Examples through the existing LLM sandbox.
  *
- * This is the FIRST consumer of IntentExampleRegistry, and it lives entirely in the
- * diagnostics namespace — never in the resolver, interpretation runtime, lifecycle, or
- * executors. It takes the curated literal Intent Examples for a locale and replays each one
- * through the unchanged LlmObservationService (same client, prompt builder, structured-output
- * validator and sandbox the opt-in Ollama provider uses), so we can measure — before any
- * prompt change or few-shot injection — whether the current sandbox turns a (e.g. Italian)
- * command into a contract-valid NormalizedCommand.
+ * Slice A1 measured the no-few-shot baseline. Slice A2 adds an OPT-IN, locale-aware few-shot
+ * affordance: the locale's TEMPLATE examples are rendered into contract-shaped exemplars and
+ * prepended to the prompt, while the LITERAL examples remain the evaluated inputs — so the
+ * model is never scored on a string it was shown verbatim (leakage guard). Few-shot is off by
+ * default; with no exemplars the prompt and behavior are byte-identical to A1.
  *
- * Boundaries held: it builds no proposals, resolves no entities, executes nothing, persists
- * nothing, and adds no relaxed/parallel validator. IntentExamples stay non-authoritative; the
- * deterministic provider remains the runtime authority. Template-only examples are deliberately
- * excluded as evaluated inputs in this slice — only records carrying literal text are run.
+ * This is the first consumer of IntentExampleRegistry and lives entirely in the diagnostics
+ * namespace — never in the resolver, interpretation runtime, lifecycle, or executors. It builds
+ * no proposals, resolves no entities, executes nothing, persists nothing, and adds no
+ * relaxed/parallel validator (exemplar contract-safety is checked with the SAME
+ * LlmStructuredOutputValidator the sandbox uses). IntentExamples stay non-authoritative; the
+ * deterministic provider remains the runtime authority.
  */
 class IntentExampleObservationService
 {
+    private const DEFAULT_FEW_SHOT_LIMIT = 5;
+
+    /**
+     * Safe, label-only sample fillers used to render a template exemplar. Values are chosen to
+     * be contract-legal AND prompt-consistent (date as YYYY-MM-DD, time as 24h HH:MM) and
+     * deliberately DISJOINT from the evaluated literals' values, so an exemplar can never be a
+     * verbatim copy of an evaluated input. They are user-facing labels, never IDs.
+     *
+     * @var array<string, string>
+     */
+    private const SLOT_FILLERS = [
+        'lead' => 'Bianchi',
+        'assignee' => 'Luca',
+        'quote' => 'Q-2050',
+        'date' => '2026-06-20',
+        'time' => '09:00',
+    ];
+
     public function __construct(
         private readonly IntentExampleRegistry $registry,
         private readonly LlmObservationService $observation,
+        private readonly LlmStructuredOutputValidator $structuredValidator,
     ) {}
 
     /**
@@ -62,13 +82,105 @@ class IntentExampleObservationService
     }
 
     /**
-     * Replay a single literal example through the unchanged LLM observation pipeline.
+     * Build locale-aware few-shot exemplars from the locale's TEMPLATE examples — at most one
+     * per intent, capped at $limit (default 5). Each exemplar is rendered with safe sample
+     * fillers and its structured output is validated with the sandbox's own contract validator;
+     * any exemplar that is not contract-safe, or whose rendered input collides with an evaluated
+     * literal in $excludeTexts (leakage), is skipped.
      *
-     * The example is adapted to the shared InterpretationCorpusCase shape: its literal `text`
-     * is the input, its `intent` the expectation. Literal Intent Examples carry no expected
-     * entities, so the entity expectation is empty (entity agreement is reported as n/a).
+     * @param  list<string>  $excludeTexts  Evaluated literal inputs that must not appear as exemplars.
+     * @return list<PromptExemplar>
      */
-    public function observeExample(IntentExample $example): LlmObservationResult
+    public function fewShotExemplars(string $locale, ?int $limit = null, array $excludeTexts = []): array
+    {
+        $limit ??= self::DEFAULT_FEW_SHOT_LIMIT;
+
+        $templates = array_values(array_filter(
+            $this->registry->byLocale($locale),
+            static fn (IntentExample $e): bool => $e->hasTemplate(),
+        ));
+
+        $exemplars = [];
+        $seenIntents = [];
+
+        foreach ($templates as $template) {
+            if (count($exemplars) >= $limit) {
+                break;
+            }
+
+            // One exemplar per intent.
+            if (isset($seenIntents[$template->intent])) {
+                continue;
+            }
+
+            $exemplar = $this->renderExemplar($template);
+
+            if ($exemplar === null) {
+                continue;
+            }
+
+            // Leakage guard: never show, as an exemplar, a string we will score verbatim.
+            if (in_array($exemplar->inputText, $excludeTexts, true)) {
+                continue;
+            }
+
+            $seenIntents[$template->intent] = true;
+            $exemplars[] = $exemplar;
+        }
+
+        return $exemplars;
+    }
+
+    /**
+     * Render one TEMPLATE example into a contract-shaped PromptExemplar, or null if it cannot be
+     * rendered contract-safe (missing filler, or output rejected by the structured validator).
+     */
+    private function renderExemplar(IntentExample $template): ?PromptExemplar
+    {
+        $input = (string) $template->template;
+        $entities = [];
+
+        foreach ($template->slots as $slot) {
+            $entityKey = $slot['entity_key'];
+            $placeholder = $slot['placeholder'];
+
+            if (! array_key_exists($entityKey, self::SLOT_FILLERS)) {
+                return null;
+            }
+
+            $filler = self::SLOT_FILLERS[$entityKey];
+            $input = str_replace($placeholder, $filler, $input);
+            $entities[$entityKey] = $filler;
+        }
+
+        $output = [
+            'intent' => $template->intent,
+            'confidence' => 0.9,
+            'entities' => $entities,
+            'notes' => [],
+        ];
+
+        // Contract-safety guarantee: an exemplar's output must pass the SAME validator the
+        // sandbox applies to real model output. If it would not, drop it rather than teach the
+        // model something the contract forbids.
+        if (! $this->structuredValidator->validate($output)->valid) {
+            return null;
+        }
+
+        return new PromptExemplar(inputText: $input, output: $output, sourceId: $template->id);
+    }
+
+    /**
+     * Replay a single literal example through the unchanged LLM observation pipeline, optionally
+     * with few-shot exemplars.
+     *
+     * The example is adapted to the shared InterpretationCorpusCase shape: its literal `text` is
+     * the input, its `intent` the expectation. Literal Intent Examples carry no expected
+     * entities, so the entity expectation is empty (entity agreement is reported as n/a).
+     *
+     * @param  list<PromptExemplar>  $exemplars
+     */
+    public function observeExample(IntentExample $example, array $exemplars = []): LlmObservationResult
     {
         $case = new InterpretationCorpusCase(
             id: $example->id,
@@ -79,31 +191,45 @@ class IntentExampleObservationService
             notes: $example->notes,
         );
 
-        return $this->observation->observe($case);
+        return $this->observation->observe($case, $exemplars);
     }
 
     /**
      * @param  list<LlmObservationResult>  $results
+     * @param  list<string>  $fewShotExampleIds
      */
-    public function report(string $locale, array $results): IntentExampleObservationReport
+    public function report(string $locale, array $results, bool $fewShotEnabled = false, array $fewShotExampleIds = []): IntentExampleObservationReport
     {
         return new IntentExampleObservationReport(
             locale: $locale,
             results: $results,
             metrics: IntentExampleObservationMetrics::fromResults($results),
+            fewShotEnabled: $fewShotEnabled,
+            fewShotExampleIds: $fewShotExampleIds,
         );
     }
 
     /**
-     * Convenience: select + observe + aggregate in one call (used by tests).
+     * Convenience: select + (optional few-shot) + observe + aggregate in one call (used by tests).
      */
-    public function observe(string $locale = 'it', ?string $caseId = null, ?int $limit = null): IntentExampleObservationReport
+    public function observe(string $locale = 'it', ?string $caseId = null, ?int $limit = null, bool $fewShot = false, ?int $fewShotLimit = null): IntentExampleObservationReport
     {
+        $examples = $this->select($locale, $caseId, $limit);
+
+        $exemplars = $fewShot
+            ? $this->fewShotExemplars($locale, $fewShotLimit, array_map(static fn (IntentExample $e): string => (string) $e->text, $examples))
+            : [];
+
         $results = array_map(
-            fn (IntentExample $e): LlmObservationResult => $this->observeExample($e),
-            $this->select($locale, $caseId, $limit),
+            fn (IntentExample $e): LlmObservationResult => $this->observeExample($e, $exemplars),
+            $examples,
         );
 
-        return $this->report($locale, $results);
+        return $this->report(
+            $locale,
+            $results,
+            $fewShot,
+            array_values(array_filter(array_map(static fn (PromptExemplar $x): ?string => $x->sourceId, $exemplars))),
+        );
     }
 }

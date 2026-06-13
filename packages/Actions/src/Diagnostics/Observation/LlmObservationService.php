@@ -52,13 +52,18 @@ class LlmObservationService
         return __DIR__.'/../../../evaluation/llm-observation-cases.json';
     }
 
-    public function observe(InterpretationCorpusCase $case): LlmObservationResult
+    /**
+     * @param  list<\Fluxio\Actions\Llm\Prompting\PromptExemplar>  $exemplars  Optional few-shot
+     *                                                                         exemplars. Empty (default) keeps the system prompt byte-identical to the runtime
+     *                                                                         path; supplying them is an opt-in diagnostics affordance.
+     */
+    public function observe(InterpretationCorpusCase $case, array $exemplars = []): LlmObservationResult
     {
         $context = new InterpretationContext(locale: $case->locale);
 
         $request = new LlmRequest(
             prompt: $this->promptBuilder->buildUserPrompt($case->text, $context),
-            systemPrompt: $this->promptBuilder->buildSystemPrompt(),
+            systemPrompt: $this->promptBuilder->buildSystemPrompt($exemplars),
             temperature: 0.0,
             // Signals structured JSON to the transport; the contract is enforced by the validator.
             jsonSchema: ['type' => 'object'],

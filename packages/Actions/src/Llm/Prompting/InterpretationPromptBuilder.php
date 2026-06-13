@@ -23,7 +23,19 @@ class InterpretationPromptBuilder
 {
     public function __construct(private readonly InterpretationGrammar $grammar) {}
 
-    public function buildSystemPrompt(): string
+    /**
+     * Build the strict system prompt.
+     *
+     * When $exemplars is empty (the default, and the only case the runtime/sandbox
+     * provider ever uses) the output is byte-identical to the original prompt. Few-shot
+     * exemplars are an OPT-IN diagnostics affordance: when supplied, a clearly delimited
+     * "Worked examples" block is appended after the shape example. The exemplars are
+     * provider-facing and contract-shaped; only their input text and output JSON are
+     * rendered (never any provenance/identity metadata).
+     *
+     * @param  list<PromptExemplar>  $exemplars
+     */
+    public function buildSystemPrompt(array $exemplars = []): string
     {
         $lines = [
             'You convert a single user message into one structured interpretation for a CRM/ERP assistant.',
@@ -74,7 +86,32 @@ class InterpretationPromptBuilder
             '{"intent":"create_task","confidence":0.82,"entities":{"lead":"Rossi","due_at":"tomorrow"},"notes":[]}',
         ]);
 
+        // Opt-in few-shot block. Appended ONLY when exemplars are supplied, so the default
+        // prompt stays byte-identical for the runtime/sandbox provider.
+        if ($exemplars !== []) {
+            $lines = array_merge($lines, $this->renderExemplars($exemplars));
+        }
+
         return implode("\n", $lines);
+    }
+
+    /**
+     * @param  list<PromptExemplar>  $exemplars
+     * @return list<string>
+     */
+    private function renderExemplars(array $exemplars): array
+    {
+        $lines = [
+            '',
+            'Worked examples (same task; produce JSON exactly like each "Output" line):',
+        ];
+
+        foreach ($exemplars as $exemplar) {
+            $lines[] = 'Input: '.$exemplar->inputText;
+            $lines[] = 'Output: '.$exemplar->outputJson();
+        }
+
+        return $lines;
     }
 
     public function buildUserPrompt(string $text, InterpretationContext $context): string

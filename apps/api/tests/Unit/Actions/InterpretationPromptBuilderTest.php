@@ -3,6 +3,7 @@
 namespace Tests\Unit\Actions;
 
 use Fluxio\Actions\Llm\Prompting\InterpretationPromptBuilder;
+use Fluxio\Actions\Llm\Prompting\PromptExemplar;
 use Tests\TestCase;
 
 /**
@@ -99,5 +100,38 @@ class InterpretationPromptBuilderTest extends TestCase
         $this->assertStringContainsString('non-empty list of name strings', $this->prompt);
         $this->assertStringContainsString('Never emit participants as an empty array', $this->prompt);
         $this->assertStringContainsString('never as objects', $this->prompt);
+    }
+
+    // ── Slice A2: optional few-shot exemplars (default byte-identical) ─────────
+
+    public function test_prompt_is_byte_identical_when_no_exemplars_are_supplied(): void
+    {
+        $builder = $this->app->make(InterpretationPromptBuilder::class);
+
+        // The no-arg call (runtime/sandbox path) and the empty-array call must be identical,
+        // and must carry no few-shot block.
+        $this->assertSame($builder->buildSystemPrompt(), $builder->buildSystemPrompt([]));
+        $this->assertStringNotContainsString('Worked examples', $builder->buildSystemPrompt());
+    }
+
+    public function test_prompt_appends_exemplar_json_when_exemplars_are_supplied(): void
+    {
+        $builder = $this->app->make(InterpretationPromptBuilder::class);
+
+        $exemplar = new PromptExemplar(
+            inputText: 'Pianifica una chiamata con Bianchi il 2026-06-20 alle 09:00',
+            output: ['intent' => 'schedule_call', 'confidence' => 0.9, 'entities' => ['lead' => 'Bianchi', 'date' => '2026-06-20', 'time' => '09:00'], 'notes' => []],
+            sourceId: 'it-schedule-call-template',
+        );
+
+        $prompt = $builder->buildSystemPrompt([$exemplar]);
+
+        $this->assertStringContainsString('Worked examples', $prompt);
+        $this->assertStringContainsString('Input: Pianifica una chiamata con Bianchi il 2026-06-20 alle 09:00', $prompt);
+        $this->assertStringContainsString('"intent":"schedule_call"', $prompt);
+        // Provenance metadata is never rendered into the prompt.
+        $this->assertStringNotContainsString('it-schedule-call-template', $prompt);
+        // The default block is preserved (exemplars are appended, not a replacement).
+        $this->assertStringContainsString('Registered intents and their allowed entity keys:', $prompt);
     }
 }

@@ -17,11 +17,14 @@ final class IntentExampleObservationReport
 {
     /**
      * @param  list<LlmObservationResult>  $results
+     * @param  list<string>  $fewShotExampleIds  Source IntentExample ids used as few-shot exemplars.
      */
     public function __construct(
         public readonly string $locale,
         public readonly array $results,
         public readonly IntentExampleObservationMetrics $metrics,
+        public readonly bool $fewShotEnabled = false,
+        public readonly array $fewShotExampleIds = [],
     ) {}
 
     /**
@@ -32,6 +35,11 @@ final class IntentExampleObservationReport
         return [
             'locale' => $this->locale,
             'evaluated' => count($this->results),
+            'few_shot' => [
+                'enabled' => $this->fewShotEnabled,
+                'count' => count($this->fewShotExampleIds),
+                'example_ids' => $this->fewShotExampleIds,
+            ],
             'metrics' => $this->metrics->toArray(),
             'cases' => array_map(fn (LlmObservationResult $r): array => $this->caseToArray($r), $this->results),
         ];
