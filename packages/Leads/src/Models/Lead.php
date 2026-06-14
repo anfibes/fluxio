@@ -23,6 +23,12 @@ class Lead extends Model
         'phone',
         'status',
         'notes',
+        'assigned_to_user_id',
+        'assigned_at',
+    ];
+
+    protected $casts = [
+        'assigned_at' => 'datetime',
     ];
 
     protected static function newFactory(): LeadFactory

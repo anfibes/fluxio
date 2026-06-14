@@ -305,9 +305,9 @@ class RicherOperationalIntentsTest extends TestCase
 
     public function test_assign_lead_proposal_can_execute(): void
     {
-        $this->actingAsUser();
+        $lead = \Fluxio\Leads\Models\Lead::factory()->create(['name' => 'Rossini', 'company' => null]);
 
-        $user = User::factory()->create();
+        $user = User::factory()->create(['name' => 'Marco']);
         Sanctum::actingAs($user);
 
         $proposal = ActionProposal::create([
@@ -338,6 +338,11 @@ class RicherOperationalIntentsTest extends TestCase
         $this->assertEquals('lead_assigned', $response->json('data.execution_result.details.type'));
         $this->assertEquals('Rossini', $response->json('data.execution_result.details.lead'));
         $this->assertEquals('Marco', $response->json('data.execution_result.details.assignee'));
+
+        $this->assertDatabaseHas('leads', [
+            'id'                   => $lead->id,
+            'assigned_to_user_id'  => $user->id,
+        ]);
     }
 
     public function test_schedule_meeting_proposal_can_execute(): void
