@@ -126,9 +126,14 @@ identical value. There is no fuzzy or semantic credit. A "match" therefore means
 
 ---
 
-## Current Results
+## Results — original English run
 
-Latest recorded run (small local reference model, 50-case corpus):
+The first evaluation used the small reference model on the 50-case English corpus. It established the
+deterministic-boundary findings below and remains the baseline this work grew from; the diagnostics
+have since been extended to a held-out Italian corpus and multiple driving strategies (see
+*Multilingual diagnostics* below).
+
+Recorded run (small local reference model, 50-case English corpus):
 
 | Metric | Value | What it means |
 |---|---|---|
@@ -228,24 +233,51 @@ To state it plainly, with no ambiguity:
 
 ---
 
-## Future Evaluation Work
+## Multilingual diagnostics (since this report)
 
-Possible next steps for the evaluation itself — all diagnostic, none implying a
-change to runtime authority:
+The evaluation steps this report originally listed as "future work" have since been built — still
+**development-only diagnostics**, with no change to runtime authority. The internal architecture and
+slice-by-slice findings live in
+[`.docs/diagnostics-architecture.md`](../.docs/diagnostics-architecture.md); the summary:
 
-- **Additional corpus coverage** — more phrasings per intent, more adversarial
-  and out-of-domain inputs, and clearer expectations for cases that currently
-  assert only an intent.
-- **Provider comparisons** — evaluating additional local models, or larger
-  variants, against the same corpus and baseline.
-- **Prompt experiments** — measuring whether prompt changes reduce the
-  placeholder-on-optional-fields failure pattern, re-checked through the same
-  diagnostic so any change is a measured delta rather than an assertion.
-- **Diagnostics improvements** — richer per-case reporting (including the raw
-  rejected output) and failure-mode tagging, so future runs are easier to read
-  and trend.
+- **Held-out Italian corpus.** A 93-case Italian evaluation corpus (all implemented intents +
+  out-of-domain `unknown`), authored idiomatically and held out from the few-shot example library, now
+  measures multilingual interpretation. Entity expectations are conservative and exact-match, as in the
+  English set.
+- **Capability-class driving.** Models are driven by *how they must be driven*, not their size:
+  an `instruction_following` class uses the forced-JSON contract directly; a `reasoning` class is
+  driven with thinking disabled (a thinking-mode × forced-JSON interaction otherwise produced empty
+  output). This mapping and its transport knobs are diagnostics-only profiles.
+- **Few-shot exemplars from the example library.** Locale-appropriate exemplars can be prepended to the
+  prompt as an opt-in, append-only block (the no-exemplar prompt stays byte-identical to runtime).
+  Exemplar choice is deterministic and metadata-driven (same intent, slot overlap) — no embeddings or
+  retrieval. Few-shot is enabled by capability class: off for the small model (it regressed), on for
+  the reasoning model (it helped).
+- **Model comparison.** The same corpus runs across multiple local models side by side, with per-model
+  metrics and per-intent breakdowns.
+- **Prompt experiments.** Targeted, diagnostics-only prompt-guidance variants can be appended and
+  measured as a delta; they are kept experiment-only unless a benchmark shows a net improvement with no
+  guard regressions (none has been promoted to a default).
+- **Richer reporting.** Per-case output now separates produced / contract-valid / intent-match /
+  entity-agreement, with per-intent breakdowns, raw provider body capture, and strategy comparison
+  deltas.
 
-These are evaluation activities, not committed features. Nothing here describes a
-future runtime architecture or a planned change to how Fluxio executes
-operations; the deterministic-first, proposal-centric model described in the
-architecture and proposal-lifecycle documents continues to hold.
+Current strongest *diagnostic* result on the 93-case Italian corpus: a small reasoning model
+(qwen3:1.7b), driven reasoning-aware with selected few-shot, reaches ~91% intent-match. This is a
+corpus-relative, directional signal — not a committed quality bar, and not a step toward making any
+model runtime-authoritative.
+
+## Still future
+
+Genuinely not built, and not presented as such anywhere:
+
+- **Runtime LLM adoption or hybrid interpretation** — the runtime stays single-provider with
+  deterministic as the default and authoritative path.
+- **Retrieval / embeddings / interpretation memory** — out of scope for the current diagnostics.
+- **Promoting any prompt variant or larger-accuracy profile to a default** — gated on a clean,
+  regression-free benchmark.
+
+These are evaluation activities, not committed features. Nothing here describes a future runtime
+architecture or a planned change to how Fluxio executes operations; the deterministic-first,
+proposal-centric model described in the architecture and proposal-lifecycle documents continues to
+hold.

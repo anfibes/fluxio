@@ -708,10 +708,19 @@ selectable via `ACTIONS_INTERPRETATION_PROVIDER=ollama`:
   fail-closed, before any `NormalizedCommand` is built (Phase 3)
 
 Development-only diagnostics compare deterministic vs. Ollama interpretation
-over a versioned corpus (`actions:compare-interpretation`,
-`actions:evaluate-interpretation-corpus`, drift metrics — Phases 5A–5C). These
-are Artisan-only, blocked in production, and never run during the proposal
-runtime.
+over versioned corpora (`actions:compare-interpretation`,
+`actions:evaluate-interpretation-corpus`). These are Artisan-only, blocked in
+production, and never run during the proposal runtime.
+
+That diagnostics layer has since grown into a dedicated **evaluation harness** —
+still observation-only, with no runtime, proposal, or execution authority: a
+held-out 93-case Italian corpus, a multilingual example library used for opt-in
+few-shot, capability-class model profiles, deterministic exemplar selection,
+side-by-side model comparison, and append-only prompt-variant experiments
+(`actions:observe-italian-corpus`). It measures whether a small local model could
+interpret well; it does not make any model authoritative. See
+[`.docs/diagnostics-architecture.md`](.docs/diagnostics-architecture.md) and
+[`docs/llm-interpretation-evaluation.md`](docs/llm-interpretation-evaluation.md).
 
 The deterministic provider remains the default and authoritative path. The
 Ollama provider is a sandbox and is not production-authoritative. Any
@@ -760,6 +769,7 @@ notes and working documents live in `.docs/`.
 - [Development Plan](.docs/development-plan.md) — roadmap and implemented-phase log
 - [LLM Interpretation Contract](.docs/llm-interpretation-contract.md) — interpretation boundary contract
 - [Refinement IR Contract](.docs/refinement-ir-contract.md) — semantic refinement IR and lowering boundary
+- [Diagnostics & Evaluation Architecture](.docs/diagnostics-architecture.md) — diagnostics-only interpretation evaluation harness (corpora, capability profiles, few-shot, model comparison)
 
 ---
 

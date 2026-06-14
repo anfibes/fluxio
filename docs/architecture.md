@@ -805,6 +805,16 @@ Phases 2–3 (transport + structured-output validation), Phase 4
 tooling) are done. Runtime hybrid interpretation remains planned; the
 runtime stays single-provider with deterministic as the default.
 
+Beyond Phases 5A–5C, the development-only evaluation tooling has grown into a
+fuller **diagnostics harness** (held-out multilingual corpus, capability-class
+model profiles, opt-in few-shot exemplars, deterministic exemplar selection,
+model comparison, append-only prompt variants). It remains strictly
+observation-only — no runtime, proposal, or execution authority, and it cannot
+promote a provider. Its architecture and boundaries are documented in
+[`.docs/diagnostics-architecture.md`](../.docs/diagnostics-architecture.md); the
+public results report is
+[`docs/llm-interpretation-evaluation.md`](llm-interpretation-evaluation.md).
+
 ---
 
 ## Current Runtime Limitation
