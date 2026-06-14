@@ -306,4 +306,57 @@ class LeadsTest extends TestCase
 
         $this->deleteJson('/api/leads/999')->assertStatus(404);
     }
+
+    // --- assigned_to shape ---
+
+    public function test_unassigned_lead_has_null_assigned_to(): void
+    {
+        $this->actingAsUser();
+        $lead = Lead::factory()->create();
+
+        $response = $this->getJson("/api/leads/{$lead->id}");
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.assigned_to', null)
+            ->assertJsonPath('data.assigned_at', null);
+    }
+
+    public function test_assigned_lead_exposes_id_and_name_in_assigned_to(): void
+    {
+        $assignee = User::factory()->create(['name' => 'Marco Rossi']);
+        $this->actingAsUser();
+        $lead = Lead::factory()->create([
+            'assigned_to_user_id' => $assignee->id,
+            'assigned_at'         => now(),
+        ]);
+
+        $response = $this->getJson("/api/leads/{$lead->id}");
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.assigned_to.id', $assignee->id)
+            ->assertJsonPath('data.assigned_to.name', 'Marco Rossi');
+
+        $this->assertNotNull($response->json('data.assigned_at'));
+    }
+
+    public function test_lead_list_includes_assigned_to_for_each_item(): void
+    {
+        $assignee = User::factory()->create(['name' => 'Sara']);
+        $this->actingAsUser();
+        Lead::factory()->create(['assigned_to_user_id' => $assignee->id, 'assigned_at' => now()]);
+        Lead::factory()->create(); // unassigned
+
+        $response = $this->getJson('/api/leads');
+
+        $response->assertStatus(200);
+        $data = $response->json('data');
+        $this->assertCount(2, $data);
+
+        $assigned   = collect($data)->firstWhere('assigned_to', '!==', null);
+        $unassigned = collect($data)->firstWhere('assigned_to', null);
+
+        $this->assertNotNull($assigned);
+        $this->assertEquals($assignee->id, $assigned['assigned_to']['id']);
+        $this->assertNotNull($unassigned);
+    }
 }

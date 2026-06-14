@@ -5,14 +5,17 @@ namespace Tests\Feature\Actions;
 use Fluxio\Actions\Diagnostics\CommandInterpretation\CommandInterpretationCorpusLoader;
 use Fluxio\Actions\Diagnostics\CommandInterpretation\CommandInterpretationEvaluationService;
 use Fluxio\Actions\Diagnostics\CommandInterpretation\DTO\CommandInterpretationCorpusCase;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
  * Phase 9D.2 — the evaluator replays the real deterministic interpretation
- * pipeline and reports proposal-level fidelity. Diagnostics-only; DB-free.
+ * pipeline and reports proposal-level fidelity. Diagnostics-only.
+ * Uses RefreshDatabase because UserEntityResolver queries the users table.
  */
 class CommandInterpretationEvaluationServiceTest extends TestCase
 {
+    use RefreshDatabase;
     private function service(): CommandInterpretationEvaluationService
     {
         return $this->app->make(CommandInterpretationEvaluationService::class);

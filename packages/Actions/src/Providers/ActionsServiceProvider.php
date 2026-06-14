@@ -18,6 +18,7 @@ use Fluxio\Actions\DTO\EntityRequirement;
 use Fluxio\Actions\DTO\IntentDefinition;
 use Fluxio\Actions\EntityResolution\Registry\EntityResolverRegistry;
 use Fluxio\Actions\EntityResolution\Resolvers\LeadEntityResolver;
+use Fluxio\Actions\EntityResolution\Resolvers\UserEntityResolver;
 use Fluxio\Actions\Enums\IntentComplexity;
 use Fluxio\Actions\Executors\AssignLeadActionExecutor;
 use Fluxio\Actions\Executors\CreateTaskActionExecutor;
@@ -76,6 +77,7 @@ class ActionsServiceProvider extends ServiceProvider
         $this->app->singleton(EntityResolverRegistry::class, function ($app) {
             $registry = new EntityResolverRegistry;
             $registry->register($app->make(LeadEntityResolver::class));
+            $registry->register($app->make(UserEntityResolver::class));
 
             return $registry;
         });
@@ -137,7 +139,7 @@ class ActionsServiceProvider extends ServiceProvider
                 operation: 'assign',
                 requirements: [
                     new EntityRequirement(key: 'lead', entityType: 'lead_query', label: 'Lead', required: true, resolverRequired: true),
-                    new EntityRequirement(key: 'assignee', entityType: 'user_query', label: 'Assignee', required: true),
+                    new EntityRequirement(key: 'assignee', entityType: 'user_query', label: 'Assignee', required: true, resolverRequired: true),
                 ],
                 executorClass: AssignLeadActionExecutor::class,
                 confidence: 0.8,

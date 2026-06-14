@@ -114,6 +114,7 @@ class RicherOperationalIntentsTest extends TestCase
 
     public function test_assign_lead_with_both_entities_is_ready(): void
     {
+        User::factory()->create(['name' => 'Marco']);
         $this->actingAsUser();
 
         $response = $this->postJson('/api/actions/interpret', [
@@ -125,6 +126,7 @@ class RicherOperationalIntentsTest extends TestCase
 
     public function test_assign_lead_editable_fields_contain_lead_and_assignee(): void
     {
+        User::factory()->create(['name' => 'Marco']);
         $this->actingAsUser();
 
         $response = $this->postJson('/api/actions/interpret', [
@@ -177,6 +179,68 @@ class RicherOperationalIntentsTest extends TestCase
             $unknownResponse->json('data.confidence'),
             $assignResponse->json('data.confidence')
         );
+    }
+
+    // ── assign_lead — proposal-time assignee resolution ──────────────────────
+
+    public function test_assign_lead_with_unknown_assignee_becomes_draft(): void
+    {
+        // No User named 'Marco' exists — resolution fails → assignee absent → draft
+        $this->actingAsUser();
+
+        $response = $this->postJson('/api/actions/interpret', [
+            'text' => 'Assign Rossini to Marco',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.intent', 'assign_lead')
+            ->assertJsonPath('data.status', 'draft');
+
+        $missingKeys = collect($response->json('data.missing'))->pluck('key')->all();
+        $this->assertContains('assignee', $missingKeys);
+    }
+
+    public function test_assign_lead_with_ambiguous_assignee_becomes_draft_with_blocking_ambiguity(): void
+    {
+        // Two users whose names match 'Marco' → ambiguous → blocking ambiguity
+        User::factory()->create(['name' => 'Marco Rossi']);
+        User::factory()->create(['name' => 'Marco Bianchi']);
+        $this->actingAsUser();
+
+        $response = $this->postJson('/api/actions/interpret', [
+            'text' => 'Assign Rossini to Marco',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.intent', 'assign_lead')
+            ->assertJsonPath('data.status', 'draft');
+
+        $missingKeys = collect($response->json('data.missing'))->pluck('key')->all();
+        $this->assertNotContains('assignee', $missingKeys);
+
+        $ambiguities = $response->json('data.ambiguities');
+        $this->assertNotEmpty($ambiguities);
+        $assigneeAmbiguity = collect($ambiguities)->firstWhere('key', 'assignee');
+        $this->assertNotNull($assigneeAmbiguity);
+        $this->assertTrue($assigneeAmbiguity['blocking']);
+        $this->assertNull($assigneeAmbiguity['selected_candidate_id']);
+        $this->assertCount(2, $assigneeAmbiguity['candidates']);
+    }
+
+    public function test_assign_lead_with_unique_assignee_is_ready(): void
+    {
+        // Exact match → auto-resolved → both fields present → ready
+        User::factory()->create(['name' => 'Marco']);
+        $this->actingAsUser();
+
+        $response = $this->postJson('/api/actions/interpret', [
+            'text' => 'Assign Rossini to Marco',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.intent', 'assign_lead')
+            ->assertJsonPath('data.status', 'ready')
+            ->assertJsonPath('data.ambiguities', []);
     }
 
     // ── schedule_meeting ─────────────────────────────────────────────────────

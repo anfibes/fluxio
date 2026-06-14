@@ -17,7 +17,9 @@ class LeadResource extends JsonResource
             'phone' => $this->phone,
             'status' => $this->status,
             'notes' => $this->notes,
-            'assigned_to_user_id' => $this->assigned_to_user_id,
+            'assigned_to' => $this->assigned_to_user_id !== null
+                ? ['id' => $this->assigned_to_user_id, 'name' => $this->assignedToUser?->name]
+                : null,
             'assigned_at' => $this->assigned_at?->toISOString(),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

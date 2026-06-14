@@ -87,13 +87,13 @@
     {
         "id": "assign-lead-person-span-and-assignee",
         "text": "Assign Mario Rossi to Marco",
-        "description": "Assign preserves the lead span (auto-resolved) and extracts the assignee.",
+        "description": "Assign preserves the lead span (auto-resolved); assignee 'Marco' is extracted but cannot resolve without a matching User in the DB, so the proposal is draft with assignee missing.",
         "expected": {
             "intent": "assign_lead",
-            "status": "ready",
+            "status": "draft",
             "lead": "Mario Rossi",
             "no_lead_ambiguity": true,
-            "entities": { "assignee": "Marco" }
+            "missing": ["assignee"]
         }
     },
     {

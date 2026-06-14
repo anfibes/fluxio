@@ -10,7 +10,7 @@ class LeadService
 {
     public function paginate(Request $request): LengthAwarePaginator
     {
-        $query = Lead::query();
+        $query = Lead::query()->with('assignedToUser');
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {

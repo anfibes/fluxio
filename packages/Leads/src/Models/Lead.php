@@ -5,6 +5,7 @@ namespace Fluxio\Leads\Models;
 use Fluxio\Leads\Database\Factories\LeadFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Lead extends Model
 {
@@ -30,6 +31,11 @@ class Lead extends Model
     protected $casts = [
         'assigned_at' => 'datetime',
     ];
+
+    public function assignedToUser(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'assigned_to_user_id');
+    }
 
     protected static function newFactory(): LeadFactory
     {

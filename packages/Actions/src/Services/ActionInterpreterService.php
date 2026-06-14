@@ -38,7 +38,17 @@ class ActionInterpreterService
         $prebuiltAmbiguities = [];
 
         if (isset($entities['lead_query'])) {
-            [$entities, $prebuiltAmbiguities] = $this->resolveEntityQuery('lead_query', $entities);
+            [$entities, $leadAmbiguities] = $this->resolveEntityQuery('lead_query', $entities);
+            $prebuiltAmbiguities = array_merge($prebuiltAmbiguities, $leadAmbiguities);
+        }
+
+        // Resolve the assignee for assign_lead at interpretation time so an unknown or
+        // ambiguous assignee keeps the proposal draft rather than surfacing only at
+        // execution. The provider emits assignee as a parsed scalar (not a _query span)
+        // so resolution is triggered here rather than from a query key.
+        if ($command->intent === 'assign_lead' && isset($entities['assignee'])) {
+            [$entities, $assigneeAmbiguities] = $this->resolveAssignee($entities['assignee'], $entities);
+            $prebuiltAmbiguities = array_merge($prebuiltAmbiguities, $assigneeAmbiguities);
         }
 
         // Parser-local temporal provenance, derived once from the source text and
@@ -105,6 +115,44 @@ class ActionInterpreterService
             ];
         }
         // else: no match → entities['lead'] remains absent → builder treats as missing
+
+        return [$entities, $ambiguities];
+    }
+
+    /**
+     * Resolve the assignee scalar value for assign_lead via UserEntityResolver.
+     *
+     * The provider emits assignee as a parsed scalar, not a _query span, so this
+     * method is intent-specific rather than key-driven. It mirrors resolveEntityQuery
+     * in outcome: auto-resolved → entity kept as label; ambiguous → blocking ambiguity,
+     * entity removed; no match → entity removed (builder treats as missing).
+     *
+     * @return array{array, array}
+     */
+    private function resolveAssignee(string $assigneeValue, array $entities): array
+    {
+        unset($entities['assignee']);
+
+        $result = $this->resolverRegistry->resolve($assigneeValue, new ResolutionContext('user_query'));
+        $ambiguities = [];
+
+        if ($result->resolved) {
+            $entities['assignee'] = $result->resolvedCandidate->label;
+        } elseif (! empty($result->candidates)) {
+            $ambiguities[] = [
+                'key'                  => 'assignee',
+                'label'                => 'Assignee',
+                'reason'               => 'multiple_matches',
+                'blocking'             => true,
+                'query'                => $assigneeValue,
+                'selected_candidate_id' => null,
+                'candidates'           => array_map(
+                    fn (ResolutionCandidate $c) => $c->toArray(),
+                    $result->candidates,
+                ),
+            ];
+        }
+        // else: no match → assignee absent → builder treats it as a missing required field
 
         return [$entities, $ambiguities];
     }
