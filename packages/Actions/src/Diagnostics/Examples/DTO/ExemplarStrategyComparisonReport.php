@@ -6,16 +6,19 @@ use Fluxio\Actions\Diagnostics\Evaluation\DTO\InterpretationCorpusCase;
 use Fluxio\Actions\Diagnostics\Observation\DTO\LlmObservationResult;
 
 /**
- * Diagnostics-only A3.1 comparison of three few-shot strategies over the same held-out corpus:
- * no few-shot (baseline), BLIND few-shot (one template per intent, registry order), and SELECTED
- * few-shot (per-case relevance-ranked exemplars).
+ * Diagnostics-only comparison of three few-shot strategies over the same held-out corpus:
+ * no few-shot (baseline/`none`), BLIND few-shot (one template per intent, registry order), and
+ * SELECTED few-shot (per-case relevance-ranked exemplars). Introduced in A3.1; widened in A5 to
+ * answer the benchmark questions directly.
  *
- * It reports, per strategy, the required quality metrics (intent match, contract validity, entity
- * agreement) plus a per-intent intent-match breakdown, and then the headline A3.1 question: does
- * SELECTED few-shot improve, regress, or match BLIND few-shot? That verdict is derived from the
- * intent-match delta and is backed by per-case improved/regressed outcomes so the change is never
- * hidden inside an aggregate. Nothing here is authoritative: no proposal is built, nothing executed,
- * nothing persisted.
+ * Per strategy it reports the full quality metric set (produced, contract-valid, intent-match,
+ * entity-agreement, provider/validation failures) plus a per-intent breakdown of BOTH intent-match
+ * and entity-agreement. It then reports the three pairwise comparisons the A5 slice asks for —
+ * selected-vs-none, selected-vs-blind, blind-vs-none — each as an aggregate delta + per-intent
+ * deltas + improved/regressed case ids, so "does selection help, and where?" is answerable without
+ * re-deriving anything by hand. `selected_vs_blind` is also surfaced at the top level (with per-case
+ * rows) as the headline question. Nothing here is authoritative: no proposal is built, nothing
+ * executed, nothing persisted.
  */
 final class ExemplarStrategyComparisonReport
 {
@@ -26,6 +29,7 @@ final class ExemplarStrategyComparisonReport
      * @param  array<string, mixed>  $blind
      * @param  array<string, mixed>  $selected
      * @param  array<string, mixed>  $selectedVsBlind
+     * @param  array<string, mixed>  $comparisons
      */
     public function __construct(
         public readonly string $locale,
@@ -36,6 +40,7 @@ final class ExemplarStrategyComparisonReport
         public readonly array $blind,
         public readonly array $selected,
         public readonly array $selectedVsBlind,
+        public readonly array $comparisons,
     ) {}
 
     /**
@@ -63,12 +68,17 @@ final class ExemplarStrategyComparisonReport
             baseline: self::strategySummary($cases, $baseline),
             blind: self::strategySummary($cases, $blind),
             selected: self::strategySummary($cases, $selected),
-            selectedVsBlind: self::diff($cases, $blind, $selected),
+            selectedVsBlind: self::pairwise($cases, $blind, $selected) + ['cases' => self::rows($cases, $blind, $selected)],
+            comparisons: [
+                'selected_vs_none' => self::pairwise($cases, $baseline, $selected),
+                'selected_vs_blind' => self::pairwise($cases, $blind, $selected),
+                'blind_vs_none' => self::pairwise($cases, $baseline, $blind),
+            ],
         );
     }
 
     /**
-     * Per-strategy aggregate metrics + per-intent intent-match breakdown.
+     * Per-strategy full aggregate metrics + per-intent breakdown (intent-match AND entity-agreement).
      *
      * @param  list<InterpretationCorpusCase>  $cases
      * @param  list<LlmObservationResult>  $results
@@ -77,21 +87,18 @@ final class ExemplarStrategyComparisonReport
     private static function strategySummary(array $cases, array $results): array
     {
         $metrics = IntentExampleObservationMetrics::fromResults($results)->toArray();
+        $metrics['per_intent'] = self::perIntent($cases, $results);
 
-        return [
-            'intent_match' => $metrics['intent_match'],
-            'contract_valid' => $metrics['contract_valid'],
-            'entity_agreement' => $metrics['entity_agreement'],
-            'per_intent' => self::perIntent($cases, $results),
-        ];
+        return $metrics;
     }
 
     /**
-     * Intent-match count/total grouped by the case's expected intent, in first-seen order.
+     * Per-intent intent-match and entity-agreement, grouped by the case's expected intent in
+     * first-seen order. Entity agreement is only counted for intents whose cases assert entities.
      *
      * @param  list<InterpretationCorpusCase>  $cases
      * @param  list<LlmObservationResult>  $results
-     * @return array<string, array{total: int, intent_match: int}>
+     * @return array<string, array{total: int, intent_match: int, entity_comparable: int, entity_agreement: int}>
      */
     private static function perIntent(array $cases, array $results): array
     {
@@ -99,11 +106,21 @@ final class ExemplarStrategyComparisonReport
 
         foreach ($cases as $i => $case) {
             $intent = $case->expectedIntent;
-            $breakdown[$intent] ??= ['total' => 0, 'intent_match' => 0];
+            $breakdown[$intent] ??= ['total' => 0, 'intent_match' => 0, 'entity_comparable' => 0, 'entity_agreement' => 0];
             $breakdown[$intent]['total']++;
 
-            if (($results[$i] ?? null)?->intentMatch === true) {
+            $result = $results[$i] ?? null;
+
+            if ($result?->intentMatch === true) {
                 $breakdown[$intent]['intent_match']++;
+            }
+
+            if ($case->expectedEntities !== []) {
+                $breakdown[$intent]['entity_comparable']++;
+
+                if ($result?->entityMatch === true) {
+                    $breakdown[$intent]['entity_agreement']++;
+                }
             }
         }
 
@@ -111,36 +128,44 @@ final class ExemplarStrategyComparisonReport
     }
 
     /**
-     * Per-case SELECTED-vs-BLIND outcome + the improve/regress/match verdict.
+     * One pairwise strategy comparison (intent-match): aggregate delta + verdict, per-case
+     * improved/regressed counts and ids, and a per-intent intent-match delta. "Improved" = a case
+     * the FROM strategy missed and the TO strategy matched; "regressed" = the reverse.
      *
      * @param  list<InterpretationCorpusCase>  $cases
-     * @param  list<LlmObservationResult>  $blind
-     * @param  list<LlmObservationResult>  $selected
+     * @param  list<LlmObservationResult>  $from
+     * @param  list<LlmObservationResult>  $to
      * @return array<string, mixed>
      */
-    private static function diff(array $cases, array $blind, array $selected): array
+    private static function pairwise(array $cases, array $from, array $to): array
     {
-        $rows = [];
         $improvedIds = [];
         $regressedIds = [];
-        $blindMatch = 0;
-        $selectedMatch = 0;
+        $fromMatch = 0;
+        $toMatch = 0;
         $improved = 0;
         $regressed = 0;
         $matchedPass = 0;
         $matchedFail = 0;
 
-        foreach ($cases as $i => $case) {
-            $bPass = ($blind[$i] ?? null)?->intentMatch === true;
-            $sPass = ($selected[$i] ?? null)?->intentMatch === true;
+        /** @var array<string, array{from: int, to: int}> $perIntent */
+        $perIntent = [];
 
-            $blindMatch += $bPass ? 1 : 0;
-            $selectedMatch += $sPass ? 1 : 0;
+        foreach ($cases as $i => $case) {
+            $fPass = ($from[$i] ?? null)?->intentMatch === true;
+            $tPass = ($to[$i] ?? null)?->intentMatch === true;
+
+            $fromMatch += $fPass ? 1 : 0;
+            $toMatch += $tPass ? 1 : 0;
+
+            $perIntent[$case->expectedIntent] ??= ['from' => 0, 'to' => 0];
+            $perIntent[$case->expectedIntent]['from'] += $fPass ? 1 : 0;
+            $perIntent[$case->expectedIntent]['to'] += $tPass ? 1 : 0;
 
             $outcome = match (true) {
-                $bPass && $sPass => 'matched_pass',
-                ! $bPass && ! $sPass => 'matched_fail',
-                ! $bPass && $sPass => 'improved',
+                $fPass && $tPass => 'matched_pass',
+                ! $fPass && ! $tPass => 'matched_fail',
+                ! $fPass && $tPass => 'improved',
                 default => 'regressed',
             };
 
@@ -156,6 +181,49 @@ final class ExemplarStrategyComparisonReport
                     $regressedIds[] = $case->id;
                     break;
             }
+        }
+
+        $delta = $toMatch - $fromMatch;
+
+        $perIntentOut = [];
+        foreach ($perIntent as $intent => $counts) {
+            $perIntentOut[$intent] = [
+                'from' => $counts['from'],
+                'to' => $counts['to'],
+                'delta' => $counts['to'] - $counts['from'],
+            ];
+        }
+
+        return [
+            'verdict' => $delta > 0 ? 'improved' : ($delta < 0 ? 'regressed' : 'matched'),
+            'from_intent_match' => $fromMatch,
+            'to_intent_match' => $toMatch,
+            'intent_match_delta' => $delta,
+            'improved' => $improved,
+            'regressed' => $regressed,
+            'matched_pass' => $matchedPass,
+            'matched_fail' => $matchedFail,
+            'improved_ids' => $improvedIds,
+            'regressed_ids' => $regressedIds,
+            'per_intent' => $perIntentOut,
+        ];
+    }
+
+    /**
+     * Per-case rows for the headline selected-vs-blind view.
+     *
+     * @param  list<InterpretationCorpusCase>  $cases
+     * @param  list<LlmObservationResult>  $blind
+     * @param  list<LlmObservationResult>  $selected
+     * @return list<array<string, mixed>>
+     */
+    private static function rows(array $cases, array $blind, array $selected): array
+    {
+        $rows = [];
+
+        foreach ($cases as $i => $case) {
+            $bPass = ($blind[$i] ?? null)?->intentMatch === true;
+            $sPass = ($selected[$i] ?? null)?->intentMatch === true;
 
             $rows[] = [
                 'id' => $case->id,
@@ -164,23 +232,16 @@ final class ExemplarStrategyComparisonReport
                 'selected_intent' => self::intentOf($selected[$i] ?? null),
                 'blind_pass' => $bPass,
                 'selected_pass' => $sPass,
-                'outcome' => $outcome,
+                'outcome' => match (true) {
+                    $bPass && $sPass => 'matched_pass',
+                    ! $bPass && ! $sPass => 'matched_fail',
+                    ! $bPass && $sPass => 'improved',
+                    default => 'regressed',
+                },
             ];
         }
 
-        $delta = $selectedMatch - $blindMatch;
-
-        return [
-            'verdict' => $delta > 0 ? 'improved' : ($delta < 0 ? 'regressed' : 'matched'),
-            'intent_match_delta' => $delta,
-            'improved' => $improved,
-            'regressed' => $regressed,
-            'matched_pass' => $matchedPass,
-            'matched_fail' => $matchedFail,
-            'improved_ids' => $improvedIds,
-            'regressed_ids' => $regressedIds,
-            'cases' => $rows,
-        ];
+        return $rows;
     }
 
     private static function intentOf(?LlmObservationResult $result): ?string
@@ -205,6 +266,9 @@ final class ExemplarStrategyComparisonReport
                 'blind' => $this->blind,
                 'selected' => $this->selected,
             ],
+            // A5: all three pairwise comparisons (aggregate + per-intent + improved/regressed ids).
+            'comparisons' => $this->comparisons,
+            // Headline question, kept at top level (with per-case rows) for back-compat.
             'selected_vs_blind' => $this->selectedVsBlind,
         ];
     }

@@ -637,4 +637,124 @@ class ObserveItalianCorpusCommandTest extends TestCase
             }
         }
     }
+
+    // ── Slice A5: benchmark rerun reporting ───────────────────────────────────
+
+    public function test_compare_strategies_reports_full_metrics_per_strategy(): void
+    {
+        $this->fakeFirstExemplarEcho();
+
+        $decoded = $this->runJson(['--compare-strategies' => true]);
+
+        // Full quality metric set is present for every strategy (not just intent-match).
+        foreach (['none', 'blind', 'selected'] as $strategy) {
+            $metrics = $decoded['strategies'][$strategy];
+            foreach (['produced', 'contract_valid', 'intent_match', 'entity_agreement'] as $key) {
+                $this->assertArrayHasKey('count', $metrics[$key], "Missing {$key}.count for {$strategy}.");
+                $this->assertArrayHasKey('rate', $metrics[$key], "Missing {$key}.rate for {$strategy}.");
+            }
+            $this->assertArrayHasKey('provider_failures', $metrics);
+            $this->assertArrayHasKey('validation_failures', $metrics);
+        }
+    }
+
+    public function test_compare_strategies_reports_per_intent_intent_match_and_entity_agreement(): void
+    {
+        $this->fakeFirstExemplarEcho();
+
+        $decoded = $this->runJson(['--compare-strategies' => true]);
+
+        $assign = $decoded['strategies']['selected']['per_intent']['assign_lead'];
+        $this->assertSame(9, $assign['total']);
+        $this->assertSame(9, $assign['intent_match']);
+        // Each assign_lead case asserts entities (lead/assignee) → comparable; the echo fake emits
+        // no entities → zero agreement. Both per-intent entity fields must be present.
+        $this->assertSame(9, $assign['entity_comparable']);
+        $this->assertSame(0, $assign['entity_agreement']);
+
+        // Out-of-domain cases assert no entities → not comparable.
+        $this->assertSame(0, $decoded['strategies']['selected']['per_intent']['unknown']['entity_comparable']);
+    }
+
+    public function test_compare_strategies_reports_three_pairwise_comparisons(): void
+    {
+        $this->fakeFirstExemplarEcho();
+
+        $decoded = $this->runJson(['--compare-strategies' => true]);
+
+        $this->assertArrayHasKey('comparisons', $decoded);
+        foreach (['selected_vs_none', 'selected_vs_blind', 'blind_vs_none'] as $pair) {
+            $this->assertArrayHasKey($pair, $decoded['comparisons'], "Missing comparison {$pair}.");
+            $this->assertArrayHasKey('intent_match_delta', $decoded['comparisons'][$pair]);
+            $this->assertArrayHasKey('per_intent', $decoded['comparisons'][$pair]);
+        }
+
+        // none=6, blind=9, selected=45 with the first-exemplar-echo fake.
+        $this->assertSame(39, $decoded['comparisons']['selected_vs_none']['intent_match_delta']);
+        $this->assertSame(36, $decoded['comparisons']['selected_vs_blind']['intent_match_delta']);
+        $this->assertSame(3, $decoded['comparisons']['blind_vs_none']['intent_match_delta']);
+
+        // Per-intent delta: selected lifts assign_lead from 0 (none) to 9.
+        $perIntent = $decoded['comparisons']['selected_vs_none']['per_intent']['assign_lead'];
+        $this->assertSame(0, $perIntent['from']);
+        $this->assertSame(9, $perIntent['to']);
+        $this->assertSame(9, $perIntent['delta']);
+
+        // improved/regressed ids are surfaced for selected vs blind.
+        $this->assertContains('it-assign-lead-affida-ferrari', $decoded['comparisons']['selected_vs_blind']['improved_ids']);
+        $this->assertSame([], $decoded['comparisons']['selected_vs_blind']['regressed_ids']);
+    }
+
+    public function test_compare_strategies_single_run_includes_corpus_model_and_profile(): void
+    {
+        $this->fakeFirstExemplarEcho();
+
+        $decoded = $this->runJson(['--compare-strategies' => true, '--limit' => '5']);
+
+        $this->assertStringContainsString('it-interpretation-corpus.json', $decoded['corpus']);
+        $this->assertSame((string) config('actions.llm.model'), $decoded['model']);
+        $this->assertArrayHasKey('id', $decoded['profile']);
+    }
+
+    public function test_multi_model_compare_strategies_preserves_profile_per_model(): void
+    {
+        $this->fakeFirstExemplarEcho();
+
+        $decoded = $this->runJson(['--models' => 'qwen3:0.6b,qwen3:1.7b', '--compare-strategies' => true, '--limit' => '6']);
+
+        $this->assertTrue($decoded['compare_strategies']);
+        $this->assertCount(2, $decoded['models']);
+
+        // qwen3:0.6b → instruction-following; qwen3:1.7b → reasoning (auto-selected per model).
+        $this->assertSame('qwen3:0.6b', $decoded['models'][0]['model']);
+        $this->assertSame('instruction-following', $decoded['models'][0]['profile']['id']);
+        $this->assertSame('qwen3:1.7b', $decoded['models'][1]['model']);
+        $this->assertSame('reasoning', $decoded['models'][1]['profile']['id']);
+
+        // Each model carries the full three-strategy comparison.
+        foreach ($decoded['models'] as $model) {
+            foreach (['none', 'blind', 'selected'] as $strategy) {
+                $this->assertArrayHasKey($strategy, $model['strategies']);
+            }
+            $this->assertArrayHasKey('comparisons', $model);
+        }
+    }
+
+    public function test_compare_strategies_honors_cli_overrides_over_the_profile(): void
+    {
+        $client = $this->fakeRecordingRequests();
+
+        // qwen3:1.7b reasoning profile defaults think=false; --think forces it on across all passes.
+        $decoded = $this->runJson(['--compare-strategies' => true, '--model' => 'qwen3:1.7b', '--think' => true, '--limit' => '2']);
+
+        $this->assertSame('reasoning', $decoded['profile']['id']);
+        $this->assertTrue($decoded['effective']['think']);
+        $this->assertSame('cli:--think', $decoded['effective']['think_source']);
+
+        // First request is the availability probe (default options); every evaluation request after
+        // it (baseline + blind + selected passes) must carry the forced think=true.
+        $evaluationRequests = array_slice($client->requests, 1);
+        $this->assertNotEmpty($evaluationRequests);
+        $this->assertTrue(collect($evaluationRequests)->every(fn ($r) => $r->think === true));
+    }
 }

@@ -160,6 +160,7 @@ class ObserveItalianCorpusCommand extends Command
                 'corpus' => $corpusPath,
                 'few_shot' => $fewShot,
                 'compare' => $compare,
+                'compare_strategies' => $compareStrategies,
                 'models' => $perModel,
             ], $flags));
 
