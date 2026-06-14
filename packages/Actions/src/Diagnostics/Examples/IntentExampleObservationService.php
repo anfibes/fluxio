@@ -30,7 +30,7 @@ use Fluxio\Actions\Llm\Validation\LlmStructuredOutputValidator;
  */
 class IntentExampleObservationService
 {
-    private const DEFAULT_FEW_SHOT_LIMIT = 5;
+    public const DEFAULT_FEW_SHOT_LIMIT = 5;
 
     /**
      * Safe, label-only sample fillers used to render a template exemplar. Values are chosen to
@@ -132,11 +132,53 @@ class IntentExampleObservationService
     }
 
     /**
+     * Render an ordered list of IntentExamples into contract-shaped exemplars, preserving order,
+     * dropping any that cannot be rendered contract-safe (missing filler / validator rejection) or
+     * whose rendered input collides with an evaluated input in $excludeTexts (leakage guard).
+     *
+     * Used by the SELECTED few-shot strategy (Slice A3.1): the deterministic selector returns
+     * ranked IntentExamples per case, and this turns them into the same PromptExemplar shape the
+     * blind path produces — so both strategies feed the prompt identically and differ only in
+     * which/ordered exemplars are shown.
+     *
+     * @param  list<IntentExample>  $examples
+     * @param  list<string>  $excludeTexts
+     * @return list<PromptExemplar>
+     */
+    public function renderExemplars(array $examples, array $excludeTexts = []): array
+    {
+        $exemplars = [];
+
+        foreach ($examples as $example) {
+            $exemplar = $this->renderExemplar($example);
+
+            if ($exemplar === null) {
+                continue;
+            }
+
+            if (in_array($exemplar->inputText, $excludeTexts, true)) {
+                continue; // leakage guard: never show a string we will score verbatim.
+            }
+
+            $exemplars[] = $exemplar;
+        }
+
+        return $exemplars;
+    }
+
+    /**
      * Render one TEMPLATE example into a contract-shaped PromptExemplar, or null if it cannot be
      * rendered contract-safe (missing filler, or output rejected by the structured validator).
      */
     private function renderExemplar(IntentExample $template): ?PromptExemplar
     {
+        // Only TEMPLATE examples render into exemplars: a literal carries no slots/fillers, so it
+        // has no contract-shaped entities to demonstrate. The selector may rank a literal highly,
+        // but it is dropped here rather than shown with an empty input.
+        if (! $template->hasTemplate()) {
+            return null;
+        }
+
         $input = (string) $template->template;
         $entities = [];
 

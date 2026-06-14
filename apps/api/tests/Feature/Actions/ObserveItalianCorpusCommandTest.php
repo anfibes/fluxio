@@ -537,4 +537,104 @@ class ObserveItalianCorpusCommandTest extends TestCase
         $this->assertFalse($decoded['models'][1]['profile']['think']);
         $this->assertFalse($decoded['models'][1]['effective']['think']);
     }
+
+    // ── Slice A3.1: dynamic exemplar selection ────────────────────────────────
+
+    /**
+     * Echoes the intent of the FIRST few-shot exemplar shown in the prompt (or `unknown` when no
+     * "Worked examples" block is present). This makes the chosen exemplar *order* observable: blind
+     * always leads with create_task (registry order); selected leads with the case's own intent.
+     */
+    private function fakeFirstExemplarEcho(): void
+    {
+        $client = new class implements LlmClientInterface
+        {
+            public function generateStructured(LlmRequest $request): LlmResponse
+            {
+                $prompt = (string) $request->systemPrompt;
+                $pos = strpos($prompt, 'Worked examples');
+
+                $intent = 'unknown';
+                if ($pos !== false && preg_match('/"intent":"([a-z_]+)"/', substr($prompt, $pos), $m) === 1) {
+                    $intent = $m[1];
+                }
+
+                $payload = ['intent' => $intent, 'confidence' => 0.9, 'entities' => [], 'notes' => []];
+
+                return new LlmResponse(rawText: (string) json_encode($payload), parsedJson: $payload);
+            }
+        };
+
+        $this->app->instance(LlmClientInterface::class, $client);
+    }
+
+    public function test_invalid_strategy_value_fails_clearly(): void
+    {
+        $this->fakeConstant();
+
+        $this->artisan('actions:observe-italian-corpus', ['--strategy' => 'bogus'])
+            ->assertFailed()
+            ->expectsOutputToContain('--strategy must be one of: blind, selected');
+    }
+
+    public function test_selected_strategy_leads_with_the_relevant_exemplar(): void
+    {
+        $this->fakeFirstExemplarEcho();
+
+        $case = 'it-assign-lead-affida-ferrari';
+
+        // Blind leads with create_task (registry order) → does not match the assign_lead case.
+        $blind = $this->runJson(['--case' => $case, '--few-shot' => true]);
+        $this->assertSame(0, $blind['metrics']['intent_match']['count']);
+
+        // Selected leads with the case's own intent (assign_lead) → matches.
+        $selected = $this->runJson(['--case' => $case, '--few-shot' => true, '--strategy' => 'selected']);
+        $this->assertTrue($selected['few_shot']['enabled']);
+        $this->assertSame(1, $selected['metrics']['intent_match']['count']);
+        $this->assertStringContainsString('assign-lead', $selected['few_shot']['example_ids'][0]);
+    }
+
+    public function test_compare_strategies_reports_baseline_blind_selected_and_a_verdict(): void
+    {
+        $this->fakeFirstExemplarEcho();
+
+        $decoded = $this->runJson(['--compare-strategies' => true]);
+
+        $this->assertSame('it', $decoded['locale']);
+        $this->assertArrayHasKey('none', $decoded['strategies']);
+        $this->assertArrayHasKey('blind', $decoded['strategies']);
+        $this->assertArrayHasKey('selected', $decoded['strategies']);
+
+        // none: no exemplars → unknown everywhere → only the 6 out-of-domain cases pass.
+        $this->assertSame(6, $decoded['strategies']['none']['intent_match']['count']);
+        // blind: first exemplar always create_task → only the 9 create_task cases pass.
+        $this->assertSame(9, $decoded['strategies']['blind']['intent_match']['count']);
+        // selected: relevant intent leads for all 5 MVP intents (9 each = 45); unknown cases miss.
+        $this->assertSame(45, $decoded['strategies']['selected']['intent_match']['count']);
+
+        // Required metrics are present per strategy.
+        $this->assertArrayHasKey('contract_valid', $decoded['strategies']['selected']);
+        $this->assertArrayHasKey('entity_agreement', $decoded['strategies']['selected']);
+        $this->assertSame(9, $decoded['strategies']['selected']['per_intent']['assign_lead']['intent_match']);
+
+        // Headline A3.1 verdict: selected improved over blind.
+        $this->assertSame('improved', $decoded['selected_vs_blind']['verdict']);
+        $this->assertSame(36, $decoded['selected_vs_blind']['intent_match_delta']);
+        $this->assertSame(36, $decoded['selected_vs_blind']['improved']);
+        $this->assertSame(0, $decoded['selected_vs_blind']['regressed']);
+        $this->assertContains('it-assign-lead-affida-ferrari', $decoded['selected_vs_blind']['improved_ids']);
+    }
+
+    public function test_selected_exemplars_never_duplicate_a_corpus_input(): void
+    {
+        $service = $this->app->make(ItalianCorpusObservationService::class);
+        $cases = $service->load();
+        $corpusTexts = array_map(static fn ($c): string => $c->text, $cases);
+
+        foreach ($cases as $case) {
+            foreach ($service->selectedExemplarsFor('it', $case, null, $corpusTexts) as $exemplar) {
+                $this->assertNotContains($exemplar->inputText, $corpusTexts, 'A selected exemplar duplicated a held-out corpus input.');
+            }
+        }
+    }
 }

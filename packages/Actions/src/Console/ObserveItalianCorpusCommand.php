@@ -4,6 +4,7 @@ namespace Fluxio\Actions\Console;
 
 use Fluxio\Actions\Diagnostics\Evaluation\DTO\InterpretationCorpusCase;
 use Fluxio\Actions\Diagnostics\Evaluation\Exceptions\InvalidInterpretationCorpusException;
+use Fluxio\Actions\Diagnostics\Examples\ExemplarStrategy;
 use Fluxio\Actions\Diagnostics\Examples\ItalianCorpusObservationService;
 use Fluxio\Actions\Diagnostics\Observation\DTO\ObservationOptions;
 use Fluxio\Actions\Diagnostics\Profiles\ObservationProfile;
@@ -43,7 +44,9 @@ class ObserveItalianCorpusCommand extends Command
                             {--path= : Path to a custom IT corpus JSON (defaults to the shipped held-out corpus)}
                             {--few-shot : Prepend IntentExamples template exemplars (held out from the corpus; default off)}
                             {--few-shot-limit= : Max few-shot exemplars (default 5, one per intent)}
+                            {--strategy=blind : Few-shot exemplar strategy for --few-shot/--compare: blind (one per intent, registry order) or selected (per-case relevance-ranked, A3.1)}
                             {--compare : Run baseline vs few-shot over the corpus and emit a per-case delta (A5)}
+                            {--compare-strategies : A3.1 — run baseline vs blind vs selected few-shot and report whether selected improves/regresses/matches blind (overrides --compare/--few-shot)}
                             {--model= : Diagnostics-only model override for this run (e.g. qwen3:1.7b). Default = configured model}
                             {--models= : Comma-separated models to compare side by side (A7); takes precedence over --model}
                             {--no-think : Force thinking OFF for this diagnostic run (overrides the profile)}
@@ -56,7 +59,7 @@ class ObserveItalianCorpusCommand extends Command
                             {--compact : Emit compact single-line JSON instead of pretty}
                             {--progress : Print progress to stderr}';
 
-    protected $description = 'Opt-in diagnostics: run the held-out Italian interpretation corpus through the LLM sandbox and report metrics as JSON. Add --few-shot for IntentExamples exemplars, --compare for an A1-vs-A2 delta, or --model/--models to compare local models (A7). Real model, no proposals, NOT a CI gate. Non-production.';
+    protected $description = 'Opt-in diagnostics: run the held-out Italian interpretation corpus through the LLM sandbox and report metrics as JSON. Add --few-shot for IntentExamples exemplars (--strategy=blind|selected), --compare for an A1-vs-A2 delta, --compare-strategies for the A3.1 none/blind/selected comparison, or --model/--models to compare local models (A7). Real model, no proposals, NOT a CI gate. Non-production.';
 
     public function handle(ItalianCorpusObservationService $service, ObservationProfileResolver $resolver): int
     {
@@ -68,6 +71,13 @@ class ObserveItalianCorpusCommand extends Command
 
         if ($this->option('think') && $this->option('no-think')) {
             $this->error('--think and --no-think cannot be used together.');
+
+            return self::FAILURE;
+        }
+
+        $strategy = ExemplarStrategy::fromString((string) $this->option('strategy'));
+        if ($strategy === null) {
+            $this->error('--strategy must be one of: blind, selected.');
 
             return self::FAILURE;
         }
@@ -99,6 +109,7 @@ class ObserveItalianCorpusCommand extends Command
         $fewShotLimit = ($rawFewShotLimit = $this->option('few-shot-limit')) !== null ? max(0, (int) $rawFewShotLimit) : null;
         $fewShot = (bool) $this->option('few-shot');
         $compare = (bool) $this->option('compare');
+        $compareStrategies = (bool) $this->option('compare-strategies');
         $showProgress = (bool) $this->option('progress');
         $stderr = $this->output->getErrorStyle();
         $onProgress = $showProgress
@@ -141,7 +152,7 @@ class ObserveItalianCorpusCommand extends Command
                         'profile' => $profile->toArray(),
                         'effective' => $this->effectiveMeta($options),
                     ],
-                    $this->bodyForModel($service, $cases, $locale, $fewShotLimit, $fewShot, $compare, $onProgress, $model, $options),
+                    $this->bodyForModel($service, $cases, $locale, $fewShotLimit, $fewShot, $compare, $compareStrategies, $strategy, $onProgress, $model, $options),
                 );
             }
 
@@ -182,7 +193,7 @@ class ObserveItalianCorpusCommand extends Command
                 : sprintf('few-shot: %d exemplar(s).', $exemplarCount));
         }
 
-        $body = $this->bodyForModel($service, $cases, $locale, $fewShotLimit, $fewShot, $compare, $onProgress, $model, $options);
+        $body = $this->bodyForModel($service, $cases, $locale, $fewShotLimit, $fewShot, $compare, $compareStrategies, $strategy, $onProgress, $model, $options);
 
         $this->line((string) json_encode(
             array_merge([
@@ -261,12 +272,25 @@ class ObserveItalianCorpusCommand extends Command
         ?int $fewShotLimit,
         bool $fewShot,
         bool $compare,
+        bool $compareStrategies,
+        ExemplarStrategy $strategy,
         ?callable $onProgress,
         ?string $model,
         ObservationOptions $options,
     ): array {
+        // A3.1: three-way strategy comparison (baseline vs blind vs selected) takes precedence.
+        if ($compareStrategies) {
+            return $service->compareStrategies($cases, $locale, $fewShotLimit, $onProgress, $model, $options)->toArray();
+        }
+
+        // A5 two-way delta stays blind few-shot (selected is exercised via --compare-strategies).
         if ($compare) {
             return $service->compare($cases, $locale, $fewShotLimit, $onProgress, $model, $options)->toArray();
+        }
+
+        // Single few-shot run: --strategy=selected picks per-case relevance-ranked exemplars (A3.1).
+        if ($fewShot && $strategy === ExemplarStrategy::Selected) {
+            return $service->observeSelected($cases, $locale, $fewShotLimit, $onProgress, $model, $options)->toArray();
         }
 
         $exemplars = $fewShot ? $service->exemplarsFor($locale, $cases, $fewShotLimit) : [];

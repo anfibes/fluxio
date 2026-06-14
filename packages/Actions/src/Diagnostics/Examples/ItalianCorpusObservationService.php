@@ -4,6 +4,7 @@ namespace Fluxio\Actions\Diagnostics\Examples;
 
 use Fluxio\Actions\Diagnostics\Evaluation\DTO\InterpretationCorpusCase;
 use Fluxio\Actions\Diagnostics\Evaluation\InterpretationCorpusLoader;
+use Fluxio\Actions\Diagnostics\Examples\DTO\ExemplarStrategyComparisonReport;
 use Fluxio\Actions\Diagnostics\Examples\DTO\IntentExampleObservationReport;
 use Fluxio\Actions\Diagnostics\Examples\DTO\ItalianCorpusComparisonReport;
 use Fluxio\Actions\Diagnostics\Observation\DTO\LlmObservationResult;
@@ -34,6 +35,7 @@ class ItalianCorpusObservationService
         private readonly InterpretationCorpusLoader $loader,
         private readonly LlmObservationService $observation,
         private readonly IntentExampleObservationService $examples,
+        private readonly ExemplarSelectionService $selection,
     ) {}
 
     /**
@@ -101,9 +103,27 @@ class ItalianCorpusObservationService
      */
     public function observe(array $cases, array $exemplars = [], string $locale = 'it', bool $fewShot = false, ?callable $onProgress = null, ?string $model = null, ?ObservationOptions $options = null): IntentExampleObservationReport
     {
-        $results = $this->run($cases, $exemplars, $onProgress, $model, $options);
+        $results = $this->run($cases, $this->constantResolver($exemplars), $onProgress, $model, $options);
 
         return $this->examples->report($locale, $results, $fewShot, $this->exampleIds($exemplars));
+    }
+
+    /**
+     * SELECTED-strategy single run (A3.1): each case sees its own relevance-ranked exemplars, chosen
+     * by ExemplarSelectionService from the case's known intent + asserted entity keys. Reported in
+     * the same shape as a blind few-shot run; few_shot.example_ids is the DISTINCT set used across
+     * all cases.
+     *
+     * @param  list<InterpretationCorpusCase>  $cases
+     * @param  (callable(int $completed, int $total): void)|null  $onProgress
+     */
+    public function observeSelected(array $cases, string $locale = 'it', ?int $fewShotLimit = null, ?callable $onProgress = null, ?string $model = null, ?ObservationOptions $options = null): IntentExampleObservationReport
+    {
+        [$resolver, $selectedIds] = $this->selectedResolver($locale, $cases, $fewShotLimit);
+
+        $results = $this->run($cases, $resolver, $onProgress, $model, $options);
+
+        return $this->examples->report($locale, $results, true, $selectedIds());
     }
 
     /**
@@ -129,10 +149,105 @@ class ItalianCorpusObservationService
             }
         };
 
-        $baseline = $this->run($cases, [], $tick, $model, $options);
-        $fewShot = $this->run($cases, $exemplars, $tick, $model, $options);
+        $baseline = $this->run($cases, $this->constantResolver([]), $tick, $model, $options);
+        $fewShot = $this->run($cases, $this->constantResolver($exemplars), $tick, $model, $options);
 
         return ItalianCorpusComparisonReport::build($locale, $cases, $baseline, $fewShot, $this->exampleIds($exemplars));
+    }
+
+    /**
+     * A3.1: run the corpus under all three strategies — no few-shot (baseline), BLIND few-shot
+     * (one template per intent, registry order, shared across cases), and SELECTED few-shot
+     * (per-case relevance-ranked exemplars) — then diff so the report shows whether SELECTED
+     * improved, regressed, or matched BLIND, with per-intent breakdowns and explicit per-case
+     * outcomes. The SAME model + options drive all three passes.
+     *
+     * @param  list<InterpretationCorpusCase>  $cases
+     * @param  (callable(int $completed, int $total): void)|null  $onProgress
+     */
+    public function compareStrategies(array $cases, string $locale = 'it', ?int $fewShotLimit = null, ?callable $onProgress = null, ?string $model = null, ?ObservationOptions $options = null): ExemplarStrategyComparisonReport
+    {
+        $blindExemplars = $this->exemplarsFor($locale, $cases, $fewShotLimit);
+        [$selectedResolver, $selectedIds] = $this->selectedResolver($locale, $cases, $fewShotLimit);
+
+        $total = count($cases) * 3;
+        $completed = 0;
+        $tick = static function () use (&$completed, $total, $onProgress): void {
+            $completed++;
+            if ($onProgress !== null) {
+                $onProgress($completed, $total);
+            }
+        };
+
+        $baseline = $this->run($cases, $this->constantResolver([]), $tick, $model, $options);
+        $blind = $this->run($cases, $this->constantResolver($blindExemplars), $tick, $model, $options);
+        $selected = $this->run($cases, $selectedResolver, $tick, $model, $options);
+
+        return ExemplarStrategyComparisonReport::build(
+            $locale,
+            $cases,
+            $baseline,
+            $blind,
+            $selected,
+            $this->exampleIds($blindExemplars),
+            $selectedIds(),
+        );
+    }
+
+    /**
+     * Build the per-case SELECTED exemplar resolver and a closure that, after the run, returns the
+     * DISTINCT set of source ids the selector actually used (in first-seen order). The corpus texts
+     * are passed as exclude-texts so a selected exemplar can never duplicate a scored input.
+     *
+     * @param  list<InterpretationCorpusCase>  $cases
+     * @return array{0: callable(InterpretationCorpusCase): list<PromptExemplar>, 1: callable(): list<string>}
+     */
+    private function selectedResolver(string $locale, array $cases, ?int $fewShotLimit): array
+    {
+        $corpusTexts = array_map(static fn (InterpretationCorpusCase $c): string => $c->text, $cases);
+        $usedIds = [];
+
+        $resolver = function (InterpretationCorpusCase $case) use ($locale, $fewShotLimit, $corpusTexts, &$usedIds): array {
+            $exemplars = $this->selectedExemplarsFor($locale, $case, $fewShotLimit, $corpusTexts);
+
+            foreach ($exemplars as $exemplar) {
+                if ($exemplar->sourceId !== null && ! in_array($exemplar->sourceId, $usedIds, true)) {
+                    $usedIds[] = $exemplar->sourceId;
+                }
+            }
+
+            return $exemplars;
+        };
+
+        // Regular closure with a by-reference capture so it reflects ids accumulated during the run
+        // (an arrow fn would capture the empty array by value at creation time).
+        $ids = function () use (&$usedIds): array {
+            return $usedIds;
+        };
+
+        return [$resolver, $ids];
+    }
+
+    /**
+     * SELECTED exemplars for one case: rank the locale's IntentExamples against the case's known
+     * intent + asserted entity keys, render the ranked candidates into contract-shaped exemplars
+     * (literals/unrenderables dropped), then cap at the few-shot limit. Driven only by structured
+     * metadata — never by re-inferring intent from the case text.
+     *
+     * @param  list<string>  $excludeTexts
+     * @return list<PromptExemplar>
+     */
+    public function selectedExemplarsFor(string $locale, InterpretationCorpusCase $case, ?int $fewShotLimit, array $excludeTexts = []): array
+    {
+        $limit = $fewShotLimit ?? IntentExampleObservationService::DEFAULT_FEW_SHOT_LIMIT;
+
+        // Rank without a limit so unrenderable (literal) candidates do not consume a slot before
+        // rendering; the cap is applied after rendering.
+        $ranked = $this->selection->selectForLocale($locale, $case->expectedIntent, array_keys($case->expectedEntities));
+
+        $rendered = $this->examples->renderExemplars($ranked, $excludeTexts);
+
+        return array_slice($rendered, 0, max(0, $limit));
     }
 
     /**
@@ -157,18 +272,23 @@ class ItalianCorpusObservationService
     }
 
     /**
+     * Run the corpus, resolving the exemplars to use PER CASE via $exemplarsFor. A constant
+     * resolver (baseline = [] / blind = the shared set) reproduces the A4/A5 behavior; a per-case
+     * resolver implements the SELECTED strategy (A3.1) where each case sees its own relevance-ranked
+     * exemplars.
+     *
      * @param  list<InterpretationCorpusCase>  $cases
-     * @param  list<PromptExemplar>  $exemplars
+     * @param  callable(InterpretationCorpusCase): list<PromptExemplar>  $exemplarsFor
      * @param  (callable(int $completed, int $total): void)|null  $onProgress
      * @return list<LlmObservationResult>
      */
-    private function run(array $cases, array $exemplars, ?callable $onProgress, ?string $model = null, ?ObservationOptions $options = null): array
+    private function run(array $cases, callable $exemplarsFor, ?callable $onProgress, ?string $model = null, ?ObservationOptions $options = null): array
     {
         $results = [];
         $total = count($cases);
 
         foreach ($cases as $index => $case) {
-            $results[] = $this->observation->observe($case, $exemplars, $model, $options);
+            $results[] = $this->observation->observe($case, $exemplarsFor($case), $model, $options);
 
             if ($onProgress !== null) {
                 $onProgress($index + 1, $total);
@@ -176,6 +296,17 @@ class ItalianCorpusObservationService
         }
 
         return $results;
+    }
+
+    /**
+     * A constant exemplar resolver — every case sees the same set (baseline = [], blind = shared).
+     *
+     * @param  list<PromptExemplar>  $exemplars
+     * @return callable(InterpretationCorpusCase): list<PromptExemplar>
+     */
+    private function constantResolver(array $exemplars): callable
+    {
+        return static fn (InterpretationCorpusCase $case): array => $exemplars;
     }
 
     /**
