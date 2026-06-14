@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Actions\Diagnostics;
 
+use Fluxio\Actions\Diagnostics\Examples\ExemplarStrategy;
 use Fluxio\Actions\Diagnostics\Profiles\DefaultObservationProfiles;
 use Fluxio\Actions\Diagnostics\Profiles\ModelCapabilityClass;
 use Fluxio\Actions\Diagnostics\Profiles\ModelCapabilityRegistry;
@@ -63,6 +64,35 @@ class ObservationProfileResolverTest extends TestCase
         // (free-text+extract), for contract fidelity + robustness. B stays available via --free-text.
         $this->assertFalse($profile->think, 'Reasoning default must disable thinking.');
         $this->assertTrue($profile->forceJson, 'Reasoning default must keep forced JSON (strategy A).');
+    }
+
+    // ── Path 1: capability-aware few-shot policy ──────────────────────────────
+
+    public function test_instruction_following_profile_defaults_few_shot_off(): void
+    {
+        $profile = DefaultObservationProfiles::instructionFollowing();
+
+        // A4.2 showed few-shot HURTS this class (qwen3:0.6b 41.9% → 33–34%), so the default is off.
+        $this->assertFalse($profile->fewShotDefault, 'Instruction-following must default few-shot off.');
+        $this->assertNull($profile->defaultExemplarStrategy, 'Instruction-following must declare no default strategy.');
+    }
+
+    public function test_reasoning_profile_defaults_few_shot_on_with_selected_strategy(): void
+    {
+        $profile = DefaultObservationProfiles::reasoning();
+
+        // A4.2 showed few-shot STRONGLY helps this class (qwen3:1.7b 74.2% → 91.4%); selected is the
+        // chosen default (deterministic, per-case, no aggregate regression vs blind).
+        $this->assertTrue($profile->fewShotDefault, 'Reasoning must default few-shot on.');
+        $this->assertSame(ExemplarStrategy::Selected, $profile->defaultExemplarStrategy);
+    }
+
+    public function test_profile_few_shot_policy_is_serialized_in_to_array(): void
+    {
+        $this->assertSame(false, DefaultObservationProfiles::instructionFollowing()->toArray()['few_shot_default']);
+        $this->assertNull(DefaultObservationProfiles::instructionFollowing()->toArray()['default_exemplar_strategy']);
+        $this->assertSame(true, DefaultObservationProfiles::reasoning()->toArray()['few_shot_default']);
+        $this->assertSame('selected', DefaultObservationProfiles::reasoning()->toArray()['default_exemplar_strategy']);
     }
 
     // ── 3 & 4. concrete model resolution ──────────────────────────────────────

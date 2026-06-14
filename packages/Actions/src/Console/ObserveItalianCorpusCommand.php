@@ -30,6 +30,14 @@ use Illuminate\Console\Command;
  * format are independent knobs — `--free-text --think` reproduces A7.1 E2 (thinking on + free-text +
  * extract); `--free-text` alone composes with the profile's thinking choice.
  *
+ * Capability-aware few-shot policy (Path 1): the profile also owns the diagnostics few-shot default —
+ * instruction_following → few-shot OFF; reasoning → few-shot ON with the `selected` strategy. So a
+ * flag-less run is the right per-model baseline automatically. CLI overrides: `--strategy=X` (implies
+ * few-shot ON) > `--few-shot` (ON, strategy = profile default or blind) > profile default. `--compare`
+ * (blind two-way) and `--compare-strategies` (none/blind/selected) are explicit modes that ignore the
+ * profile few-shot default and always run their fixed strategy set. Few-shot is diagnostics-only: it
+ * conditions the prompt with held-out IntentExamples exemplars and never touches the runtime.
+ *
  * The corpus is the held-out measurement set; the IntentExamples library is the few-shot source.
  * They never overlap (leakage guard). It builds no proposals, calls no ActionInterpreterService,
  * executes nothing, resolves no entities, and persists nothing. It is blocked in production.
@@ -44,7 +52,7 @@ class ObserveItalianCorpusCommand extends Command
                             {--path= : Path to a custom IT corpus JSON (defaults to the shipped held-out corpus)}
                             {--few-shot : Prepend IntentExamples template exemplars (held out from the corpus; default off)}
                             {--few-shot-limit= : Max few-shot exemplars (default 5, one per intent)}
-                            {--strategy=blind : Few-shot exemplar strategy for --few-shot/--compare: blind (one per intent, registry order) or selected (per-case relevance-ranked, A3.1)}
+                            {--strategy= : Few-shot exemplar strategy: blind (one per intent, registry order) or selected (per-case relevance-ranked, A3.1). Supplying it implies few-shot ON and overrides the profile default. If omitted, the profile decides (instruction_following → off; reasoning → on/selected)}
                             {--compare : Run baseline vs few-shot over the corpus and emit a per-case delta (A5)}
                             {--compare-strategies : A3.1 — run baseline vs blind vs selected few-shot and report whether selected improves/regresses/matches blind (overrides --compare/--few-shot)}
                             {--model= : Diagnostics-only model override for this run (e.g. qwen3:1.7b). Default = configured model}
@@ -75,11 +83,18 @@ class ObserveItalianCorpusCommand extends Command
             return self::FAILURE;
         }
 
-        $strategy = ExemplarStrategy::fromString((string) $this->option('strategy'));
-        if ($strategy === null) {
-            $this->error('--strategy must be one of: blind, selected.');
+        // --strategy is optional now (no default). When supplied it must be valid AND implies
+        // few-shot ON; when omitted the resolved profile decides the few-shot default (Path 1).
+        $rawStrategy = $this->option('strategy');
+        $strategyProvided = $rawStrategy !== null && trim((string) $rawStrategy) !== '';
+        $cliStrategy = null;
+        if ($strategyProvided) {
+            $cliStrategy = ExemplarStrategy::fromString((string) $rawStrategy);
+            if ($cliStrategy === null) {
+                $this->error('--strategy must be one of: blind, selected.');
 
-            return self::FAILURE;
+                return self::FAILURE;
+            }
         }
 
         $path = ($rawPath = $this->option('path')) !== null && trim((string) $rawPath) !== '' ? (string) $rawPath : null;
@@ -107,7 +122,7 @@ class ObserveItalianCorpusCommand extends Command
 
         $locale = 'it';
         $fewShotLimit = ($rawFewShotLimit = $this->option('few-shot-limit')) !== null ? max(0, (int) $rawFewShotLimit) : null;
-        $fewShot = (bool) $this->option('few-shot');
+        $fewShotFlag = (bool) $this->option('few-shot');
         $compare = (bool) $this->option('compare');
         $compareStrategies = (bool) $this->option('compare-strategies');
         $showProgress = (bool) $this->option('progress');
@@ -142,23 +157,26 @@ class ObserveItalianCorpusCommand extends Command
                 }
 
                 // A7.2: each model auto-selects its capability-class profile; CLI flags still override.
+                // Path 1: the profile also decides the few-shot default per model (resolved here so
+                // each model in a --models run gets its own policy independently).
                 $profile = $resolver->resolve($model);
                 $options = $this->effectiveOptions($profile);
+                $policy = $this->resolveFewShotPolicy($profile, $cliStrategy, $fewShotFlag, $compare, $compareStrategies);
 
                 $perModel[] = array_merge(
                     [
                         'model' => $model,
                         'available' => true,
                         'profile' => $profile->toArray(),
-                        'effective' => $this->effectiveMeta($options),
+                        'effective' => $this->effectiveMeta($options, $policy['meta']),
                     ],
-                    $this->bodyForModel($service, $cases, $locale, $fewShotLimit, $fewShot, $compare, $compareStrategies, $strategy, $onProgress, $model, $options),
+                    $this->bodyForModel($service, $cases, $locale, $fewShotLimit, $compare, $compareStrategies, $policy['enabled'], $policy['strategy'], $onProgress, $model, $options),
                 );
             }
 
             $this->line((string) json_encode([
                 'corpus' => $corpusPath,
-                'few_shot' => $fewShot,
+                'few_shot' => $fewShotFlag,
                 'compare' => $compare,
                 'compare_strategies' => $compareStrategies,
                 'models' => $perModel,
@@ -176,6 +194,8 @@ class ObserveItalianCorpusCommand extends Command
         // the default run stays byte-identical to before; CLI flags still override.
         $profile = $resolver->resolve($effectiveModel);
         $options = $this->effectiveOptions($profile);
+        // Path 1: the profile decides the few-shot default unless CLI flags override it.
+        $policy = $this->resolveFewShotPolicy($profile, $cliStrategy, $fewShotFlag, $compare, $compareStrategies);
 
         // Only probe when a model is explicitly overridden — the default path stays untouched.
         if ($model !== null) {
@@ -187,21 +207,21 @@ class ObserveItalianCorpusCommand extends Command
             }
         }
 
-        if ($fewShot && $showProgress && ! $compare) {
+        if ($policy['enabled'] && $showProgress && ! $compare && ! $compareStrategies) {
             $exemplarCount = count($service->exemplarsFor($locale, $cases, $fewShotLimit));
             $stderr->writeln($exemplarCount === 0
                 ? "few-shot requested but no suitable exemplars for locale [{$locale}] — running without few-shot."
-                : sprintf('few-shot: %d exemplar(s).', $exemplarCount));
+                : sprintf('few-shot (%s): %d exemplar(s).', $policy['strategy']?->value ?? 'blind', $exemplarCount));
         }
 
-        $body = $this->bodyForModel($service, $cases, $locale, $fewShotLimit, $fewShot, $compare, $compareStrategies, $strategy, $onProgress, $model, $options);
+        $body = $this->bodyForModel($service, $cases, $locale, $fewShotLimit, $compare, $compareStrategies, $policy['enabled'], $policy['strategy'], $onProgress, $model, $options);
 
         $this->line((string) json_encode(
             array_merge([
                 'model' => $effectiveModel,
                 'corpus' => $corpusPath,
                 'profile' => $profile->toArray(),
-                'effective' => $this->effectiveMeta($options),
+                'effective' => $this->effectiveMeta($options, $policy['meta']),
             ], $body),
             $flags,
         ));
@@ -237,11 +257,13 @@ class ObserveItalianCorpusCommand extends Command
 
     /**
      * Effective-options metadata for the report, so a reader can distinguish profile defaults from
-     * explicit overrides (profile / cli:--think / cli:--no-think / cli:--free-text).
+     * explicit overrides (profile / cli:--think / cli:--no-think / cli:--free-text), and (Path 1)
+     * whether few-shot + the exemplar strategy came from the profile or the CLI.
      *
+     * @param  array<string, mixed>  $policyMeta  Few-shot policy meta from resolveFewShotPolicy().
      * @return array<string, mixed>
      */
-    private function effectiveMeta(ObservationOptions $options): array
+    private function effectiveMeta(ObservationOptions $options, array $policyMeta): array
     {
         $thinkSource = match (true) {
             (bool) $this->option('think') => 'cli:--think',
@@ -249,13 +271,71 @@ class ObserveItalianCorpusCommand extends Command
             default => 'profile',
         };
 
-        return [
+        return array_merge([
             'think' => $options->think,
             'think_source' => $thinkSource,
             'force_json' => $options->forceJson,
             'force_json_source' => $this->option('free-text') ? 'cli:--free-text' : 'profile',
             'max_tokens' => $options->maxTokens,
+        ], $policyMeta);
+    }
+
+    /**
+     * Resolve the diagnostics few-shot policy for one model (Path 1). Precedence:
+     *   1. --compare-strategies  → runs none/blind/selected (fixed); profile default ignored.
+     *   2. --compare             → blind two-way (fixed); profile default ignored.
+     *   3. --strategy=X          → few-shot ON, strategy X (CLI; implies enabled).
+     *   4. --few-shot            → few-shot ON, strategy = profile default or blind.
+     *   5. profile.fewShotDefault → the resolved profile decides (reasoning ON/selected; else OFF).
+     *
+     * `strategy` is the resolved ExemplarStrategy when the normal observe path runs few-shot, or null
+     * when few-shot is off / a comparison mode owns the strategy set. `meta` is report-only.
+     *
+     * @return array{enabled: bool, strategy: ?ExemplarStrategy, meta: array<string, mixed>}
+     */
+    private function resolveFewShotPolicy(
+        ObservationProfile $profile,
+        ?ExemplarStrategy $cliStrategy,
+        bool $fewShotFlag,
+        bool $compare,
+        bool $compareStrategies,
+    ): array {
+        $meta = static fn (bool $enabled, ?string $strategy, string $fewShotSource, string $strategySource): array => [
+            'few_shot' => $enabled,
+            'few_shot_source' => $fewShotSource,
+            'strategy' => $strategy,
+            'strategy_source' => $strategySource,
         ];
+
+        // Explicit comparison modes own their (fixed) strategy set; the profile default is ignored.
+        if ($compareStrategies) {
+            return ['enabled' => true, 'strategy' => null, 'meta' => $meta(true, 'all', 'cli:--compare-strategies', 'cli:--compare-strategies')];
+        }
+        if ($compare) {
+            return ['enabled' => true, 'strategy' => ExemplarStrategy::Blind, 'meta' => $meta(true, 'blind', 'cli:--compare', 'cli:--compare')];
+        }
+
+        // --strategy=X implies few-shot ON and overrides the profile default.
+        if ($cliStrategy !== null) {
+            return ['enabled' => true, 'strategy' => $cliStrategy, 'meta' => $meta(true, $cliStrategy->value, 'cli:--strategy', 'cli:--strategy')];
+        }
+
+        // --few-shot ON without a strategy: use the profile's default strategy, else blind.
+        if ($fewShotFlag) {
+            $strategy = $profile->defaultExemplarStrategy ?? ExemplarStrategy::Blind;
+            $strategySource = $profile->defaultExemplarStrategy !== null ? 'profile' : 'default';
+
+            return ['enabled' => true, 'strategy' => $strategy, 'meta' => $meta(true, $strategy->value, 'cli:--few-shot', $strategySource)];
+        }
+
+        // No CLI few-shot flags: the resolved profile decides.
+        if ($profile->fewShotDefault) {
+            $strategy = $profile->defaultExemplarStrategy ?? ExemplarStrategy::Blind;
+
+            return ['enabled' => true, 'strategy' => $strategy, 'meta' => $meta(true, $strategy->value, 'profile', 'profile')];
+        }
+
+        return ['enabled' => false, 'strategy' => null, 'meta' => $meta(false, null, 'profile', 'none')];
     }
 
     /**
@@ -271,10 +351,10 @@ class ObserveItalianCorpusCommand extends Command
         array $cases,
         string $locale,
         ?int $fewShotLimit,
-        bool $fewShot,
         bool $compare,
         bool $compareStrategies,
-        ExemplarStrategy $strategy,
+        bool $fewShotEnabled,
+        ?ExemplarStrategy $strategy,
         ?callable $onProgress,
         ?string $model,
         ObservationOptions $options,
@@ -289,14 +369,15 @@ class ObserveItalianCorpusCommand extends Command
             return $service->compare($cases, $locale, $fewShotLimit, $onProgress, $model, $options)->toArray();
         }
 
-        // Single few-shot run: --strategy=selected picks per-case relevance-ranked exemplars (A3.1).
-        if ($fewShot && $strategy === ExemplarStrategy::Selected) {
+        // Normal observe path: the resolved policy (Path 1) decides few-shot on/off and strategy.
+        // Selected → per-case relevance-ranked exemplars (A3.1); blind/off → the shared/empty set.
+        if ($fewShotEnabled && $strategy === ExemplarStrategy::Selected) {
             return $service->observeSelected($cases, $locale, $fewShotLimit, $onProgress, $model, $options)->toArray();
         }
 
-        $exemplars = $fewShot ? $service->exemplarsFor($locale, $cases, $fewShotLimit) : [];
+        $exemplars = $fewShotEnabled ? $service->exemplarsFor($locale, $cases, $fewShotLimit) : [];
 
-        return $service->observe($cases, $exemplars, $locale, $fewShot, $onProgress, $model, $options)->toArray();
+        return $service->observe($cases, $exemplars, $locale, $fewShotEnabled, $onProgress, $model, $options)->toArray();
     }
 
     /**

@@ -757,4 +757,109 @@ class ObserveItalianCorpusCommandTest extends TestCase
         $this->assertNotEmpty($evaluationRequests);
         $this->assertTrue(collect($evaluationRequests)->every(fn ($r) => $r->think === true));
     }
+
+    // ── Path 1: capability-aware few-shot policy ──────────────────────────────
+
+    public function test_instruction_following_default_run_uses_no_few_shot(): void
+    {
+        $client = $this->fakeRecordingRequests();
+
+        // Configured default model (qwen3:0.6b) → instruction-following → few-shot OFF by profile.
+        $decoded = $this->runJson(['--case' => 'it-create-task-followup-ferrari']);
+
+        $this->assertFalse($decoded['effective']['few_shot']);
+        $this->assertSame('profile', $decoded['effective']['few_shot_source']);
+        $this->assertNull($decoded['effective']['strategy']);
+        $this->assertSame('none', $decoded['effective']['strategy_source']);
+        // No exemplars conditioned the prompt.
+        $this->assertStringNotContainsString('Worked examples', (string) end($client->requests)->systemPrompt);
+        $this->assertFalse($decoded['few_shot']['enabled']);
+    }
+
+    public function test_reasoning_default_run_uses_selected_few_shot(): void
+    {
+        $client = $this->fakeRecordingRequests();
+
+        // qwen3:1.7b → reasoning → few-shot ON + selected, all from the profile (no CLI flags).
+        $decoded = $this->runJson(['--case' => 'it-assign-lead-affida-ferrari', '--model' => 'qwen3:1.7b']);
+
+        $this->assertTrue($decoded['effective']['few_shot']);
+        $this->assertSame('profile', $decoded['effective']['few_shot_source']);
+        $this->assertSame('selected', $decoded['effective']['strategy']);
+        $this->assertSame('profile', $decoded['effective']['strategy_source']);
+        $this->assertTrue($decoded['few_shot']['enabled']);
+        // The evaluation request (last; the probe ran first with no exemplars) carried exemplars.
+        $this->assertStringContainsString('Worked examples', (string) end($client->requests)->systemPrompt);
+    }
+
+    public function test_multi_model_run_applies_each_profile_few_shot_default_independently(): void
+    {
+        $this->fakeRecordingRequests();
+
+        $decoded = $this->runJson(['--models' => 'qwen3:0.6b,qwen3:1.7b', '--limit' => '2']);
+
+        // qwen3:0.6b → no few-shot; qwen3:1.7b → selected few-shot. Independent per model.
+        $this->assertFalse($decoded['models'][0]['effective']['few_shot']);
+        $this->assertSame('none', $decoded['models'][0]['effective']['strategy_source']);
+
+        $this->assertTrue($decoded['models'][1]['effective']['few_shot']);
+        $this->assertSame('selected', $decoded['models'][1]['effective']['strategy']);
+        $this->assertSame('profile', $decoded['models'][1]['effective']['strategy_source']);
+    }
+
+    public function test_cli_strategy_blind_overrides_reasoning_selected_default(): void
+    {
+        $client = $this->fakeRecordingRequests();
+
+        // --strategy=blind implies few-shot ON and overrides the reasoning profile's selected default.
+        $decoded = $this->runJson(['--case' => 'it-assign-lead-affida-ferrari', '--model' => 'qwen3:1.7b', '--strategy' => 'blind']);
+
+        $this->assertTrue($decoded['effective']['few_shot']);
+        $this->assertSame('cli:--strategy', $decoded['effective']['few_shot_source']);
+        $this->assertSame('blind', $decoded['effective']['strategy']);
+        $this->assertSame('cli:--strategy', $decoded['effective']['strategy_source']);
+        $this->assertStringContainsString('Worked examples', (string) end($client->requests)->systemPrompt);
+    }
+
+    public function test_few_shot_flag_on_instruction_following_falls_back_to_blind(): void
+    {
+        $this->fakeRecordingRequests();
+
+        // --few-shot with no strategy on an instruction-following model (no profile default) → blind.
+        $decoded = $this->runJson(['--case' => 'it-create-task-followup-ferrari', '--few-shot' => true]);
+
+        $this->assertTrue($decoded['effective']['few_shot']);
+        $this->assertSame('cli:--few-shot', $decoded['effective']['few_shot_source']);
+        $this->assertSame('blind', $decoded['effective']['strategy']);
+        $this->assertSame('default', $decoded['effective']['strategy_source']);
+    }
+
+    public function test_few_shot_flag_on_reasoning_uses_the_profile_default_strategy(): void
+    {
+        $this->fakeRecordingRequests();
+
+        // --few-shot with no strategy on a reasoning model → the profile's default strategy (selected).
+        $decoded = $this->runJson(['--case' => 'it-assign-lead-affida-ferrari', '--model' => 'qwen3:1.7b', '--few-shot' => true]);
+
+        $this->assertTrue($decoded['effective']['few_shot']);
+        $this->assertSame('cli:--few-shot', $decoded['effective']['few_shot_source']);
+        $this->assertSame('selected', $decoded['effective']['strategy']);
+        $this->assertSame('profile', $decoded['effective']['strategy_source']);
+    }
+
+    public function test_compare_strategies_ignores_profile_few_shot_default_and_runs_all_three(): void
+    {
+        $this->fakeFirstExemplarEcho();
+
+        // Even on an instruction-following model (profile few-shot OFF), --compare-strategies still
+        // runs the full none/blind/selected set and is tagged as a CLI-owned comparison mode.
+        $decoded = $this->runJson(['--model' => 'qwen3:0.6b', '--compare-strategies' => true]);
+
+        $this->assertSame('instruction-following', $decoded['profile']['id']);
+        $this->assertSame('cli:--compare-strategies', $decoded['effective']['few_shot_source']);
+        $this->assertSame('all', $decoded['effective']['strategy']);
+        foreach (['none', 'blind', 'selected'] as $strategy) {
+            $this->assertArrayHasKey($strategy, $decoded['strategies']);
+        }
+    }
 }
