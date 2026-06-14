@@ -9,6 +9,7 @@ use Fluxio\Actions\Diagnostics\Examples\ItalianCorpusObservationService;
 use Fluxio\Actions\Diagnostics\Observation\DTO\ObservationOptions;
 use Fluxio\Actions\Diagnostics\Profiles\ObservationProfile;
 use Fluxio\Actions\Diagnostics\Profiles\ObservationProfileResolver;
+use Fluxio\Actions\Llm\Prompting\PromptVariant;
 use Illuminate\Console\Command;
 
 /**
@@ -60,6 +61,7 @@ class ObserveItalianCorpusCommand extends Command
                             {--no-think : Force thinking OFF for this diagnostic run (overrides the profile)}
                             {--think : Force thinking ON for this diagnostic run (overrides the profile); cannot combine with --no-think}
                             {--free-text : Do not force JSON; extract a JSON object from free text, then validate with the same validator (composes with the profile/think; add --think to reproduce A7.1 E2)}
+                            {--prompt-variant= : A6.2 — append a diagnostics-only prompt guidance variant (e.g. it_intent_guidance). Overrides the profile variant; omit for the byte-identical base prompt}
                             {--num-predict= : A7.1/E3 — raise the generation budget (Ollama num_predict) for this run}
                             {--case= : Observe only the corpus case with this id}
                             {--limit= : Observe at most N corpus cases}
@@ -92,6 +94,20 @@ class ObserveItalianCorpusCommand extends Command
             $cliStrategy = ExemplarStrategy::fromString((string) $rawStrategy);
             if ($cliStrategy === null) {
                 $this->error('--strategy must be one of: blind, selected.');
+
+                return self::FAILURE;
+            }
+        }
+
+        // --prompt-variant (A6.2) is optional. When supplied it must be a known variant and overrides
+        // any profile variant; when omitted the resolved profile decides (currently: none).
+        $rawVariant = $this->option('prompt-variant');
+        $variantProvided = $rawVariant !== null && trim((string) $rawVariant) !== '';
+        $cliVariant = null;
+        if ($variantProvided) {
+            $cliVariant = PromptVariant::fromString((string) $rawVariant);
+            if ($cliVariant === null) {
+                $this->error('--prompt-variant must be a known variant: it_intent_guidance.');
 
                 return self::FAILURE;
             }
@@ -160,7 +176,8 @@ class ObserveItalianCorpusCommand extends Command
                 // Path 1: the profile also decides the few-shot default per model (resolved here so
                 // each model in a --models run gets its own policy independently).
                 $profile = $resolver->resolve($model);
-                $options = $this->effectiveOptions($profile);
+                $variant = $this->resolvePromptVariant($profile, $cliVariant);
+                $options = $this->effectiveOptions($profile, $variant['variant']);
                 $policy = $this->resolveFewShotPolicy($profile, $cliStrategy, $fewShotFlag, $compare, $compareStrategies);
 
                 $perModel[] = array_merge(
@@ -168,7 +185,7 @@ class ObserveItalianCorpusCommand extends Command
                         'model' => $model,
                         'available' => true,
                         'profile' => $profile->toArray(),
-                        'effective' => $this->effectiveMeta($options, $policy['meta']),
+                        'effective' => $this->effectiveMeta($options, $policy['meta'], $variant),
                     ],
                     $this->bodyForModel($service, $cases, $locale, $fewShotLimit, $compare, $compareStrategies, $policy['enabled'], $policy['strategy'], $onProgress, $model, $options),
                 );
@@ -193,7 +210,8 @@ class ObserveItalianCorpusCommand extends Command
         // For the default model (instruction-following) the profile is think=null + format=json, so
         // the default run stays byte-identical to before; CLI flags still override.
         $profile = $resolver->resolve($effectiveModel);
-        $options = $this->effectiveOptions($profile);
+        $variant = $this->resolvePromptVariant($profile, $cliVariant);
+        $options = $this->effectiveOptions($profile, $variant['variant']);
         // Path 1: the profile decides the few-shot default unless CLI flags override it.
         $policy = $this->resolveFewShotPolicy($profile, $cliStrategy, $fewShotFlag, $compare, $compareStrategies);
 
@@ -221,7 +239,7 @@ class ObserveItalianCorpusCommand extends Command
                 'model' => $effectiveModel,
                 'corpus' => $corpusPath,
                 'profile' => $profile->toArray(),
-                'effective' => $this->effectiveMeta($options, $policy['meta']),
+                'effective' => $this->effectiveMeta($options, $policy['meta'], $variant),
             ], $body),
             $flags,
         ));
@@ -237,7 +255,7 @@ class ObserveItalianCorpusCommand extends Command
      * cannot be combined (rejected in handle()). --free-text only controls forceJson; it never
      * changes thinking.
      */
-    private function effectiveOptions(ObservationProfile $profile): ObservationOptions
+    private function effectiveOptions(ObservationProfile $profile, ?PromptVariant $promptVariant): ObservationOptions
     {
         $think = $profile->think;
         if ($this->option('no-think')) {
@@ -252,18 +270,42 @@ class ObserveItalianCorpusCommand extends Command
             forceJson: $this->option('free-text') ? false : $profile->forceJson,
             // Budget is a pure CLI concern; profiles do not own it.
             maxTokens: ($rawNumPredict = $this->option('num-predict')) !== null ? max(1, (int) $rawNumPredict) : null,
+            // A6.2: diagnostics-only prompt variant (already resolved CLI > profile > none).
+            promptVariant: $promptVariant,
         );
     }
 
     /**
+     * Resolve the effective prompt variant for a model (A6.2). Precedence: CLI --prompt-variant >
+     * profile.promptVariantId > none. The profile id (a string) is parsed to a known variant; an
+     * invalid/unknown profile id resolves to none (the CLI value was already validated in handle()).
+     *
+     * @return array{variant: ?PromptVariant, source: string}
+     */
+    private function resolvePromptVariant(ObservationProfile $profile, ?PromptVariant $cliVariant): array
+    {
+        if ($cliVariant !== null) {
+            return ['variant' => $cliVariant, 'source' => 'cli:--prompt-variant'];
+        }
+
+        $profileVariant = $profile->promptVariantId !== null ? PromptVariant::fromString($profile->promptVariantId) : null;
+        if ($profileVariant !== null) {
+            return ['variant' => $profileVariant, 'source' => 'profile'];
+        }
+
+        return ['variant' => null, 'source' => 'none'];
+    }
+
+    /**
      * Effective-options metadata for the report, so a reader can distinguish profile defaults from
-     * explicit overrides (profile / cli:--think / cli:--no-think / cli:--free-text), and (Path 1)
-     * whether few-shot + the exemplar strategy came from the profile or the CLI.
+     * explicit overrides (profile / cli:--think / cli:--no-think / cli:--free-text), (Path 1) whether
+     * few-shot + the exemplar strategy came from the profile or the CLI, and (A6.2) the prompt variant.
      *
      * @param  array<string, mixed>  $policyMeta  Few-shot policy meta from resolveFewShotPolicy().
+     * @param  array{variant: ?PromptVariant, source: string}  $variant  Resolved prompt variant.
      * @return array<string, mixed>
      */
-    private function effectiveMeta(ObservationOptions $options, array $policyMeta): array
+    private function effectiveMeta(ObservationOptions $options, array $policyMeta, array $variant): array
     {
         $thinkSource = match (true) {
             (bool) $this->option('think') => 'cli:--think',
@@ -277,6 +319,8 @@ class ObserveItalianCorpusCommand extends Command
             'force_json' => $options->forceJson,
             'force_json_source' => $this->option('free-text') ? 'cli:--free-text' : 'profile',
             'max_tokens' => $options->maxTokens,
+            'prompt_variant' => $variant['variant']?->value,
+            'prompt_variant_source' => $variant['source'],
         ], $policyMeta);
     }
 

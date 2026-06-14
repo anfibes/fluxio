@@ -71,7 +71,8 @@ class LlmObservationService
 
         $request = new LlmRequest(
             prompt: $this->promptBuilder->buildUserPrompt($case->text, $context),
-            systemPrompt: $this->promptBuilder->buildSystemPrompt($exemplars),
+            // A6.2: an opt-in, append-only prompt variant (null by default → byte-identical to runtime).
+            systemPrompt: $this->promptBuilder->buildSystemPrompt($exemplars, $options->promptVariant),
             model: $model,
             temperature: 0.0,
             maxTokens: $options->maxTokens,
@@ -104,6 +105,14 @@ class LlmObservationService
             return $this->completed($case, $raw, null, false, [$emptyMessage], null, [], [], $rawBody);
         }
 
+        // A6.2 de-confound: a reasoning model driven with think=false can echo Ollama's internal
+        // control directive (e.g. "/no_think") into an entity value. That is a transport artifact,
+        // never a real interpretation, so drop any entity whose value is exactly a control token
+        // BEFORE validation/comparison. The raw response/body are left untouched for transparency,
+        // so this never hides a genuine interpretation error — it only stops the artifact from
+        // appearing in the extracted entities. Diagnostics-only.
+        $parsed = $this->stripControlTokenEntities($parsed);
+
         $validation = $this->structuredValidator->validate($parsed);
 
         if (! $validation->valid) {
@@ -126,6 +135,37 @@ class LlmObservationService
         $sandboxViolations = $this->sandbox->violations($command);
 
         return $this->completed($case, $raw, $parsed, true, [], $command, $sandboxViolations, $normalizedErrors, $rawBody);
+    }
+
+    /**
+     * Reasoning-model control directives that must never survive as entity values. These are
+     * transport/template artifacts (the qwen3 "/think" soft switches), not user content.
+     *
+     * @var list<string>
+     */
+    private const CONTROL_TOKENS = ['/no_think', '/think'];
+
+    /**
+     * Drop any entity whose (trimmed) string value is exactly a reasoning control token. Only the
+     * `entities` map is touched; intent/confidence/notes are untouched. A standalone control token
+     * is never a legitimate entity value, so removing it cannot hide a real interpretation.
+     *
+     * @param  array<string, mixed>  $parsed
+     * @return array<string, mixed>
+     */
+    private function stripControlTokenEntities(array $parsed): array
+    {
+        if (! isset($parsed['entities']) || ! is_array($parsed['entities'])) {
+            return $parsed;
+        }
+
+        foreach ($parsed['entities'] as $key => $value) {
+            if (is_string($value) && in_array(strtolower(trim($value)), self::CONTROL_TOKENS, true)) {
+                unset($parsed['entities'][$key]);
+            }
+        }
+
+        return $parsed;
     }
 
     private function failure(InterpretationCorpusCase $case, Throwable $e): LlmObservationResult

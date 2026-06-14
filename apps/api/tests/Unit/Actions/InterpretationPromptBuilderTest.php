@@ -4,6 +4,7 @@ namespace Tests\Unit\Actions;
 
 use Fluxio\Actions\Llm\Prompting\InterpretationPromptBuilder;
 use Fluxio\Actions\Llm\Prompting\PromptExemplar;
+use Fluxio\Actions\Llm\Prompting\PromptVariant;
 use Tests\TestCase;
 
 /**
@@ -133,5 +134,52 @@ class InterpretationPromptBuilderTest extends TestCase
         $this->assertStringNotContainsString('it-schedule-call-template', $prompt);
         // The default block is preserved (exemplars are appended, not a replacement).
         $this->assertStringContainsString('Registered intents and their allowed entity keys:', $prompt);
+    }
+
+    // ── Slice A6.2: optional, append-only prompt variant (default byte-identical) ─
+
+    public function test_prompt_is_byte_identical_when_no_variant_is_supplied(): void
+    {
+        $builder = $this->app->make(InterpretationPromptBuilder::class);
+
+        // The no-arg call (runtime path) equals the explicit null-variant call, and carries no variant.
+        $this->assertSame($builder->buildSystemPrompt(), $builder->buildSystemPrompt([], null));
+        $this->assertStringNotContainsString('Intent selection hints for Italian input', $builder->buildSystemPrompt());
+    }
+
+    public function test_variant_block_is_appended_only_when_requested(): void
+    {
+        $builder = $this->app->make(InterpretationPromptBuilder::class);
+
+        $base = $builder->buildSystemPrompt();
+        $withVariant = $builder->buildSystemPrompt([], PromptVariant::ItIntentGuidance);
+
+        $this->assertStringContainsString('Intent selection hints for Italian input', $withVariant);
+        // Append-only: the entire base prompt is a prefix of the variant prompt.
+        $this->assertStringStartsWith($base, $withVariant);
+        // Intent-selection only — the variant adds no entity-formatting rules.
+        $this->assertStringContainsString('use these to choose the intent only', $withVariant);
+    }
+
+    public function test_variant_and_exemplars_compose_without_replacing_the_base(): void
+    {
+        $builder = $this->app->make(InterpretationPromptBuilder::class);
+
+        $exemplar = new PromptExemplar(
+            inputText: 'Assegna Bianchi a Luca',
+            output: ['intent' => 'assign_lead', 'confidence' => 0.9, 'entities' => ['lead' => 'Bianchi', 'assignee' => 'Luca'], 'notes' => []],
+            sourceId: 'it-assign-lead-template',
+        );
+
+        $prompt = $builder->buildSystemPrompt([$exemplar], PromptVariant::ItIntentGuidance);
+
+        $this->assertStringContainsString('Registered intents and their allowed entity keys:', $prompt);
+        $this->assertStringContainsString('Intent selection hints for Italian input', $prompt);
+        $this->assertStringContainsString('Worked examples', $prompt);
+        // Variant guidance precedes the worked examples block.
+        $this->assertLessThan(
+            strpos($prompt, 'Worked examples'),
+            strpos($prompt, 'Intent selection hints for Italian input'),
+        );
     }
 }

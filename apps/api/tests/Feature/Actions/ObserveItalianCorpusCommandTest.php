@@ -862,4 +862,61 @@ class ObserveItalianCorpusCommandTest extends TestCase
             $this->assertArrayHasKey($strategy, $decoded['strategies']);
         }
     }
+
+    // ── Slice A6.2: diagnostics-only Italian intent-selection prompt variant ───
+
+    public function test_default_run_uses_no_prompt_variant(): void
+    {
+        $client = $this->fakeRecordingRequests();
+
+        $decoded = $this->runJson(['--case' => 'it-create-task-followup-ferrari']);
+
+        $this->assertNull($decoded['effective']['prompt_variant']);
+        $this->assertSame('none', $decoded['effective']['prompt_variant_source']);
+        $this->assertStringNotContainsString('Intent selection hints for Italian input', (string) end($client->requests)->systemPrompt);
+    }
+
+    public function test_cli_prompt_variant_appends_guidance_and_is_reported(): void
+    {
+        $client = $this->fakeRecordingRequests();
+
+        $decoded = $this->runJson(['--case' => 'it-create-task-followup-ferrari', '--prompt-variant' => 'it_intent_guidance']);
+
+        $this->assertSame('it_intent_guidance', $decoded['effective']['prompt_variant']);
+        $this->assertSame('cli:--prompt-variant', $decoded['effective']['prompt_variant_source']);
+        $this->assertStringContainsString('Intent selection hints for Italian input', (string) end($client->requests)->systemPrompt);
+    }
+
+    public function test_unknown_prompt_variant_fails_clearly(): void
+    {
+        $this->fakeRecordingRequests();
+
+        $this->artisan('actions:observe-italian-corpus', ['--prompt-variant' => 'bogus'])
+            ->assertFailed()
+            ->expectsOutputToContain('--prompt-variant must be a known variant');
+    }
+
+    public function test_no_think_artifact_cannot_leak_into_entities(): void
+    {
+        // Fake a reasoning model echoing Ollama's "/no_think" control directive into an entity value.
+        $client = new class implements LlmClientInterface
+        {
+            public function generateStructured(LlmRequest $request): LlmResponse
+            {
+                $payload = ['intent' => 'prepare_contract_from_quote', 'confidence' => 0.9, 'entities' => ['lead' => 'Ferrari', 'quote' => '/no_think'], 'notes' => []];
+
+                return new LlmResponse(rawText: (string) json_encode($payload), parsedJson: $payload);
+            }
+        };
+        $this->app->instance(LlmClientInterface::class, $client);
+
+        $decoded = $this->runJson(['--case' => 'it-prepare-contract-ferrari-q2048']);
+
+        $case = $decoded['cases'][0];
+        // The control token is stripped before validation: it never appears in the extracted entities.
+        $this->assertArrayNotHasKey('quote', $case['normalized_command']['entities']);
+        $this->assertStringNotContainsString('/no_think', json_encode($case['normalized_command']));
+        // The raw response is preserved for transparency (the artifact is not hidden, only de-leaked).
+        $this->assertStringContainsString('/no_think', (string) $case['raw_response']);
+    }
 }

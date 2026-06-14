@@ -87,6 +87,31 @@ class ObservationProfileResolverTest extends TestCase
         $this->assertSame(ExemplarStrategy::Selected, $profile->defaultExemplarStrategy);
     }
 
+    public function test_shipped_reasoning_profile_carries_no_prompt_variant_by_default(): void
+    {
+        // A6.2: the it_intent_guidance variant stays CLI-only — the A6.2 benchmark showed it fixes 4
+        // targeted cases but regresses schedule_meeting/unknown and adds validation failures, so it
+        // must NOT be a profile default. (The mechanism below proves a profile *could* carry one.)
+        $this->assertNull(DefaultObservationProfiles::reasoning()->promptVariantId);
+        $this->assertNull(DefaultObservationProfiles::instructionFollowing()->promptVariantId);
+    }
+
+    public function test_a_profile_can_carry_and_resolve_a_prompt_variant(): void
+    {
+        // Proves profile-level promptVariantId is honored end-to-end (id round-trips to the enum),
+        // so enabling it by default later is a one-line change if a future benchmark justifies it.
+        $profile = new \Fluxio\Actions\Diagnostics\Profiles\ObservationProfile(
+            id: 'reasoning',
+            capabilityClass: ModelCapabilityClass::Reasoning,
+            think: false,
+            forceJson: true,
+            promptVariantId: 'it_intent_guidance',
+        );
+
+        $this->assertSame('it_intent_guidance', $profile->toArray()['prompt_variant']);
+        $this->assertSame(\Fluxio\Actions\Llm\Prompting\PromptVariant::ItIntentGuidance, \Fluxio\Actions\Llm\Prompting\PromptVariant::fromString((string) $profile->promptVariantId));
+    }
+
     public function test_profile_few_shot_policy_is_serialized_in_to_array(): void
     {
         $this->assertSame(false, DefaultObservationProfiles::instructionFollowing()->toArray()['few_shot_default']);

@@ -26,16 +26,17 @@ class InterpretationPromptBuilder
     /**
      * Build the strict system prompt.
      *
-     * When $exemplars is empty (the default, and the only case the runtime/sandbox
-     * provider ever uses) the output is byte-identical to the original prompt. Few-shot
-     * exemplars are an OPT-IN diagnostics affordance: when supplied, a clearly delimited
-     * "Worked examples" block is appended after the shape example. The exemplars are
-     * provider-facing and contract-shaped; only their input text and output JSON are
-     * rendered (never any provenance/identity metadata).
+     * When $exemplars is empty AND $variant is null (the default, and the only case the
+     * runtime/sandbox provider ever uses) the output is byte-identical to the original prompt.
+     * Both are OPT-IN diagnostics affordances appended AFTER the base prompt, never rewriting it:
+     *  - $variant (A6.2): a delimited intent-selection guidance block appended after the shape
+     *    example. Diagnostics-only; the runtime always passes null.
+     *  - $exemplars (A2/A3.1): a delimited "Worked examples" block. Provider-facing and
+     *    contract-shaped; only input text and output JSON are rendered (never provenance/identity).
      *
      * @param  list<PromptExemplar>  $exemplars
      */
-    public function buildSystemPrompt(array $exemplars = []): string
+    public function buildSystemPrompt(array $exemplars = [], ?PromptVariant $variant = null): string
     {
         $lines = [
             'You convert a single user message into one structured interpretation for a CRM/ERP assistant.',
@@ -85,6 +86,12 @@ class InterpretationPromptBuilder
             'Example of the required shape:',
             '{"intent":"create_task","confidence":0.82,"entities":{"lead":"Rossi","due_at":"tomorrow"},"notes":[]}',
         ]);
+
+        // Opt-in, append-only diagnostics guidance variant (A6.2). Added ONLY when a variant is
+        // supplied, so the default prompt stays byte-identical for the runtime/sandbox provider.
+        if ($variant !== null) {
+            $lines = array_merge($lines, $variant->guidanceLines());
+        }
 
         // Opt-in few-shot block. Appended ONLY when exemplars are supplied, so the default
         // prompt stays byte-identical for the runtime/sandbox provider.
