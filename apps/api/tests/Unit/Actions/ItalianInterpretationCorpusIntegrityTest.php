@@ -44,8 +44,9 @@ class ItalianInterpretationCorpusIntegrityTest extends TestCase
 
     public function test_corpus_is_large_enough_to_be_useful(): void
     {
-        // ~50 cases: each weighs ~2%, so one case no longer swings the headline by 20% (the A1/A2 flaw).
-        $this->assertGreaterThanOrEqual(45, count($this->cases));
+        // A4.2 expanded 51 → 90+ cases: each weighs ~1%, restoring measurement headroom after the
+        // strong model saturated the 51-case set (qwen3:1.7b selected = 98% = 1 residual error).
+        $this->assertGreaterThanOrEqual(90, count($this->cases));
     }
 
     public function test_every_case_is_italian(): void
@@ -128,24 +129,35 @@ class ItalianInterpretationCorpusIntegrityTest extends TestCase
         }
     }
 
-    public function test_every_mvp_intent_has_at_least_eight_italian_cases(): void
+    public function test_every_mvp_intent_has_at_least_fifteen_italian_cases(): void
     {
         $counts = array_count_values(array_map(fn ($c) => $c->expectedIntent, $this->cases));
 
         foreach (self::MVP_INTENTS as $intent) {
             $this->assertGreaterThanOrEqual(
-                8,
+                15,
                 $counts[$intent] ?? 0,
-                "Intent [{$intent}] has fewer than 8 Italian cases.",
+                "Intent [{$intent}] has fewer than 15 Italian cases.",
             );
         }
     }
 
-    public function test_corpus_has_several_out_of_domain_unknown_cases(): void
+    public function test_corpus_has_enough_out_of_domain_unknown_cases(): void
     {
         $unknown = array_filter($this->cases, fn ($c) => $c->expectedIntent === 'unknown');
 
-        $this->assertGreaterThanOrEqual(3, count($unknown), 'Expected several out-of-domain unknown cases.');
+        $this->assertGreaterThanOrEqual(10, count($unknown), 'Expected at least 10 out-of-domain unknown cases.');
+    }
+
+    public function test_no_duplicate_corpus_text(): void
+    {
+        $texts = array_map(fn ($c) => $c->text, $this->cases);
+
+        $this->assertSame(
+            array_values(array_unique($texts)),
+            array_values($texts),
+            'Duplicate corpus text found — each case must be a distinct phrasing.',
+        );
     }
 
     public function test_no_corpus_text_leaks_from_intent_examples(): void

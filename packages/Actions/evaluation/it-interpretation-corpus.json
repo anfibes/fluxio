@@ -360,5 +360,299 @@
         "locale": "it",
         "expected": { "intent": "unknown" },
         "notes": ["Settings toggle, out of domain."]
+    },
+    {
+        "id": "it-create-task-preventivo-studio-verdi",
+        "text": "Ricordami di mandare il preventivo allo Studio Verdi",
+        "locale": "it",
+        "expected": { "intent": "create_task", "entities": { "lead": "Studio Verdi" } },
+        "notes": ["A4.2: studio-style lead; mentions 'preventivo' but it is a reminder/to-do, not a contract-from-quote (near-miss vs prepare_contract)."]
+    },
+    {
+        "id": "it-create-task-ricontatta-rossi-consulting",
+        "text": "Aggiungi un compito per ricontattare Rossi Consulting",
+        "locale": "it",
+        "expected": { "intent": "create_task", "entities": { "lead": "Rossi Consulting" } },
+        "notes": ["A4.2: company-style lead."]
+    },
+    {
+        "id": "it-create-task-richiama-officine-marino",
+        "text": "Segna di richiamare Officine Marino la settimana prossima",
+        "locale": "it",
+        "expected": { "intent": "create_task", "entities": { "lead": "Officine Marino" } },
+        "notes": ["A4.2: multi-word organization lead; relative time present but not asserted."]
+    },
+    {
+        "id": "it-create-task-pratica-bianchi-partners",
+        "text": "Apri un'attività per seguire la pratica di Bianchi & Partners",
+        "locale": "it",
+        "expected": { "intent": "create_task", "entities": { "lead": "Bianchi & Partners" } },
+        "notes": ["A4.2: lead with ampersand."]
+    },
+    {
+        "id": "it-create-task-documenti-farmacia-san-marco",
+        "text": "Raccogli i documenti della Farmacia San Marco",
+        "locale": "it",
+        "expected": { "intent": "create_task", "entities": { "lead": "Farmacia San Marco" } },
+        "notes": ["A4.2: mentions 'documenti' but no contract/quote (near-miss vs prepare_contract); multi-word lead."]
+    },
+    {
+        "id": "it-create-task-offerta-tecno-impianti",
+        "text": "Metti un promemoria per inviare l'offerta a Tecno Impianti Abruzzo",
+        "locale": "it",
+        "expected": { "intent": "create_task", "entities": { "lead": "Tecno Impianti Abruzzo" } },
+        "notes": ["A4.2: 'offerta' (quote-like) appears but it is a reminder; lead appears late, multi-word org."]
+    },
+    {
+        "id": "it-create-task-relazione-associazione-nuova-alba",
+        "text": "Annota di preparare la relazione per l'Associazione Nuova Alba",
+        "locale": "it",
+        "expected": { "intent": "create_task", "entities": { "lead": "Associazione Nuova Alba" } },
+        "notes": ["A4.2: lead introduced with an article; multi-word organization."]
+    },
+    {
+        "id": "it-schedule-call-videochiamata-rossi-consulting",
+        "text": "Fissa una videochiamata con Rossi Consulting per giovedì",
+        "locale": "it",
+        "expected": { "intent": "schedule_call", "entities": { "lead": "Rossi Consulting" } },
+        "notes": ["A4.2: 'videochiamata' (near-miss vs schedule_meeting); company-style lead."]
+    },
+    {
+        "id": "it-schedule-call-telefono-studio-verdi",
+        "text": "Sentiamo lo Studio Verdi al telefono lunedì mattina",
+        "locale": "it",
+        "expected": { "intent": "schedule_call", "entities": { "lead": "Studio Verdi" } },
+        "notes": ["A4.2: 'al telefono' framing (near-miss vs schedule_meeting); studio-style lead."]
+    },
+    {
+        "id": "it-schedule-call-farmacia-san-marco",
+        "text": "Prenota una chiamata con la Farmacia San Marco per la prossima settimana",
+        "locale": "it",
+        "expected": { "intent": "schedule_call", "entities": { "lead": "Farmacia San Marco" } },
+        "notes": ["A4.2: multi-word lead with article."]
+    },
+    {
+        "id": "it-schedule-call-tecno-impianti-abruzzo",
+        "text": "Organizza una call con Tecno Impianti Abruzzo venerdì pomeriggio",
+        "locale": "it",
+        "expected": { "intent": "schedule_call", "entities": { "lead": "Tecno Impianti Abruzzo" } },
+        "notes": ["A4.2: multi-word organization lead."]
+    },
+    {
+        "id": "it-schedule-call-bianchi-partners",
+        "text": "Programma una telefonata con Bianchi & Partners per martedì",
+        "locale": "it",
+        "expected": { "intent": "schedule_call", "entities": { "lead": "Bianchi & Partners" } },
+        "notes": ["A4.2: lead with ampersand."]
+    },
+    {
+        "id": "it-schedule-call-aggiornamento-officine-marino",
+        "text": "Metti in agenda una chiamata di aggiornamento con Officine Marino",
+        "locale": "it",
+        "expected": { "intent": "schedule_call", "entities": { "lead": "Officine Marino" } },
+        "notes": ["A4.2: multi-word organization lead."]
+    },
+    {
+        "id": "it-schedule-call-sentire-associazione-nuova-alba",
+        "text": "Dobbiamo sentire al telefono l'Associazione Nuova Alba mercoledì",
+        "locale": "it",
+        "expected": { "intent": "schedule_call", "entities": { "lead": "Associazione Nuova Alba" } },
+        "notes": ["A4.2: lead appears late with an article; 'sentire al telefono' framing."]
+    },
+    {
+        "id": "it-schedule-meeting-di-persona-studio-verdi",
+        "text": "Vediamo lo Studio Verdi di persona in ufficio venerdì",
+        "locale": "it",
+        "expected": { "intent": "schedule_meeting", "entities": { "lead": "Studio Verdi" } },
+        "notes": ["A4.2: 'di persona in ufficio' (near-miss vs schedule_call); studio-style lead."]
+    },
+    {
+        "id": "it-schedule-meeting-faccia-a-faccia-rossi-consulting",
+        "text": "Organizza un faccia a faccia con Rossi Consulting lunedì",
+        "locale": "it",
+        "expected": { "intent": "schedule_meeting", "entities": { "lead": "Rossi Consulting" } },
+        "notes": ["A4.2: 'faccia a faccia' (in-person, near-miss vs schedule_call); company-style lead."]
+    },
+    {
+        "id": "it-schedule-meeting-farmacia-san-marco",
+        "text": "Fissa un incontro con la Farmacia San Marco giovedì alle 16",
+        "locale": "it",
+        "expected": { "intent": "schedule_meeting", "entities": { "lead": "Farmacia San Marco" } },
+        "notes": ["A4.2: multi-word lead with article; time present but not asserted."]
+    },
+    {
+        "id": "it-schedule-meeting-tecno-impianti-abruzzo",
+        "text": "Prenota una riunione con Tecno Impianti Abruzzo per la prossima settimana",
+        "locale": "it",
+        "expected": { "intent": "schedule_meeting", "entities": { "lead": "Tecno Impianti Abruzzo" } },
+        "notes": ["A4.2: multi-word organization lead."]
+    },
+    {
+        "id": "it-schedule-meeting-sede-bianchi-partners",
+        "text": "Metti in agenda un incontro in sede con Bianchi & Partners",
+        "locale": "it",
+        "expected": { "intent": "schedule_meeting", "entities": { "lead": "Bianchi & Partners" } },
+        "notes": ["A4.2: lead with ampersand."]
+    },
+    {
+        "id": "it-schedule-meeting-appuntamento-officine-marino",
+        "text": "Fissa un appuntamento con le Officine Marino martedì mattina",
+        "locale": "it",
+        "expected": { "intent": "schedule_meeting", "entities": { "lead": "Officine Marino" } },
+        "notes": ["A4.2: multi-word lead with article."]
+    },
+    {
+        "id": "it-schedule-meeting-tavolo-associazione-nuova-alba",
+        "text": "Organizza un tavolo di lavoro con l'Associazione Nuova Alba venerdì",
+        "locale": "it",
+        "expected": { "intent": "schedule_meeting", "entities": { "lead": "Associazione Nuova Alba" } },
+        "notes": ["A4.2: lead with article; 'tavolo di lavoro' meeting framing."]
+    },
+    {
+        "id": "it-assign-lead-carico-studio-verdi",
+        "text": "Metti in carico lo Studio Verdi a Elena",
+        "locale": "it",
+        "expected": { "intent": "assign_lead", "entities": { "lead": "Studio Verdi", "assignee": "Elena" } },
+        "notes": ["A4.2: 'metti in carico' assignment phrasing (near-miss vs create_task); studio-style lead."]
+    },
+    {
+        "id": "it-assign-lead-gestione-rossi-consulting",
+        "text": "Sposta la gestione di Rossi Consulting su Andrea",
+        "locale": "it",
+        "expected": { "intent": "assign_lead", "entities": { "lead": "Rossi Consulting", "assignee": "Andrea" } },
+        "notes": ["A4.2: transfer phrasing 'sposta la gestione su'; company-style lead."]
+    },
+    {
+        "id": "it-assign-lead-farmacia-san-marco-marta",
+        "text": "Affida la Farmacia San Marco a Marta",
+        "locale": "it",
+        "expected": { "intent": "assign_lead", "entities": { "lead": "Farmacia San Marco", "assignee": "Marta" } },
+        "notes": ["A4.2: multi-word lead with article."]
+    },
+    {
+        "id": "it-assign-lead-tecno-impianti-stefano",
+        "text": "Assegna Tecno Impianti Abruzzo a Stefano",
+        "locale": "it",
+        "expected": { "intent": "assign_lead", "entities": { "lead": "Tecno Impianti Abruzzo", "assignee": "Stefano" } },
+        "notes": ["A4.2: multi-word organization lead."]
+    },
+    {
+        "id": "it-assign-lead-bianchi-partners-federico",
+        "text": "Passa il cliente Bianchi & Partners a Federico",
+        "locale": "it",
+        "expected": { "intent": "assign_lead", "entities": { "lead": "Bianchi & Partners", "assignee": "Federico" } },
+        "notes": ["A4.2: lead with ampersand."]
+    },
+    {
+        "id": "it-assign-lead-officine-marino-roberta",
+        "text": "Attribuisci le Officine Marino a Roberta",
+        "locale": "it",
+        "expected": { "intent": "assign_lead", "entities": { "lead": "Officine Marino", "assignee": "Roberta" } },
+        "notes": ["A4.2: multi-word lead with article."]
+    },
+    {
+        "id": "it-assign-lead-associazione-nuova-alba-nicola",
+        "text": "Gira l'Associazione Nuova Alba a Nicola per la gestione",
+        "locale": "it",
+        "expected": { "intent": "assign_lead", "entities": { "lead": "Associazione Nuova Alba", "assignee": "Nicola" } },
+        "notes": ["A4.2: lead with article; 'gira ... a' transfer phrasing."]
+    },
+    {
+        "id": "it-prepare-contract-studio-verdi-q6010",
+        "text": "Redigi il contratto per lo Studio Verdi sulla base del preventivo Q-6010",
+        "locale": "it",
+        "expected": { "intent": "prepare_contract_from_quote", "entities": { "lead": "Studio Verdi", "quote": "Q-6010" } },
+        "notes": ["A4.2: studio-style lead with article; explicit quote."]
+    },
+    {
+        "id": "it-prepare-contract-rossi-consulting-q8123",
+        "text": "Genera il contratto per Rossi Consulting a partire dal preventivo Q-8123",
+        "locale": "it",
+        "expected": { "intent": "prepare_contract_from_quote", "entities": { "lead": "Rossi Consulting", "quote": "Q-8123" } },
+        "notes": ["A4.2: company-style lead; explicit quote."]
+    },
+    {
+        "id": "it-prepare-contract-farmacia-san-marco-q4099",
+        "text": "Imposta un contratto per la Farmacia San Marco dal preventivo Q-4099",
+        "locale": "it",
+        "expected": { "intent": "prepare_contract_from_quote", "entities": { "lead": "Farmacia San Marco", "quote": "Q-4099" } },
+        "notes": ["A4.2: multi-word lead with article; explicit quote."]
+    },
+    {
+        "id": "it-prepare-contract-tecno-impianti-q2500",
+        "text": "Crea il contratto per Tecno Impianti Abruzzo basato sul preventivo Q-2500",
+        "locale": "it",
+        "expected": { "intent": "prepare_contract_from_quote", "entities": { "lead": "Tecno Impianti Abruzzo", "quote": "Q-2500" } },
+        "notes": ["A4.2: multi-word organization lead; explicit quote."]
+    },
+    {
+        "id": "it-prepare-contract-bianchi-partners-q9001",
+        "text": "Prepara la bozza di contratto per Bianchi & Partners dal preventivo Q-9001",
+        "locale": "it",
+        "expected": { "intent": "prepare_contract_from_quote", "entities": { "lead": "Bianchi & Partners", "quote": "Q-9001" } },
+        "notes": ["A4.2: lead with ampersand; explicit quote."]
+    },
+    {
+        "id": "it-prepare-contract-officine-marino-q3750",
+        "text": "Redigi un contratto per le Officine Marino partendo dal preventivo Q-3750",
+        "locale": "it",
+        "expected": { "intent": "prepare_contract_from_quote", "entities": { "lead": "Officine Marino", "quote": "Q-3750" } },
+        "notes": ["A4.2: multi-word lead with article; explicit quote."]
+    },
+    {
+        "id": "it-prepare-contract-associazione-q1600",
+        "text": "Genera il contratto per l'Associazione Nuova Alba dall'offerta Q-1600",
+        "locale": "it",
+        "expected": { "intent": "prepare_contract_from_quote", "entities": { "lead": "Associazione Nuova Alba", "quote": "Q-1600" } },
+        "notes": ["A4.2: lead with article; 'offerta' synonym for the quote reference."]
+    },
+    {
+        "id": "it-unknown-report-contratti",
+        "text": "Genera un report dei contratti firmati quest'anno",
+        "locale": "it",
+        "expected": { "intent": "unknown" },
+        "notes": ["A4.2: reporting; mentions 'contratti' (near-miss vs prepare_contract) but is a report query."]
+    },
+    {
+        "id": "it-unknown-elenco-chiamate",
+        "text": "Elenca tutte le chiamate fatte questa settimana",
+        "locale": "it",
+        "expected": { "intent": "unknown" },
+        "notes": ["A4.2: listing; mentions 'chiamate' (near-miss vs schedule_call) but is a query, not scheduling."]
+    },
+    {
+        "id": "it-unknown-riunioni-oggi",
+        "text": "Mostra le riunioni in calendario per oggi",
+        "locale": "it",
+        "expected": { "intent": "unknown" },
+        "notes": ["A4.2: viewing; mentions 'riunioni' (near-miss vs schedule_meeting) but is a query."]
+    },
+    {
+        "id": "it-unknown-fatture-scadute",
+        "text": "Quali fatture sono scadute questo mese?",
+        "locale": "it",
+        "expected": { "intent": "unknown" },
+        "notes": ["A4.2: invoices/generic question, out of domain."]
+    },
+    {
+        "id": "it-unknown-cerca-documento",
+        "text": "Cerca il documento di trasporto del mese scorso",
+        "locale": "it",
+        "expected": { "intent": "unknown" },
+        "notes": ["A4.2: document search, out of domain."]
+    },
+    {
+        "id": "it-unknown-magazzino",
+        "text": "Aggiorna le giacenze di magazzino",
+        "locale": "it",
+        "expected": { "intent": "unknown" },
+        "notes": ["A4.2: inventory, out of domain."]
+    },
+    {
+        "id": "it-unknown-newsletter-email",
+        "text": "Invia la newsletter a tutti i clienti",
+        "locale": "it",
+        "expected": { "intent": "unknown" },
+        "notes": ["A4.2: bulk email/marketing action, out of the supported intents."]
     }
 ]

@@ -132,9 +132,9 @@ class ObserveItalianCorpusCommandTest extends TestCase
 
         $decoded = $this->runJson();
 
-        $this->assertGreaterThanOrEqual(45, $decoded['evaluated']);
-        // create_task is the only intent the constant fake matches.
-        $this->assertSame(9, $decoded['metrics']['intent_match']['count']);
+        $this->assertGreaterThanOrEqual(90, $decoded['evaluated']);
+        // create_task is the only intent the constant fake matches (16 create_task cases after A4.2).
+        $this->assertSame(16, $decoded['metrics']['intent_match']['count']);
     }
 
     // ── Few-shot observation ──────────────────────────────────────────────────
@@ -165,16 +165,16 @@ class ObserveItalianCorpusCommandTest extends TestCase
         $this->assertSame('it', $decoded['locale']);
         $this->assertGreaterThan(0, $decoded['few_shot']['count']);
 
-        // Baseline → unknown everywhere: only the unknown cases pass.
-        // Few-shot → schedule_call everywhere: only the schedule_call cases pass.
-        $this->assertSame(6, $decoded['baseline']['intent_match']['count']);
-        $this->assertSame(9, $decoded['few_shot_result']['intent_match']['count']);
+        // Baseline → unknown everywhere: only the unknown cases pass (13 after A4.2).
+        // Few-shot → schedule_call everywhere: only the schedule_call cases pass (16 after A4.2).
+        $this->assertSame(13, $decoded['baseline']['intent_match']['count']);
+        $this->assertSame(16, $decoded['few_shot_result']['intent_match']['count']);
 
         $delta = $decoded['delta'];
-        $this->assertSame(9, $delta['improved']);   // 9 schedule_call cases now pass
-        $this->assertSame(6, $delta['regressed']);  // 6 unknown cases now fail
+        $this->assertSame(16, $delta['improved']);   // 16 schedule_call cases now pass
+        $this->assertSame(13, $delta['regressed']);  // 13 unknown cases now fail
         $this->assertSame(0, $delta['unchanged_pass']);
-        $this->assertSame($decoded['total'] - 15, $delta['unchanged_fail']);
+        $this->assertSame($decoded['total'] - 29, $delta['unchanged_fail']);
 
         // Ids are surfaced for quick scanning.
         $this->assertContains('it-schedule-call-domani-ferrari', $delta['improved_ids']);
@@ -605,22 +605,22 @@ class ObserveItalianCorpusCommandTest extends TestCase
         $this->assertArrayHasKey('blind', $decoded['strategies']);
         $this->assertArrayHasKey('selected', $decoded['strategies']);
 
-        // none: no exemplars → unknown everywhere → only the 6 out-of-domain cases pass.
-        $this->assertSame(6, $decoded['strategies']['none']['intent_match']['count']);
-        // blind: first exemplar always create_task → only the 9 create_task cases pass.
-        $this->assertSame(9, $decoded['strategies']['blind']['intent_match']['count']);
-        // selected: relevant intent leads for all 5 MVP intents (9 each = 45); unknown cases miss.
-        $this->assertSame(45, $decoded['strategies']['selected']['intent_match']['count']);
+        // none: no exemplars → unknown everywhere → only the 13 out-of-domain cases pass.
+        $this->assertSame(13, $decoded['strategies']['none']['intent_match']['count']);
+        // blind: first exemplar always create_task → only the 16 create_task cases pass.
+        $this->assertSame(16, $decoded['strategies']['blind']['intent_match']['count']);
+        // selected: relevant intent leads for all 5 MVP intents (16 each = 80); unknown cases miss.
+        $this->assertSame(80, $decoded['strategies']['selected']['intent_match']['count']);
 
         // Required metrics are present per strategy.
         $this->assertArrayHasKey('contract_valid', $decoded['strategies']['selected']);
         $this->assertArrayHasKey('entity_agreement', $decoded['strategies']['selected']);
-        $this->assertSame(9, $decoded['strategies']['selected']['per_intent']['assign_lead']['intent_match']);
+        $this->assertSame(16, $decoded['strategies']['selected']['per_intent']['assign_lead']['intent_match']);
 
         // Headline A3.1 verdict: selected improved over blind.
         $this->assertSame('improved', $decoded['selected_vs_blind']['verdict']);
-        $this->assertSame(36, $decoded['selected_vs_blind']['intent_match_delta']);
-        $this->assertSame(36, $decoded['selected_vs_blind']['improved']);
+        $this->assertSame(64, $decoded['selected_vs_blind']['intent_match_delta']);
+        $this->assertSame(64, $decoded['selected_vs_blind']['improved']);
         $this->assertSame(0, $decoded['selected_vs_blind']['regressed']);
         $this->assertContains('it-assign-lead-affida-ferrari', $decoded['selected_vs_blind']['improved_ids']);
     }
@@ -665,11 +665,11 @@ class ObserveItalianCorpusCommandTest extends TestCase
         $decoded = $this->runJson(['--compare-strategies' => true]);
 
         $assign = $decoded['strategies']['selected']['per_intent']['assign_lead'];
-        $this->assertSame(9, $assign['total']);
-        $this->assertSame(9, $assign['intent_match']);
+        $this->assertSame(16, $assign['total']);
+        $this->assertSame(16, $assign['intent_match']);
         // Each assign_lead case asserts entities (lead/assignee) → comparable; the echo fake emits
         // no entities → zero agreement. Both per-intent entity fields must be present.
-        $this->assertSame(9, $assign['entity_comparable']);
+        $this->assertSame(16, $assign['entity_comparable']);
         $this->assertSame(0, $assign['entity_agreement']);
 
         // Out-of-domain cases assert no entities → not comparable.
@@ -689,16 +689,16 @@ class ObserveItalianCorpusCommandTest extends TestCase
             $this->assertArrayHasKey('per_intent', $decoded['comparisons'][$pair]);
         }
 
-        // none=6, blind=9, selected=45 with the first-exemplar-echo fake.
-        $this->assertSame(39, $decoded['comparisons']['selected_vs_none']['intent_match_delta']);
-        $this->assertSame(36, $decoded['comparisons']['selected_vs_blind']['intent_match_delta']);
+        // none=13, blind=16, selected=80 with the first-exemplar-echo fake.
+        $this->assertSame(67, $decoded['comparisons']['selected_vs_none']['intent_match_delta']);
+        $this->assertSame(64, $decoded['comparisons']['selected_vs_blind']['intent_match_delta']);
         $this->assertSame(3, $decoded['comparisons']['blind_vs_none']['intent_match_delta']);
 
-        // Per-intent delta: selected lifts assign_lead from 0 (none) to 9.
+        // Per-intent delta: selected lifts assign_lead from 0 (none) to 16.
         $perIntent = $decoded['comparisons']['selected_vs_none']['per_intent']['assign_lead'];
         $this->assertSame(0, $perIntent['from']);
-        $this->assertSame(9, $perIntent['to']);
-        $this->assertSame(9, $perIntent['delta']);
+        $this->assertSame(16, $perIntent['to']);
+        $this->assertSame(16, $perIntent['delta']);
 
         // improved/regressed ids are surfaced for selected vs blind.
         $this->assertContains('it-assign-lead-affida-ferrari', $decoded['comparisons']['selected_vs_blind']['improved_ids']);
