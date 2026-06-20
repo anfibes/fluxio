@@ -13,6 +13,7 @@ return [
     'ambiguous_task' => 'Più attività corrispondono al titolo indicato. Si prega di chiarire.',
     'unknown_task' => 'Nessuna attività corrisponde al titolo indicato.',
     'invalid_task_status' => 'Lo stato di destinazione non è uno stato valido per l\'attività.',
+    'invalid_lead_status' => 'Lo stato di destinazione non è uno stato valido per il lead.',
     'refined' => 'Proposta di azione affinata correttamente.',
     'cannot_refine' => 'Questa proposta di azione non può essere affinata.',
     'refinement_not_recognized' => 'L\'affinamento non è stato applicato. La proposta è rimasta invariata.',
@@ -54,6 +55,9 @@ return [
         ],
         'update_task_status' => [
             'canonical' => 'Imposta l\'attività :task come :state.',
+        ],
+        'update_lead_status' => [
+            'canonical' => 'Imposta il lead :lead su :state.',
         ],
     ],
 

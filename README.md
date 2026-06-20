@@ -636,7 +636,11 @@ Current implemented operational intents:
 - `schedule_call`
 - `schedule_meeting`
 - `assign_lead`
+- `update_lead_status` (updates a Lead's lifecycle status through a proposal)
 - `prepare_contract_from_quote`
+
+The first CRM lifecycle loop is now complete:
+`assign_lead → create_task → update_task_status → update_lead_status`.
 
 ---
 

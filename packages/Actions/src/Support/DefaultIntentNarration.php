@@ -51,6 +51,10 @@ final class DefaultIntentNarration
                 intent: 'update_task_status',
                 canonicalTemplateKey: 'actions::actions.narration.update_task_status.canonical',
             ),
+            new IntentNarrationDefinition(
+                intent: 'update_lead_status',
+                canonicalTemplateKey: 'actions::actions.narration.update_lead_status.canonical',
+            ),
         ];
     }
 }

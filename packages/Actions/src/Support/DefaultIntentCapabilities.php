@@ -129,6 +129,24 @@ final class DefaultIntentCapabilities
                 supportsCollectionMutations: false,
             ),
 
+            // update_lead_status: scalar field replacements only (target lead + status).
+            // Ambiguity resolution is supported because `lead` goes through entity
+            // resolution and can become a blocking ambiguity — required by the
+            // AmbiguityCapabilityInvariant. No collection mutations.
+            new IntentCapability(
+                intent: 'update_lead_status',
+                mutations: [
+                    new MutationCapability(operation: 'replace', fields: ['lead', 'state'], collection: false),
+                ],
+                refinements: [
+                    RefinementCapabilityType::ReplaceField,
+                    RefinementCapabilityType::ResolveAmbiguity,
+                ],
+                supportsContextualReferences: false,
+                supportsAmbiguityResolution: true,
+                supportsCollectionMutations: false,
+            ),
+
             // prepare_contract_from_quote: lead and quote replacement.
             // Ambiguity resolution is supported because lead requires entity resolution.
             // Collection mutations and contextual references remain disabled.

@@ -26,6 +26,7 @@ use Fluxio\Actions\Executors\CreateTaskActionExecutor;
 use Fluxio\Actions\Executors\PrepareContractActionExecutor;
 use Fluxio\Actions\Executors\ScheduleCallActionExecutor;
 use Fluxio\Actions\Executors\ScheduleMeetingActionExecutor;
+use Fluxio\Actions\Executors\UpdateLeadStatusActionExecutor;
 use Fluxio\Actions\Executors\UpdateTaskStatusActionExecutor;
 use Fluxio\Actions\Interpretation\Contracts\InterpretationProviderInterface;
 use Fluxio\Actions\Interpretation\InterpretationProviderAdapter;
@@ -163,6 +164,24 @@ class ActionsServiceProvider extends ServiceProvider
                     new EntityRequirement(key: 'state', entityType: 'scalar', label: 'Status', required: true),
                 ],
                 executorClass: UpdateTaskStatusActionExecutor::class,
+                confidence: 0.85,
+                complexity: IntentComplexity::Domain,
+            ));
+
+            // update_lead_status completes the first CRM lifecycle loop
+            // (assign_lead → create_task → update_task_status → update_lead_status).
+            // `lead` reuses the existing lead_query resolver; `state` carries the
+            // normalized target status — keyed `state`, not `status`, per the sandbox.
+            $registry->register(new IntentDefinition(
+                intent: 'update_lead_status',
+                label: 'Update Lead Status',
+                module: 'leads',
+                operation: 'update',
+                requirements: [
+                    new EntityRequirement(key: 'lead', entityType: 'lead_query', label: 'Lead', required: true, resolverRequired: true),
+                    new EntityRequirement(key: 'state', entityType: 'scalar', label: 'Status', required: true),
+                ],
+                executorClass: UpdateLeadStatusActionExecutor::class,
                 confidence: 0.85,
                 complexity: IntentComplexity::Domain,
             ));

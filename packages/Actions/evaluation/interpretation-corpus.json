@@ -712,5 +712,36 @@
         "notes": [
             "'set ... to <status>' phrasing with a multi-word task span."
         ]
+    },
+    {
+        "id": "update-lead-status-mark-contacted",
+        "text": "Mark Rossini as contacted",
+        "locale": "en",
+        "expected": {
+            "intent": "update_lead_status",
+            "entities": {
+                "lead": "Rossini",
+                "state": "contacted"
+            }
+        },
+        "notes": [
+            "Update an existing lead's lifecycle status; the lead span is resolved downstream by the existing LeadEntityResolver.",
+            "The status key is named 'state' because the provider sandbox forbids entity keys containing 'status'."
+        ]
+    },
+    {
+        "id": "update-lead-status-set-to-won",
+        "text": "Set Rossi SRL to won",
+        "locale": "en",
+        "expected": {
+            "intent": "update_lead_status",
+            "entities": {
+                "lead": "Rossi SRL",
+                "state": "won"
+            }
+        },
+        "notes": [
+            "'set ... to <status>' phrasing mapping onto a canonical Lead status."
+        ]
     }
 ]

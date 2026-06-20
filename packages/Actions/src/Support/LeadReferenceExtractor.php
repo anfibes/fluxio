@@ -61,6 +61,14 @@ class LeadReferenceExtractor
             return $this->trim($after);
         }
 
+        if ($intent === 'update_lead_status') {
+            // "mark <lead> as contacted" / "set <lead> to won" / "qualify <lead>" —
+            // the lead sits between a leading lifecycle/command verb and an optional
+            // "as|to <status>" tail. Mirrors TaskReferenceExtractor: strip the verb and
+            // the status clause, drop the "lead" noun and a leading determiner.
+            return $this->extractLeadStatusReference($text);
+        }
+
         foreach ($this->anchors($intent) as $anchor) {
             $pattern = '/\b'.preg_quote($anchor, '/').'\b\s+(.+)$/i';
 
@@ -74,6 +82,44 @@ class LeadReferenceExtractor
         }
 
         return null;
+    }
+
+    /**
+     * Extract the lead reference span from an update_lead_status command.
+     *
+     * Narrow and deterministic — it removes only the command scaffolding (leading
+     * verb, "as|to <status>" tail, the "lead" noun, a leading determiner, a trailing
+     * bare status word) and returns whatever lead reference remains, casing preserved.
+     * A status word inside the lead name ("Lost account") is kept; identity/ambiguity
+     * stay owned by LeadEntityResolver.
+     */
+    private function extractLeadStatusReference(string $text): ?string
+    {
+        $span = trim($text);
+
+        // Drop a leading lifecycle/command verb ("mark", "set", "qualify", …).
+        $span = (string) preg_replace(
+            '/^\s*(please\s+)?(mark|set|move|update|change|reopen|qualified|qualify|contacted)\b\s*/i',
+            '',
+            $span,
+            1,
+        );
+
+        // Drop a trailing status clause introduced by "as"/"to" ("… as contacted").
+        $span = (string) preg_replace('/\s+(as|to)\s+.+$/i', '', $span);
+
+        // Drop the literal noun "lead".
+        $span = (string) preg_replace('/\blead\b/i', ' ', $span);
+
+        // Drop a leading determiner ("the Rossi" → "Rossi").
+        $span = (string) preg_replace('/^\s*(the|a|an|this|that)\s+/i', '', $span);
+
+        // Drop a trailing bare status word with no connector ("mark Rossi contacted").
+        $span = (string) preg_replace('/\s+(new|contacted|qualified|lost|won)\s*$/i', '', $span);
+
+        $span = trim((string) preg_replace('/\s+/', ' ', $span));
+
+        return $span === '' ? null : $span;
     }
 
     /**

@@ -13,6 +13,7 @@ return [
     'ambiguous_task' => 'Multiple tasks match the given title. Please clarify.',
     'unknown_task' => 'No task matches the given title.',
     'invalid_task_status' => 'The target status is not a valid task status.',
+    'invalid_lead_status' => 'The target status is not a valid lead status.',
     'refined' => 'Action proposal refined successfully.',
     'cannot_refine' => 'This action proposal cannot be refined.',
     'refinement_not_recognized' => 'The refinement could not be applied. The proposal was left unchanged.',
@@ -53,6 +54,9 @@ return [
         ],
         'update_task_status' => [
             'canonical' => 'Mark task :task as :state.',
+        ],
+        'update_lead_status' => [
+            'canonical' => 'Set lead :lead to :state.',
         ],
     ],
 

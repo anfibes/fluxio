@@ -7,6 +7,7 @@ use Fluxio\Actions\DTO\EntityReference;
 use Fluxio\Actions\DTO\ParsedIntent;
 use Fluxio\Actions\Support\DateTimeExpressionParser;
 use Fluxio\Actions\Support\LeadReferenceExtractor;
+use Fluxio\Actions\Support\LeadStatusNormalizer;
 use Fluxio\Actions\Support\TaskReferenceExtractor;
 use Fluxio\Actions\Support\TaskStatusNormalizer;
 
@@ -17,6 +18,7 @@ class RuleBasedIntentResolver implements IntentResolverInterface
         private readonly LeadReferenceExtractor $leadReferenceExtractor,
         private readonly TaskReferenceExtractor $taskReferenceExtractor,
         private readonly TaskStatusNormalizer $taskStatusNormalizer,
+        private readonly LeadStatusNormalizer $leadStatusNormalizer,
     ) {}
 
     public function resolve(string $text): ParsedIntent
@@ -28,6 +30,7 @@ class RuleBasedIntentResolver implements IntentResolverInterface
         // than creating one.
         $intent = match (true) {
             $this->isUpdateTaskStatus($lower) => 'update_task_status',
+            $this->isUpdateLeadStatus($lower) => 'update_lead_status',
             str_contains($lower, 'contract') => 'prepare_contract_from_quote',
             str_contains($lower, 'assign') => 'assign_lead',
             str_contains($lower, 'meeting') => 'schedule_meeting',
@@ -76,6 +79,18 @@ class RuleBasedIntentResolver implements IntentResolverInterface
             $status = $this->taskStatusNormalizer->normalize($lower);
             if ($status !== null) {
                 $entities['state'] = $status;
+            }
+        }
+
+        // update_lead_status: the lead reference SPAN is emitted as a lead_query
+        // reference above (resolved downstream by the existing LeadEntityResolver); here
+        // we add only the normalized target lifecycle state, keyed `state` (the sandbox
+        // forbids entity keys containing "status"). Validated against Lead::STATUSES at
+        // execution time.
+        if ($intent === 'update_lead_status') {
+            $state = $this->leadStatusNormalizer->normalize($lower);
+            if ($state !== null) {
+                $entities['state'] = $state;
             }
         }
 
@@ -159,5 +174,28 @@ class RuleBasedIntentResolver implements IntentResolverInterface
         // verb that names the task noun directly. The explicit-update form is allowed
         // without a status so the proposal can stay draft on a missing target status.
         return ($hasTransitionVerb || $hasExplicitUpdateVerb) && str_contains($lower, 'task');
+    }
+
+    /**
+     * Whether the command expresses a change to an existing lead's lifecycle status
+     * (update_lead_status). Disjoint from the task domain: any command naming a "task"
+     * is excluded. A recognized lead state (explicit "as/to <status>" slot or a leading
+     * lifecycle verb like "qualify") is itself the signal; an explicit "update/change …
+     * lead" with no recognized state yet stays an update command (draft on missing
+     * state). "create" and "assign" commands are never lead-status updates.
+     */
+    private function isUpdateLeadStatus(string $lower): bool
+    {
+        if (str_contains($lower, 'create') || str_contains($lower, 'task')) {
+            return false;
+        }
+
+        if ($this->leadStatusNormalizer->normalize($lower) !== null) {
+            return true;
+        }
+
+        $hasExplicitUpdateVerb = preg_match('/\b(update|change)\b/', $lower) === 1;
+
+        return $hasExplicitUpdateVerb && str_contains($lower, 'lead');
     }
 }
