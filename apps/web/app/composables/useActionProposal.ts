@@ -5,6 +5,7 @@ export function useActionProposal() {
 
   const proposal = ref<ActionProposal | null>(null)
   const loading = ref(false)
+  const confirming = ref(false)
   const error = ref<string | null>(null)
 
   async function runProposalAction(id: string, action: 'confirm' | 'execute'): Promise<void> {
@@ -63,6 +64,7 @@ export function useActionProposal() {
     if (!proposal.value || proposal.value.status !== 'ready') return
     const id = proposal.value.id
     loading.value = true
+    confirming.value = true
     error.value = null
     try {
       await runProposalAction(id, 'confirm')
@@ -73,17 +75,19 @@ export function useActionProposal() {
     }
     finally {
       loading.value = false
+      confirming.value = false
     }
   }
 
   function setProposal(p: ActionProposal | null) { proposal.value = p }
   function setLoading(value: boolean) { loading.value = value }
   function setError(message: string | null) { error.value = message }
-  function clear() { proposal.value = null; error.value = null; loading.value = false }
+  function clear() { proposal.value = null; error.value = null; loading.value = false; confirming.value = false }
 
   return {
     proposal: readonly(proposal),
     loading: readonly(loading),
+    confirming: readonly(confirming),
     error: readonly(error),
     interpret,
     refine,

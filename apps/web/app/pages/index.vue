@@ -16,7 +16,7 @@ const { isAuthenticated } = useAuth()
 
 // ── live state ───────────────────────────────────────────────
 const commandText = ref('')
-const { proposal, loading, error, submitCommand, confirmAndExecute, resolveAmbiguity, setError, clear } = useActionProposal()
+const { proposal, loading, confirming, error, submitCommand, confirmAndExecute, resolveAmbiguity, setError, clear } = useActionProposal()
 const { history, push: pushHistory } = useCommandHistory()
 
 // ── composer keyboard shortcut ───────────────────────────────
@@ -187,6 +187,7 @@ function handleReset() {
         <ProposalActionProposalRail
           :proposal="displayProposal"
           :loading="loading"
+          :confirming="confirming"
           @confirm-execute="confirmAndExecute"
           @resolve-ambiguity="handleResolveAmbiguity"
           @reset="handleReset"

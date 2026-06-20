@@ -52,7 +52,7 @@ export interface ProposalAmbiguity {
   candidates: AmbiguityCandidate[]
 }
 
-export type EditableFieldSource = 'detected' | 'inferred' | 'guessed' | 'computed' | 'edited' | 'missing'
+export type EditableFieldSource = 'detected' | 'inferred' | 'guessed' | 'computed' | 'edited' | 'derived' | 'missing'
 
 /**
  * Optional, parser-local explainability for a field — explains HOW the value

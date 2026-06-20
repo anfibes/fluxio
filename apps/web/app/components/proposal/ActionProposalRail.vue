@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ActionProposal } from '~/types/actions'
 
-const props = defineProps<{ proposal: ActionProposal | null; loading?: boolean }>()
+const props = defineProps<{ proposal: ActionProposal | null; loading?: boolean; confirming?: boolean }>()
 const emit = defineEmits<{ 'confirm-execute': []; 'resolve-ambiguity': [text: string]; 'reset': [] }>()
 
 const isReady    = computed(() => props.proposal?.status === 'ready')
@@ -9,7 +9,7 @@ const isDraft    = computed(() => props.proposal?.status === 'draft')
 const isExecuted = computed(() => props.proposal?.status === 'executed')
 const isFailed   = computed(() => props.proposal?.status === 'failed')
 
-const canConfirm = computed(() => isReady.value && !props.loading)
+const canConfirm = computed(() => isReady.value && !props.confirming)
 
 // ── Operational hierarchy helpers ───────────────────────────
 
@@ -194,8 +194,8 @@ const exampleCommands = [
 
         </div>
 
-        <!-- Footer — hidden when already executed or failed -->
-        <div v-if="!isExecuted && !isFailed" class="flex gap-2 border-t border-border p-4">
+        <!-- Footer — only for states where user action is meaningful -->
+        <div v-if="isReady || isDraft || confirming" class="flex gap-2 border-t border-border p-4">
           <button
             type="button"
             class="flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-colors"
@@ -205,8 +205,8 @@ const exampleCommands = [
               : 'cursor-not-allowed bg-surface-raised text-muted'"
             @click="emit('confirm-execute')"
           >
-            <span v-if="loading" class="h-2 w-2 animate-pulse rounded-full bg-current opacity-60" />
-            {{ loading ? $t('proposal.confirming') : isDraft ? $t('proposal.complete_to_confirm') : $t('proposal.confirm_execute') }}
+            <span v-if="confirming" class="h-2 w-2 animate-pulse rounded-full bg-current opacity-60" />
+            {{ confirming ? $t('proposal.confirming') : isDraft ? $t('proposal.complete_to_confirm') : $t('proposal.confirm_execute') }}
           </button>
         </div>
 

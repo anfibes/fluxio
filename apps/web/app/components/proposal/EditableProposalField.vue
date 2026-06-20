@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { EditableField, EditableFieldSource } from '~/types/actions'
 
-defineProps<{ field: EditableField }>()
+const props = defineProps<{ field: EditableField }>()
 
 const sourceBadge: Record<EditableFieldSource, { text: string; cls: string }> = {
   detected: { text: 'detected', cls: 'bg-emerald-500/10 text-emerald-400' },
@@ -9,8 +9,13 @@ const sourceBadge: Record<EditableFieldSource, { text: string; cls: string }> = 
   guessed:   { text: 'guessed',  cls: 'bg-amber-500/10 text-amber-400' },
   computed:  { text: 'computed', cls: 'bg-purple-500/10 text-purple-400' },
   edited:    { text: 'edited',   cls: 'bg-surface-raised text-text-muted' },
+  derived:   { text: 'derived',  cls: 'bg-teal-500/10 text-teal-400' },
   missing:   { text: 'missing',  cls: 'bg-red-500/10 text-red-400' },
 }
+
+const badge = computed(() =>
+  sourceBadge[props.field.source as EditableFieldSource] ?? sourceBadge.detected,
+)
 </script>
 
 <template>
@@ -35,9 +40,9 @@ const sourceBadge: Record<EditableFieldSource, { text: string; cls: string }> = 
     </div>
     <span
       class="mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-xs"
-      :class="sourceBadge[field.source].cls"
+      :class="badge.cls"
     >
-      {{ sourceBadge[field.source].text }}
+      {{ badge.text }}
     </span>
   </div>
 </template>
