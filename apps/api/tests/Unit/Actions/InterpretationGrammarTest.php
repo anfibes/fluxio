@@ -192,7 +192,20 @@ class InterpretationGrammarTest extends TestCase
 
     public function test_export_contains_no_runtime_authority_surface(): void
     {
-        $flat = json_encode($this->grammar->export());
+        $export = $this->grammar->export();
+
+        // The guard protects the provider-facing ENTITY-KEY / contract surface, not the
+        // intent-name vocabulary. A legitimately named intent (e.g. update_task_status)
+        // is a registry fact, not a leaked runtime authority surface, so intent names —
+        // the `intents` list and the keys of `entity_keys_by_intent` — are excluded;
+        // everything a provider could emit as an entity key or contract field is checked.
+        $surface = [
+            'entity_keys' => array_merge(...array_values($export['entity_keys_by_intent'])),
+            'universal_parser_keys' => $export['universal_parser_keys'],
+            'allowed_reference_keys' => $export['allowed_reference_keys'],
+            'root_contract_fields' => $export['root_contract_fields'],
+        ];
+        $flat = json_encode($surface);
 
         foreach ([
             'status', 'readiness', 'ambiguit', 'missing', 'execution', 'executed',

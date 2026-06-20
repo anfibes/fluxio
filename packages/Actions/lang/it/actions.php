@@ -10,6 +10,9 @@ return [
     'unknown_lead' => 'Nessun lead corrisponde al nome indicato.',
     'ambiguous_assignee' => 'Più utenti corrispondono al nome indicato. Si prega di chiarire.',
     'unknown_assignee' => 'Nessun utente corrisponde al nome dell\'assegnatario.',
+    'ambiguous_task' => 'Più attività corrispondono al titolo indicato. Si prega di chiarire.',
+    'unknown_task' => 'Nessuna attività corrisponde al titolo indicato.',
+    'invalid_task_status' => 'Lo stato di destinazione non è uno stato valido per l\'attività.',
     'refined' => 'Proposta di azione affinata correttamente.',
     'cannot_refine' => 'Questa proposta di azione non può essere affinata.',
     'refinement_not_recognized' => 'L\'affinamento non è stato applicato. La proposta è rimasta invariata.',
@@ -49,6 +52,9 @@ return [
         'prepare_contract_from_quote' => [
             'canonical' => 'Prepara un contratto per :lead dal preventivo :quote.',
         ],
+        'update_task_status' => [
+            'canonical' => 'Imposta l\'attività :task come :state.',
+        ],
     ],
 
     'capabilities' => [
@@ -67,6 +73,8 @@ return [
             'participants' => 'Partecipanti',
             'assignee' => 'Assegnatario',
             'quote' => 'Preventivo',
+            'task' => 'Attività',
+            'state' => 'Stato',
         ],
         'refinements' => [
             'replace_field' => 'Aggiorna campi',

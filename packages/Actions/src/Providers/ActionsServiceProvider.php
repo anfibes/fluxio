@@ -18,6 +18,7 @@ use Fluxio\Actions\DTO\EntityRequirement;
 use Fluxio\Actions\DTO\IntentDefinition;
 use Fluxio\Actions\EntityResolution\Registry\EntityResolverRegistry;
 use Fluxio\Actions\EntityResolution\Resolvers\LeadEntityResolver;
+use Fluxio\Actions\EntityResolution\Resolvers\TaskEntityResolver;
 use Fluxio\Actions\EntityResolution\Resolvers\UserEntityResolver;
 use Fluxio\Actions\Enums\IntentComplexity;
 use Fluxio\Actions\Executors\AssignLeadActionExecutor;
@@ -25,6 +26,7 @@ use Fluxio\Actions\Executors\CreateTaskActionExecutor;
 use Fluxio\Actions\Executors\PrepareContractActionExecutor;
 use Fluxio\Actions\Executors\ScheduleCallActionExecutor;
 use Fluxio\Actions\Executors\ScheduleMeetingActionExecutor;
+use Fluxio\Actions\Executors\UpdateTaskStatusActionExecutor;
 use Fluxio\Actions\Interpretation\Contracts\InterpretationProviderInterface;
 use Fluxio\Actions\Interpretation\InterpretationProviderAdapter;
 use Fluxio\Actions\Interpretation\Providers\DeterministicInterpretationProvider;
@@ -78,6 +80,7 @@ class ActionsServiceProvider extends ServiceProvider
             $registry = new EntityResolverRegistry;
             $registry->register($app->make(LeadEntityResolver::class));
             $registry->register($app->make(UserEntityResolver::class));
+            $registry->register($app->make(TaskEntityResolver::class));
 
             return $registry;
         });
@@ -143,6 +146,24 @@ class ActionsServiceProvider extends ServiceProvider
                 ],
                 executorClass: AssignLeadActionExecutor::class,
                 confidence: 0.8,
+                complexity: IntentComplexity::Domain,
+            ));
+
+            // update_task_status closes the Task lifecycle loop (create_task → update).
+            // `task` is a resolver-backed reference (TaskEntityResolver). `state` carries
+            // the normalized target status — keyed `state`, not `status`, because the
+            // provider sandbox forbids entity keys containing "status".
+            $registry->register(new IntentDefinition(
+                intent: 'update_task_status',
+                label: 'Update Task Status',
+                module: 'tasks',
+                operation: 'update',
+                requirements: [
+                    new EntityRequirement(key: 'task', entityType: 'task_query', label: 'Task', required: true, resolverRequired: true),
+                    new EntityRequirement(key: 'state', entityType: 'scalar', label: 'Status', required: true),
+                ],
+                executorClass: UpdateTaskStatusActionExecutor::class,
+                confidence: 0.85,
                 complexity: IntentComplexity::Domain,
             ));
 

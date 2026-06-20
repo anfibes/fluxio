@@ -10,6 +10,9 @@ return [
     'unknown_lead' => 'No lead matches the given name.',
     'ambiguous_assignee' => 'Multiple users match the given name. Please clarify.',
     'unknown_assignee' => 'No user matches the given assignee name.',
+    'ambiguous_task' => 'Multiple tasks match the given title. Please clarify.',
+    'unknown_task' => 'No task matches the given title.',
+    'invalid_task_status' => 'The target status is not a valid task status.',
     'refined' => 'Action proposal refined successfully.',
     'cannot_refine' => 'This action proposal cannot be refined.',
     'refinement_not_recognized' => 'The refinement could not be applied. The proposal was left unchanged.',
@@ -48,6 +51,9 @@ return [
         'prepare_contract_from_quote' => [
             'canonical' => 'Prepare a contract for :lead from quote :quote.',
         ],
+        'update_task_status' => [
+            'canonical' => 'Mark task :task as :state.',
+        ],
     ],
 
     'capabilities' => [
@@ -66,6 +72,8 @@ return [
             'participants' => 'Participants',
             'assignee' => 'Assignee',
             'quote' => 'Quote',
+            'task' => 'Task',
+            'state' => 'Status',
         ],
         'refinements' => [
             'replace_field' => 'Update fields',

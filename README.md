@@ -475,8 +475,10 @@ EntityResolverInterface
 → ResolutionResult
 ```
 
-Current implemented resolver:
+Current implemented resolvers:
 - `LeadEntityResolver`
+- `UserEntityResolver`
+- `TaskEntityResolver`
 
 Current behaviors:
 - deterministic scoring
@@ -630,6 +632,7 @@ Fluxio already includes:
 
 Current implemented operational intents:
 - `create_task`
+- `update_task_status` (closes the Task lifecycle loop: `create_task → update_task_status`)
 - `schedule_call`
 - `schedule_meeting`
 - `assign_lead`

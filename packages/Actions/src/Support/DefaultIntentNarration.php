@@ -47,6 +47,10 @@ final class DefaultIntentNarration
                 intent: 'prepare_contract_from_quote',
                 canonicalTemplateKey: 'actions::actions.narration.prepare_contract_from_quote.canonical',
             ),
+            new IntentNarrationDefinition(
+                intent: 'update_task_status',
+                canonicalTemplateKey: 'actions::actions.narration.update_task_status.canonical',
+            ),
         ];
     }
 }

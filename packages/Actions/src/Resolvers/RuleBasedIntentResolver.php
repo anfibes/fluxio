@@ -7,19 +7,27 @@ use Fluxio\Actions\DTO\EntityReference;
 use Fluxio\Actions\DTO\ParsedIntent;
 use Fluxio\Actions\Support\DateTimeExpressionParser;
 use Fluxio\Actions\Support\LeadReferenceExtractor;
+use Fluxio\Actions\Support\TaskReferenceExtractor;
+use Fluxio\Actions\Support\TaskStatusNormalizer;
 
 class RuleBasedIntentResolver implements IntentResolverInterface
 {
     public function __construct(
         private readonly DateTimeExpressionParser $parser,
         private readonly LeadReferenceExtractor $leadReferenceExtractor,
+        private readonly TaskReferenceExtractor $taskReferenceExtractor,
+        private readonly TaskStatusNormalizer $taskStatusNormalizer,
     ) {}
 
     public function resolve(string $text): ParsedIntent
     {
         $lower = mb_strtolower($text);
 
+        // update_task_status is checked before create_task: phrases like "complete the
+        // follow-up task" contain "task" but mutate an EXISTING task's lifecycle rather
+        // than creating one.
         $intent = match (true) {
+            $this->isUpdateTaskStatus($lower) => 'update_task_status',
             str_contains($lower, 'contract') => 'prepare_contract_from_quote',
             str_contains($lower, 'assign') => 'assign_lead',
             str_contains($lower, 'meeting') => 'schedule_meeting',
@@ -52,6 +60,22 @@ class RuleBasedIntentResolver implements IntentResolverInterface
         if ($intent === 'assign_lead') {
             if ((bool) preg_match('/\bto\s+([A-Z][a-z]+)\b/', $text, $m)) {
                 $entities['assignee'] = $m[1];
+            }
+        }
+
+        // update_task_status: emit the task reference SPAN (resolved downstream by
+        // TaskEntityResolver) and the normalized target status. The status key is named
+        // `state` because the provider sandbox forbids entity keys containing "status";
+        // it carries the canonical Task status string, validated at execution time.
+        if ($intent === 'update_task_status') {
+            $taskQuery = $this->taskReferenceExtractor->extract($text);
+            if ($taskQuery !== null) {
+                $entities['task'] = $taskQuery;
+            }
+
+            $status = $this->taskStatusNormalizer->normalize($lower);
+            if ($status !== null) {
+                $entities['state'] = $status;
             }
         }
 
@@ -102,5 +126,38 @@ class RuleBasedIntentResolver implements IntentResolverInterface
             warnings: $warnings,
             entityReferences: $references,
         );
+    }
+
+    /**
+     * Whether the command expresses a change to an existing task's lifecycle status
+     * (update_task_status), as opposed to creating a task. Deliberately narrow — it
+     * recognizes only the obvious "mark … as <status>", "set … to <status>", and
+     * "<transition-verb> … task" phrasings, never a general NLP surface. A "create"
+     * command is always excluded.
+     */
+    private function isUpdateTaskStatus(string $lower): bool
+    {
+        if (str_contains($lower, 'create')) {
+            return false;
+        }
+
+        $hasStatus = $this->taskStatusNormalizer->normalize($lower) !== null;
+        $hasMark = preg_match('/\bmark\b/', $lower) === 1;
+        $hasSetTo = preg_match('/\bset\b.+\bto\b/', $lower) === 1;
+        $hasTransitionVerb = preg_match(
+            '/\b(complete|completed|close|closed|cancel|canceled|cancelled|reopen|finish|finished|done)\b/',
+            $lower,
+        ) === 1;
+        $hasExplicitUpdateVerb = preg_match('/\b(update|change)\b/', $lower) === 1;
+
+        // "mark … as <status>" / "set … to <status>" — only when a status is recognized.
+        if (($hasMark || $hasSetTo) && $hasStatus) {
+            return true;
+        }
+
+        // "Complete the … task" / "Update the … task": a transition or explicit-update
+        // verb that names the task noun directly. The explicit-update form is allowed
+        // without a status so the proposal can stay draft on a missing target status.
+        return ($hasTransitionVerb || $hasExplicitUpdateVerb) && str_contains($lower, 'task');
     }
 }

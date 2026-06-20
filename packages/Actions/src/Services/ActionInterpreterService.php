@@ -51,6 +51,15 @@ class ActionInterpreterService
             $prebuiltAmbiguities = array_merge($prebuiltAmbiguities, $assigneeAmbiguities);
         }
 
+        // Resolve the target task for update_task_status at interpretation time so an
+        // unknown or ambiguous task keeps the proposal draft rather than surfacing only
+        // at execution. The provider emits the task as a parsed scalar span (`task`),
+        // not a _query key, so resolution is triggered here against TaskEntityResolver.
+        if ($command->intent === 'update_task_status' && isset($entities['task'])) {
+            [$entities, $taskAmbiguities] = $this->resolveTask($entities['task'], $entities);
+            $prebuiltAmbiguities = array_merge($prebuiltAmbiguities, $taskAmbiguities);
+        }
+
         // Parser-local temporal provenance, derived once from the source text and
         // used only to attach explainability metadata to date/time editable fields.
         // It does not affect entities, status, readiness, confidence, or execution.
@@ -140,19 +149,57 @@ class ActionInterpreterService
             $entities['assignee'] = $result->resolvedCandidate->label;
         } elseif (! empty($result->candidates)) {
             $ambiguities[] = [
-                'key'                  => 'assignee',
-                'label'                => 'Assignee',
-                'reason'               => 'multiple_matches',
-                'blocking'             => true,
-                'query'                => $assigneeValue,
+                'key' => 'assignee',
+                'label' => 'Assignee',
+                'reason' => 'multiple_matches',
+                'blocking' => true,
+                'query' => $assigneeValue,
                 'selected_candidate_id' => null,
-                'candidates'           => array_map(
+                'candidates' => array_map(
                     fn (ResolutionCandidate $c) => $c->toArray(),
                     $result->candidates,
                 ),
             ];
         }
         // else: no match → assignee absent → builder treats it as a missing required field
+
+        return [$entities, $ambiguities];
+    }
+
+    /**
+     * Resolve the task span for update_task_status via TaskEntityResolver.
+     *
+     * Mirrors resolveAssignee: auto-resolved → entity kept as the resolved title;
+     * ambiguous → blocking ambiguity, entity removed; no match → entity removed (the
+     * builder then treats `task` as a missing required field). The resolver dispatch
+     * key (`task_query`) lives only here, never in the provider's entity surface.
+     *
+     * @return array{array, array}
+     */
+    private function resolveTask(string $taskValue, array $entities): array
+    {
+        unset($entities['task']);
+
+        $result = $this->resolverRegistry->resolve($taskValue, new ResolutionContext('task_query'));
+        $ambiguities = [];
+
+        if ($result->resolved) {
+            $entities['task'] = $result->resolvedCandidate->label;
+        } elseif (! empty($result->candidates)) {
+            $ambiguities[] = [
+                'key' => 'task',
+                'label' => 'Task',
+                'reason' => 'multiple_matches',
+                'blocking' => true,
+                'query' => $taskValue,
+                'selected_candidate_id' => null,
+                'candidates' => array_map(
+                    fn (ResolutionCandidate $c) => $c->toArray(),
+                    $result->candidates,
+                ),
+            ];
+        }
+        // else: no match → task absent → builder treats it as a missing required field
 
         return [$entities, $ambiguities];
     }

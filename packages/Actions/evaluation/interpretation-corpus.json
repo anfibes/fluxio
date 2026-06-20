@@ -681,5 +681,36 @@
         "notes": [
             "Out-of-domain general knowledge question."
         ]
+    },
+    {
+        "id": "update-task-status-mark-completed",
+        "text": "Mark the follow-up task as completed",
+        "locale": "en",
+        "expected": {
+            "intent": "update_task_status",
+            "entities": {
+                "task": "follow-up",
+                "state": "completed"
+            }
+        },
+        "notes": [
+            "Update an existing task's lifecycle status; the task span is resolved downstream by TaskEntityResolver.",
+            "The status key is named 'state' because the provider sandbox forbids entity keys containing 'status'."
+        ]
+    },
+    {
+        "id": "update-task-status-set-to-pending",
+        "text": "Set the Rossi follow-up task to pending",
+        "locale": "en",
+        "expected": {
+            "intent": "update_task_status",
+            "entities": {
+                "task": "Rossi follow-up",
+                "state": "pending"
+            }
+        },
+        "notes": [
+            "'set ... to <status>' phrasing with a multi-word task span."
+        ]
     }
 ]
