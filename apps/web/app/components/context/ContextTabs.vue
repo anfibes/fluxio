@@ -6,29 +6,31 @@ type Tab = typeof tabs[number]
 
 const active = ref<Tab>('Tasks')
 
-const mockTasks: ContextItem[] = [
-  { id: 1, title: 'Follow-up call with Acme Corp', subtitle: 'High priority', meta: 'Fri' },
-  { id: 2, title: 'Send proposal to TechStart', subtitle: 'Pending review', meta: 'Mon' },
-  { id: 3, title: 'Update CRM records', subtitle: 'Assigned to you', meta: 'Tue' },
-]
-
-const mockLeads: ContextItem[] = [
-  { id: 1, title: 'Sarah Chen', subtitle: 'TechStart Inc.', meta: 'New' },
-  { id: 2, title: 'Marco Rossi', subtitle: 'Acme Corp', meta: 'Active' },
-  { id: 3, title: 'Priya Nair', subtitle: 'Freelance', meta: 'Warm' },
-]
-
-const mockRecent: ContextItem[] = [
-  { id: 1, title: 'Task created — Demo with TechStart', meta: '2m ago' },
-  { id: 2, title: 'Lead updated — Sarah Chen', meta: '1h ago' },
-  { id: 3, title: 'Task completed — Send invoice', meta: '3h ago' },
-]
+const { items: leadItems, loading: leadsLoading, error: leadsError, refresh: refreshLeads } = useLeads()
+const { items: taskItems, loading: tasksLoading, error: tasksError, refresh: refreshTasks } = useTasks()
 
 const items = computed<ContextItem[]>(() => {
-  if (active.value === 'Tasks') return mockTasks
-  if (active.value === 'Leads') return mockLeads
-  return mockRecent
+  if (active.value === 'Tasks') return taskItems.value
+  if (active.value === 'Leads') return leadItems.value
+  return []
 })
+
+const loading = computed<boolean>(() => {
+  if (active.value === 'Tasks') return tasksLoading.value
+  if (active.value === 'Leads') return leadsLoading.value
+  return false
+})
+
+const error = computed<string | null>(() => {
+  if (active.value === 'Tasks') return tasksError.value
+  if (active.value === 'Leads') return leadsError.value
+  return null
+})
+
+function retry() {
+  if (active.value === 'Tasks') refreshTasks()
+  if (active.value === 'Leads') refreshLeads()
+}
 </script>
 
 <template>
@@ -48,7 +50,25 @@ const items = computed<ContextItem[]>(() => {
       </button>
     </div>
     <div class="px-4 py-1">
-      <ContextList :items="items" />
+      <!-- Loading -->
+      <div v-if="loading" class="py-6 text-center text-xs text-muted">
+        Loading…
+      </div>
+
+      <!-- Error -->
+      <div v-else-if="error" class="flex flex-col items-center gap-2 py-4">
+        <p class="text-xs text-red-400">{{ error }}</p>
+        <button
+          type="button"
+          class="rounded px-2 py-1 text-xs text-muted transition-colors hover:text-text-muted border border-border"
+          @click="retry"
+        >
+          Retry
+        </button>
+      </div>
+
+      <!-- Empty / data -->
+      <ContextList v-else :items="items" />
     </div>
   </div>
 </template>
