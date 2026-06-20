@@ -6,6 +6,7 @@ use Fluxio\Actions\Diagnostics\CommandInterpretation\CommandInterpretationCorpus
 use Fluxio\Actions\Diagnostics\CommandInterpretation\CommandInterpretationEvaluationService;
 use Fluxio\Actions\Diagnostics\CommandInterpretation\DTO\CommandInterpretationCorpusCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\SeedsDemoLeads;
 use Tests\TestCase;
 
 /**
@@ -16,6 +17,8 @@ use Tests\TestCase;
 class CommandInterpretationEvaluationServiceTest extends TestCase
 {
     use RefreshDatabase;
+    use SeedsDemoLeads;
+
     private function service(): CommandInterpretationEvaluationService
     {
         return $this->app->make(CommandInterpretationEvaluationService::class);

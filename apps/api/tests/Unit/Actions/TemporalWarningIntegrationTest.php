@@ -8,6 +8,8 @@ use Fluxio\Actions\Interpretation\Providers\DeterministicInterpretationProvider;
 use Fluxio\Actions\Resolvers\RuleBasedIntentResolver;
 use Fluxio\Actions\Services\ActionInterpreterService;
 use Fluxio\Actions\Support\DateTimeExpressionParser;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\SeedsDemoLeads;
 use Tests\TestCase;
 
 /**
@@ -19,6 +21,9 @@ use Tests\TestCase;
  */
 class TemporalWarningIntegrationTest extends TestCase
 {
+    use RefreshDatabase;
+    use SeedsDemoLeads;
+
     private DeterministicInterpretationProvider $provider;
 
     private ActionInterpreterService $service;

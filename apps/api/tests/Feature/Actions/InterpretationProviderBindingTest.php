@@ -11,11 +11,13 @@ use Fluxio\Actions\Interpretation\Providers\DeterministicInterpretationProvider;
 use Fluxio\Actions\Interpretation\Providers\FakeLlmInterpretationProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\SeedsDemoLeads;
 use Tests\TestCase;
 
 class InterpretationProviderBindingTest extends TestCase
 {
     use RefreshDatabase;
+    use SeedsDemoLeads;
 
     protected function setUp(): void
     {
@@ -33,6 +35,7 @@ class InterpretationProviderBindingTest extends TestCase
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user);
+
         return $user;
     }
 
@@ -101,7 +104,7 @@ class InterpretationProviderBindingTest extends TestCase
     {
         $this->actingAsUser();
 
-        $r1         = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
+        $r1 = $this->postJson('/api/actions/interpret', ['text' => 'Call Rossi']);
         $proposalId = $r1->json('data.id');
 
         $r2 = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The second one']);
@@ -119,7 +122,7 @@ class InterpretationProviderBindingTest extends TestCase
         $this->actingAsUser();
 
         // Interpret
-        $r1         = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossini tomorrow at 4pm']);
+        $r1 = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossini tomorrow at 4pm']);
         $proposalId = $r1->json('data.id');
         $this->assertEquals('ready', $r1->json('data.status'));
 
@@ -137,12 +140,12 @@ class InterpretationProviderBindingTest extends TestCase
 
     public function test_command_interpreter_interface_can_be_swapped_to_fake_provider(): void
     {
-        $fake = new FakeLlmInterpretationProvider();
+        $fake = new FakeLlmInterpretationProvider;
         $fake->addResponse('Book me a meeting', new \Fluxio\Actions\DTO\NormalizedCommand(
-            intent:     'schedule_meeting',
+            intent: 'schedule_meeting',
             confidence: 0.99,
             sourceText: 'Book me a meeting',
-            locale:     'en',
+            locale: 'en',
         ));
 
         $this->app->bind(InterpretationProviderInterface::class, fn () => $fake);

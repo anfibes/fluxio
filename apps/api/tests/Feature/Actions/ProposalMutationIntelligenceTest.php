@@ -7,11 +7,13 @@ use Carbon\Carbon;
 use Fluxio\Actions\Models\ActionProposal;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\SeedsDemoLeads;
 use Tests\TestCase;
 
 class ProposalMutationIntelligenceTest extends TestCase
 {
     use RefreshDatabase;
+    use SeedsDemoLeads;
 
     protected function setUp(): void
     {

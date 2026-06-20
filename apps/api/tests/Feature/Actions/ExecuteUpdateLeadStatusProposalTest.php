@@ -225,4 +225,67 @@ class ExecuteUpdateLeadStatusProposalTest extends TestCase
         // assign_lead does not touch status
         $this->assertDatabaseHas('leads', ['id' => $lead->id, 'status' => 'new']);
     }
+
+    // ── Invariant regression: resolution agrees with execution ────────────────
+
+    /**
+     * The core bug this patch fixes: a proposal made ready/resolved through entity
+     * resolution must be executable against the SAME real Lead row. Here an ambiguous
+     * "Rossi" is narrowed by ordinal ("the second one") to a real candidate, then
+     * confirmed and executed — and exactly that Lead row is updated.
+     */
+    public function test_resolve_rossi_pick_second_then_execute_updates_that_lead(): void
+    {
+        // Real ambiguous leads — the rows the resolver scores AND the executor acts on.
+        Lead::factory()->create(['name' => 'Rossi SRL', 'company' => 'Rossi SRL', 'status' => 'new']);
+        Lead::factory()->create(['name' => 'Mario Rossi', 'company' => null, 'status' => 'new']);
+        Lead::factory()->create(['name' => 'Studio Rossi', 'company' => 'Studio Rossi', 'status' => 'new']);
+        $this->actingAsUser();
+
+        $r1 = $this->postJson('/api/actions/interpret', ['text' => 'Mark Rossi as qualified']);
+        $r1->assertStatus(200)
+            ->assertJsonPath('data.intent', 'update_lead_status')
+            ->assertJsonPath('data.status', 'draft');
+
+        $candidates = $r1->json('data.ambiguities.0.candidates');
+        $this->assertGreaterThanOrEqual(2, count($candidates));
+        $secondLabel = $candidates[1]['label'];
+        $secondId = $candidates[1]['id'];
+        // Candidate ids are real Lead primary keys.
+        $this->assertEquals($secondLabel, Lead::find($secondId)?->name);
+
+        $proposalId = $r1->json('data.id');
+
+        $r2 = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'the second one']);
+        $r2->assertStatus(200)->assertJsonPath('data.status', 'ready');
+        $fields = collect($r2->json('data.editable_fields'))->keyBy('key');
+        $this->assertEquals($secondLabel, $fields['lead']['value']);
+
+        $this->postJson("/api/actions/{$proposalId}/confirm")->assertStatus(200);
+        $this->postJson("/api/actions/{$proposalId}/execute")
+            ->assertStatus(200)
+            ->assertJsonPath('data.status', 'executed');
+
+        // The exact resolved row is updated — no proposal/execution disagreement.
+        $this->assertDatabaseHas('leads', ['id' => $secondId, 'status' => 'qualified']);
+    }
+
+    /**
+     * Regression: with an empty leads table, the (now removed) in-memory fixtures must
+     * not appear. "Rossi" resolves to nothing — no candidates, no ready proposal.
+     */
+    public function test_empty_lead_database_produces_no_hardcoded_resolution(): void
+    {
+        $this->actingAsUser();
+
+        $r = $this->postJson('/api/actions/interpret', ['text' => 'Mark Rossi as qualified']);
+
+        $r->assertStatus(200)
+            ->assertJsonPath('data.intent', 'update_lead_status')
+            ->assertJsonPath('data.status', 'draft')
+            ->assertJsonPath('data.ambiguities', []);
+
+        $missing = collect($r->json('data.missing'))->pluck('key')->all();
+        $this->assertContains('lead', $missing);
+    }
 }

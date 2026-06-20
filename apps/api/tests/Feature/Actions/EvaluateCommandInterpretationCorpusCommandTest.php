@@ -5,6 +5,7 @@ namespace Tests\Feature\Actions;
 use Fluxio\Actions\Models\ActionProposal;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Tests\Concerns\SeedsDemoLeads;
 use Tests\TestCase;
 
 /**
@@ -16,6 +17,7 @@ use Tests\TestCase;
 class EvaluateCommandInterpretationCorpusCommandTest extends TestCase
 {
     use RefreshDatabase;
+    use SeedsDemoLeads;
 
     /** @var list<string> */
     private array $tempFiles = [];

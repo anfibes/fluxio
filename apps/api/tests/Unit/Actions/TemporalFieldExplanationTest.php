@@ -4,6 +4,8 @@ namespace Tests\Unit\Actions;
 
 use Carbon\Carbon;
 use Fluxio\Actions\Services\ActionInterpreterService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\SeedsDemoLeads;
 use Tests\TestCase;
 
 /**
@@ -18,6 +20,9 @@ use Tests\TestCase;
  */
 class TemporalFieldExplanationTest extends TestCase
 {
+    use RefreshDatabase;
+    use SeedsDemoLeads;
+
     private ActionInterpreterService $service;
 
     protected function setUp(): void

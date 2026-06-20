@@ -10,6 +10,7 @@ use Fluxio\Actions\Models\ActionProposal;
 use Fluxio\Actions\Registry\IntentCapabilityRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\SeedsDemoLeads;
 use Tests\TestCase;
 
 /**
@@ -28,6 +29,7 @@ use Tests\TestCase;
 class IntentCapabilityTest extends TestCase
 {
     use RefreshDatabase;
+    use SeedsDemoLeads;
 
     protected function setUp(): void
     {

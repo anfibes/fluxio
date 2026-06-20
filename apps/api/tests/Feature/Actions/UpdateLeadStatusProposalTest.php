@@ -5,18 +5,20 @@ namespace Tests\Feature\Actions;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\SeedsDemoLeads;
 use Tests\TestCase;
 
 /**
  * update_lead_status — proposal-time interpretation and readiness.
  *
  * The proposal is ready only when the target lead is uniquely resolved (via the
- * existing in-memory LeadEntityResolver) AND a valid target lifecycle state is known.
+ * DB-backed LeadEntityResolver) AND a valid target lifecycle state is known.
  * Unknown/ambiguous lead and missing state all keep it draft.
  */
 class UpdateLeadStatusProposalTest extends TestCase
 {
     use RefreshDatabase;
+    use SeedsDemoLeads;
 
     private function actingAsUser(): User
     {

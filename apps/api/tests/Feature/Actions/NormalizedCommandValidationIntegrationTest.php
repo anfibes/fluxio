@@ -14,11 +14,13 @@ use Fluxio\Actions\Validation\NormalizedCommandValidator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Exceptions;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\SeedsDemoLeads;
 use Tests\TestCase;
 
 class NormalizedCommandValidationIntegrationTest extends TestCase
 {
     use RefreshDatabase;
+    use SeedsDemoLeads;
 
     protected function setUp(): void
     {

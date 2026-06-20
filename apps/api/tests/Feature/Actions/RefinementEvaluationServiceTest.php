@@ -8,6 +8,7 @@ use Fluxio\Actions\Diagnostics\Refinement\DTO\RefinementCorpusCase;
 use Fluxio\Actions\Diagnostics\Refinement\RefinementCorpusLoader;
 use Fluxio\Actions\Diagnostics\Refinement\RefinementEvaluationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\SeedsDemoLeads;
 use Tests\TestCase;
 
 /**
@@ -19,6 +20,7 @@ use Tests\TestCase;
 class RefinementEvaluationServiceTest extends TestCase
 {
     use RefreshDatabase;
+    use SeedsDemoLeads;
 
     protected function setUp(): void
     {

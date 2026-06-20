@@ -127,34 +127,38 @@ class ExecuteActionProposalTest extends TestCase
 
     // --- ambiguous lead ---
 
-    public function test_ambiguous_lead_returns_422_and_does_not_create_task(): void
+    public function test_ambiguous_lead_is_blocking_at_proposal_time_and_creates_no_task(): void
     {
         $this->actingAsUser();
 
         Lead::factory()->create(['name' => 'Rossini']);
         Lead::factory()->create(['name' => 'Rossini']);
 
-        $proposal = $this->interpretAndConfirm('Create a task for Rossini');
+        // With the DB-backed LeadEntityResolver, two matching leads now surface a
+        // BLOCKING ambiguity at proposal time (deterministic), rather than only failing
+        // later at execution against the DB. The proposal stays draft, is never
+        // confirmable, and no task is created.
+        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Create a task for Rossini']);
+        $interpret->assertStatus(200)
+            ->assertJsonPath('data.status', 'draft');
 
-        $response = $this->postJson("/api/actions/{$proposal['id']}/execute");
+        $ambiguity = collect($interpret->json('data.ambiguities'))->firstWhere('key', 'lead');
+        $this->assertNotNull($ambiguity);
+        $this->assertTrue($ambiguity['blocking']);
+        $this->assertNull($ambiguity['selected_candidate_id']);
 
-        $response->assertStatus(422)
-            ->assertJsonStructure(['errors' => ['lead']]);
+        $proposalId = $interpret->json('data.id');
+
+        // A draft proposal can neither be confirmed nor executed.
+        $this->postJson("/api/actions/{$proposalId}/confirm")->assertStatus(422);
+        $this->postJson("/api/actions/{$proposalId}/execute")->assertStatus(422);
 
         $this->assertDatabaseCount('tasks', 0);
 
-        $this->assertDatabaseHas('action_proposals', [
-            'id' => $proposal['id'],
-            'status' => 'confirmed',
-        ]);
-
-        // Validation is not an execution failure: the proposal stays confirmed and
-        // records no failure state, even though it now flows through the inner
-        // savepoint / outer-lock structure.
-        $refreshed = ActionProposal::find($proposal['id']);
+        // No failure state is recorded; the proposal simply never left draft.
+        $refreshed = ActionProposal::find($proposalId);
+        $this->assertEquals('draft', $refreshed->status);
         $this->assertNull($refreshed->failed_at);
-        $this->assertNull($refreshed->failure_reason);
-        $this->assertNull($refreshed->failure_reason_code);
     }
 
     // --- zero leads ---

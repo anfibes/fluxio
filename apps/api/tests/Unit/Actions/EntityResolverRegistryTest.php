@@ -7,23 +7,28 @@ use Fluxio\Actions\EntityResolution\DTO\ResolutionCandidate;
 use Fluxio\Actions\EntityResolution\DTO\ResolutionContext;
 use Fluxio\Actions\EntityResolution\DTO\ResolutionResult;
 use Fluxio\Actions\EntityResolution\Registry\EntityResolverRegistry;
-use Fluxio\Actions\EntityResolution\Repositories\InMemoryLeadRepository;
 use Fluxio\Actions\EntityResolution\Resolvers\LeadEntityResolver;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\SeedsDemoLeads;
 use Tests\TestCase;
 
 /**
  * Verifies that EntityResolverRegistry correctly routes queries to registered
- * resolvers and returns no-match results when no resolver handles the type.
+ * resolvers and returns no-match results when no resolver handles the type. The
+ * LeadEntityResolver is DB-backed, so the demo leads are seeded as real rows.
  */
 class EntityResolverRegistryTest extends TestCase
 {
+    use RefreshDatabase;
+    use SeedsDemoLeads;
+
     private EntityResolverRegistry $registry;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->registry = new EntityResolverRegistry();
-        $this->registry->register(new LeadEntityResolver(new InMemoryLeadRepository()));
+        $this->registry = new EntityResolverRegistry;
+        $this->registry->register(new LeadEntityResolver);
     }
 
     // ── supports() ───────────────────────────────────────────────────────────
@@ -61,8 +66,13 @@ class EntityResolverRegistryTest extends TestCase
     public function test_first_matching_resolver_is_used(): void
     {
         // Register a stub that always returns a fixed result for 'lead_query'.
-        $stub = new class implements EntityResolverInterface {
-            public function supports(string $entityType): bool { return $entityType === 'lead_query'; }
+        $stub = new class implements EntityResolverInterface
+        {
+            public function supports(string $entityType): bool
+            {
+                return $entityType === 'lead_query';
+            }
+
             public function resolve(string $query, ResolutionContext $context): ResolutionResult
             {
                 return ResolutionResult::autoResolved(new ResolutionCandidate(
@@ -71,9 +81,9 @@ class EntityResolverRegistryTest extends TestCase
             }
         };
 
-        $registry = new EntityResolverRegistry();
+        $registry = new EntityResolverRegistry;
         $registry->register($stub);
-        $registry->register(new LeadEntityResolver(new InMemoryLeadRepository()));
+        $registry->register(new LeadEntityResolver);
 
         $result = $registry->resolve('Rossi', new ResolutionContext('lead_query'));
 

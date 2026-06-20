@@ -6,6 +6,7 @@ use App\Models\User;
 use Fluxio\Actions\Interpreters\RuleBasedCommandInterpreter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\SeedsDemoLeads;
 use Tests\TestCase;
 
 /**
@@ -17,6 +18,7 @@ use Tests\TestCase;
 class CommandLeadSpanExtractionTest extends TestCase
 {
     use RefreshDatabase;
+    use SeedsDemoLeads;
 
     private function actingAsUser(): User
     {

@@ -3,24 +3,31 @@
 namespace Tests\Unit\Actions;
 
 use Fluxio\Actions\EntityResolution\DTO\ResolutionContext;
-use Fluxio\Actions\EntityResolution\Repositories\InMemoryLeadRepository;
 use Fluxio\Actions\EntityResolution\Resolvers\LeadEntityResolver;
+use Fluxio\Leads\Models\Lead;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\SeedsDemoLeads;
 use Tests\TestCase;
 
 /**
- * Verifies that LeadEntityResolver produces correct ResolutionResult values
- * for exact matches, ambiguous multi-matches, and unrecognised queries.
+ * Verifies that the DB-backed LeadEntityResolver produces correct ResolutionResult
+ * values for exact matches, ambiguous multi-matches, and unrecognised queries — now
+ * scored against real Lead rows (the same rows the executors act on).
  */
 class LeadEntityResolverTest extends TestCase
 {
+    use RefreshDatabase;
+    use SeedsDemoLeads;
+
     private LeadEntityResolver $resolver;
-    private ResolutionContext  $context;
+
+    private ResolutionContext $context;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->resolver = new LeadEntityResolver(new InMemoryLeadRepository());
-        $this->context  = new ResolutionContext(entityType: 'lead_query');
+        $this->resolver = new LeadEntityResolver;
+        $this->context = new ResolutionContext(entityType: 'lead_query');
     }
 
     // ── supports() ───────────────────────────────────────────────────────────
@@ -70,10 +77,12 @@ class LeadEntityResolverTest extends TestCase
         $this->assertEmpty($result->candidates);
     }
 
-    public function test_exact_match_resolved_candidate_has_correct_id(): void
+    public function test_exact_match_resolved_candidate_has_real_db_id(): void
     {
         $result = $this->resolver->resolve('Rossini', $this->context);
 
+        $expectedId = Lead::where('name', 'Rossini')->value('id');
+        $this->assertEquals($expectedId, $result->resolvedCandidate->id);
         $this->assertEquals(5, $result->resolvedCandidate->id);
     }
 
@@ -115,8 +124,8 @@ class LeadEntityResolverTest extends TestCase
 
     public function test_rossi_query_candidates_ordered_by_confidence_descending(): void
     {
-        // Rossi SRL scores 0.8 (starts-with) and should appear before the two 0.65 matches.
-        // Equal-confidence candidates (Mario Rossi, Studio Rossi) retain repository order.
+        // Rossi SRL scores 0.8 (starts-with) and appears before the two 0.65 matches.
+        // Equal-confidence candidates retain DB order (ascending id: Mario before Studio).
         $result = $this->resolver->resolve('Rossi', $this->context);
 
         $labels = array_map(fn ($c) => $c->label, $result->candidates);
@@ -131,18 +140,27 @@ class LeadEntityResolverTest extends TestCase
         $this->assertEquals([7, 1, 12], $ids);
     }
 
+    public function test_lead_matched_by_company_field(): void
+    {
+        // A company-only query resolves the row whose company matches, even though the
+        // candidate label is the name — consistent with the executor's name-OR-company lookup.
+        Lead::factory()->create(['name' => 'Giovanni Verdi', 'company' => 'VerdiCo']);
+
+        $result = $this->resolver->resolve('VerdiCo', $this->context);
+
+        $this->assertTrue($result->resolved);
+        $this->assertEquals('Giovanni Verdi', $result->resolvedCandidate->label);
+    }
+
     // ── Auto-resolve threshold ────────────────────────────────────────────────
 
     public function test_single_low_confidence_candidate_does_not_auto_resolve(): void
     {
-        // A lone word-boundary match (score 0.65) is below the auto-resolve threshold
-        // and must surface as an ambiguity requiring explicit user selection.
-        $repo     = new InMemoryLeadRepository([
-            ['id' => 1, 'type' => 'person', 'label' => 'Mario Rossi', 'description' => null],
-        ]);
-        $resolver = new LeadEntityResolver($repo);
+        // A lone word-boundary match (score 0.65) is below the auto-resolve threshold.
+        Lead::query()->delete();
+        Lead::factory()->create(['name' => 'Mario Rossi', 'company' => null]);
 
-        $result = $resolver->resolve('Rossi', $this->context);
+        $result = $this->resolver->resolve('Rossi', $this->context);
 
         $this->assertFalse($result->resolved);
         $this->assertCount(1, $result->candidates);
@@ -152,12 +170,10 @@ class LeadEntityResolverTest extends TestCase
     public function test_single_high_confidence_candidate_auto_resolves(): void
     {
         // A lone starts-with match (score 0.8) meets the threshold → auto-resolve.
-        $repo     = new InMemoryLeadRepository([
-            ['id' => 7, 'type' => 'company', 'label' => 'Rossi SRL', 'description' => 'Company lead'],
-        ]);
-        $resolver = new LeadEntityResolver($repo);
+        Lead::query()->delete();
+        Lead::factory()->create(['name' => 'Rossi SRL', 'company' => 'Rossi SRL']);
 
-        $result = $resolver->resolve('Rossi', $this->context);
+        $result = $this->resolver->resolve('Rossi', $this->context);
 
         $this->assertTrue($result->resolved);
         $this->assertEquals('Rossi SRL', $result->resolvedCandidate->label);
@@ -182,11 +198,24 @@ class LeadEntityResolverTest extends TestCase
         $this->assertEmpty($result->candidates);
     }
 
+    public function test_empty_database_yields_no_hardcoded_candidates(): void
+    {
+        // Regression: with no Lead rows, the resolver must surface nothing — proving the
+        // old in-memory fixtures are gone from the runtime path.
+        Lead::query()->delete();
+
+        foreach (['Rossi', 'Rossini', 'Mario Rossi', 'Studio Rossi'] as $query) {
+            $result = $this->resolver->resolve($query, $this->context);
+            $this->assertFalse($result->resolved, "[{$query}] must not resolve against an empty DB.");
+            $this->assertEmpty($result->candidates, "[{$query}] must produce no candidates against an empty DB.");
+        }
+    }
+
     // ── Candidate DTO shape ───────────────────────────────────────────────────
 
     public function test_candidate_to_array_contains_required_keys(): void
     {
-        $result    = $this->resolver->resolve('Rossi', $this->context);
+        $result = $this->resolver->resolve('Rossi', $this->context);
         $candidate = $result->candidates[0]->toArray();
 
         $this->assertArrayHasKey('id', $candidate);
@@ -196,18 +225,21 @@ class LeadEntityResolverTest extends TestCase
         $this->assertArrayHasKey('confidence', $candidate);
     }
 
-    public function test_candidate_description_may_be_null(): void
+    public function test_company_lead_resolves_with_company_type(): void
     {
-        // ResolutionCandidate accepts nullable description — the payload key must
-        // still be present in toArray() even when the value is null.
-        $repo      = new InMemoryLeadRepository([
-            ['id' => 99, 'type' => 'person', 'label' => 'Rossini', 'description' => null],
-        ]);
-        $resolver  = new LeadEntityResolver($repo);
-        $result    = $resolver->resolve('Rossini', $this->context);
-        $candidate = $result->resolvedCandidate->toArray();
+        $result = $this->resolver->resolve('Rossi', $this->context);
 
-        $this->assertArrayHasKey('description', $candidate);
-        $this->assertNull($candidate['description']);
+        $rossiSrl = collect($result->candidates)->firstWhere('label', 'Rossi SRL');
+        $this->assertNotNull($rossiSrl);
+        $this->assertEquals('company', $rossiSrl->type);
+    }
+
+    public function test_person_lead_resolves_with_person_type(): void
+    {
+        $result = $this->resolver->resolve('Rossi', $this->context);
+
+        $mario = collect($result->candidates)->firstWhere('label', 'Mario Rossi');
+        $this->assertNotNull($mario);
+        $this->assertEquals('person', $mario->type);
     }
 }

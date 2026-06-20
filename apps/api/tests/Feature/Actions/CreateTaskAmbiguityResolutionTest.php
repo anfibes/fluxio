@@ -5,6 +5,7 @@ namespace Tests\Feature\Actions;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\SeedsDemoLeads;
 use Tests\TestCase;
 
 /**
@@ -15,6 +16,7 @@ use Tests\TestCase;
 class CreateTaskAmbiguityResolutionTest extends TestCase
 {
     use RefreshDatabase;
+    use SeedsDemoLeads;
 
     private function actingAsUser(): User
     {

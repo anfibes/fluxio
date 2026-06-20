@@ -4,6 +4,7 @@ namespace Tests\Feature\Actions;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Tests\Concerns\SeedsDemoLeads;
 use Tests\TestCase;
 
 /**
@@ -18,6 +19,7 @@ use Tests\TestCase;
 class ActionsCorpusGateTest extends TestCase
 {
     use RefreshDatabase;
+    use SeedsDemoLeads;
 
     public function test_command_interpretation_corpus_gate_passes(): void
     {

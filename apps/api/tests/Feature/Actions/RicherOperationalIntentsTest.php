@@ -7,11 +7,13 @@ use Carbon\Carbon;
 use Fluxio\Actions\Models\ActionProposal;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\SeedsDemoLeads;
 use Tests\TestCase;
 
 class RicherOperationalIntentsTest extends TestCase
 {
     use RefreshDatabase;
+    use SeedsDemoLeads;
 
     protected function setUp(): void
     {
@@ -29,6 +31,7 @@ class RicherOperationalIntentsTest extends TestCase
     {
         $user = User::factory()->create();
         Sanctum::actingAs($user);
+
         return $user;
     }
 
@@ -172,8 +175,8 @@ class RicherOperationalIntentsTest extends TestCase
     {
         $this->actingAsUser();
 
-        $assignResponse   = $this->postJson('/api/actions/interpret', ['text' => 'Assign Rossini to Marco']);
-        $unknownResponse  = $this->postJson('/api/actions/interpret', ['text' => 'Show me the dashboard']);
+        $assignResponse = $this->postJson('/api/actions/interpret', ['text' => 'Assign Rossini to Marco']);
+        $unknownResponse = $this->postJson('/api/actions/interpret', ['text' => 'Show me the dashboard']);
 
         $this->assertGreaterThan(
             $unknownResponse->json('data.confidence'),
@@ -337,18 +340,18 @@ class RicherOperationalIntentsTest extends TestCase
         $this->actingAsUser();
 
         // Create ready proposal directly
-        $user     = User::factory()->create();
+        $user = User::factory()->create();
         Sanctum::actingAs($user);
 
         $proposal = ActionProposal::create([
-            'user_id'     => $user->id,
-            'intent'      => 'prepare_contract_from_quote',
-            'status'      => 'confirmed',
-            'confidence'  => 0.75,
+            'user_id' => $user->id,
+            'intent' => 'prepare_contract_from_quote',
+            'status' => 'confirmed',
+            'confidence' => 0.75,
             'source_text' => 'Prepare a contract for Rossini',
-            'entities'    => ['lead' => 'Rossini'],
-            'missing'     => [],
-            'warnings'    => [],
+            'entities' => ['lead' => 'Rossini'],
+            'missing' => [],
+            'warnings' => [],
             'editable_fields' => [
                 ['key' => 'lead', 'label' => 'Lead', 'value' => 'Rossini', 'source' => 'detected', 'required' => true],
             ],
@@ -369,20 +372,22 @@ class RicherOperationalIntentsTest extends TestCase
 
     public function test_assign_lead_proposal_can_execute(): void
     {
-        $lead = \Fluxio\Leads\Models\Lead::factory()->create(['name' => 'Rossini', 'company' => null]);
+        // Use the seeded demo lead so proposal-time resolution and execution act on the
+        // same Lead row (no duplicate "Rossini" that would make the executor ambiguous).
+        $lead = \Fluxio\Leads\Models\Lead::where('name', 'Rossini')->firstOrFail();
 
         $user = User::factory()->create(['name' => 'Marco']);
         Sanctum::actingAs($user);
 
         $proposal = ActionProposal::create([
-            'user_id'     => $user->id,
-            'intent'      => 'assign_lead',
-            'status'      => 'confirmed',
-            'confidence'  => 0.8,
+            'user_id' => $user->id,
+            'intent' => 'assign_lead',
+            'status' => 'confirmed',
+            'confidence' => 0.8,
             'source_text' => 'Assign Rossini to Marco',
-            'entities'    => ['lead' => 'Rossini', 'assignee' => 'Marco'],
-            'missing'     => [],
-            'warnings'    => [],
+            'entities' => ['lead' => 'Rossini', 'assignee' => 'Marco'],
+            'missing' => [],
+            'warnings' => [],
             'editable_fields' => [
                 ['key' => 'lead',     'label' => 'Lead',     'value' => 'Rossini', 'source' => 'detected', 'required' => true],
                 ['key' => 'assignee', 'label' => 'Assignee', 'value' => 'Marco',   'source' => 'detected', 'required' => true],
@@ -404,8 +409,8 @@ class RicherOperationalIntentsTest extends TestCase
         $this->assertEquals('Marco', $response->json('data.execution_result.details.assignee'));
 
         $this->assertDatabaseHas('leads', [
-            'id'                   => $lead->id,
-            'assigned_to_user_id'  => $user->id,
+            'id' => $lead->id,
+            'assigned_to_user_id' => $user->id,
         ]);
     }
 
@@ -417,14 +422,14 @@ class RicherOperationalIntentsTest extends TestCase
         Sanctum::actingAs($user);
 
         $proposal = ActionProposal::create([
-            'user_id'     => $user->id,
-            'intent'      => 'schedule_meeting',
-            'status'      => 'confirmed',
-            'confidence'  => 0.7,
+            'user_id' => $user->id,
+            'intent' => 'schedule_meeting',
+            'status' => 'confirmed',
+            'confidence' => 0.7,
             'source_text' => 'Schedule a meeting with Rossini',
-            'entities'    => ['lead' => 'Rossini'],
-            'missing'     => [],
-            'warnings'    => [],
+            'entities' => ['lead' => 'Rossini'],
+            'missing' => [],
+            'warnings' => [],
             'editable_fields' => [
                 ['key' => 'lead', 'label' => 'Lead', 'value' => 'Rossini',                      'source' => 'detected', 'required' => true],
                 ['key' => 'date', 'label' => 'Date', 'value' => now()->addDay()->toDateString(), 'source' => 'detected', 'required' => true],
@@ -518,7 +523,7 @@ class RicherOperationalIntentsTest extends TestCase
     {
         $this->actingAsUser();
 
-        $r1         = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossi tomorrow morning']);
+        $r1 = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossi tomorrow morning']);
         $proposalId = $r1->json('data.id');
 
         // Resolve the ambiguity — same refinement mechanism as schedule_call
@@ -540,7 +545,7 @@ class RicherOperationalIntentsTest extends TestCase
     {
         $this->actingAsUser();
 
-        $r1         = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossi tomorrow morning']);
+        $r1 = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossi tomorrow morning']);
         $proposalId = $r1->json('data.id');
 
         $r2 = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'The second one']);
@@ -553,7 +558,7 @@ class RicherOperationalIntentsTest extends TestCase
     {
         $this->actingAsUser();
 
-        $r1         = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossi tomorrow morning']);
+        $r1 = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossi tomorrow morning']);
         $proposalId = $r1->json('data.id');
         $candidates = $r1->json('data.ambiguities.0.candidates');
 
@@ -571,7 +576,7 @@ class RicherOperationalIntentsTest extends TestCase
         $this->actingAsUser();
 
         // Interpret — ambiguous
-        $r1         = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossi tomorrow morning']);
+        $r1 = $this->postJson('/api/actions/interpret', ['text' => 'Schedule a meeting with Rossi tomorrow morning']);
         $proposalId = $r1->json('data.id');
         $this->assertEquals('draft', $r1->json('data.status'));
 
