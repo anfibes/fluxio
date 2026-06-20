@@ -3,6 +3,7 @@
 namespace Tests\Feature\Actions;
 
 use App\Models\User;
+use Carbon\Carbon;
 use Fluxio\Actions\Contracts\ActionExecutorInterface;
 use Fluxio\Actions\DTO\Execution\ExecutionResult;
 use Fluxio\Actions\Executors\CreateTaskActionExecutor;
@@ -472,6 +473,306 @@ class ExecuteActionProposalTest extends TestCase
 
         $refreshed = ActionProposal::find($proposal['id']);
         $this->assertNotNull($refreshed->executed_at);
+    }
+
+    // --- due_at propagation ---
+
+    public function test_create_task_with_date_and_time_propagates_due_at(): void
+    {
+        Carbon::setTestNow('2026-06-20 12:00:00');
+        $this->actingAsUser();
+
+        $interpret = $this->postJson('/api/actions/interpret', [
+            'text' => 'Create a task for Rossini tomorrow at 10am',
+        ]);
+
+        $interpret->assertStatus(200)
+            ->assertJsonPath('data.intent', 'create_task');
+
+        // due_at appears in editable_fields
+        $fields = collect($interpret->json('data.editable_fields'))->keyBy('key');
+        $this->assertArrayHasKey('date', $fields->all());
+        $this->assertArrayHasKey('time', $fields->all());
+        $this->assertArrayHasKey('due_at', $fields->all());
+        $this->assertEquals('2026-06-21', $fields['date']['value']);
+        $this->assertEquals('10:00', $fields['time']['value']);
+        $this->assertEquals('2026-06-21 10:00', $fields['due_at']['value']);
+
+        // due_at appears in changes.payload
+        $payload = $interpret->json('data.changes.0.payload');
+        $this->assertArrayHasKey('date', $payload);
+        $this->assertArrayHasKey('time', $payload);
+        $this->assertArrayHasKey('due_at', $payload);
+        $this->assertEquals('2026-06-21 10:00', $payload['due_at']);
+
+        // Execution persists due_at on the Task
+        $proposalId = $interpret->json('data.id');
+        $this->postJson("/api/actions/{$proposalId}/confirm")->assertStatus(200);
+        $this->postJson("/api/actions/{$proposalId}/execute")->assertStatus(200);
+
+        $this->assertDatabaseCount('tasks', 1);
+        $task = Task::first();
+        $this->assertNotNull($task->due_at);
+        $this->assertEquals('2026-06-21 10:00:00', $task->due_at->format('Y-m-d H:i:s'));
+
+        Carbon::setTestNow();
+    }
+
+    public function test_create_task_with_date_only_propagates_due_at(): void
+    {
+        Carbon::setTestNow('2026-06-20 12:00:00');
+        $this->actingAsUser();
+
+        $interpret = $this->postJson('/api/actions/interpret', [
+            'text' => 'Create a task for Rossini tomorrow',
+        ]);
+
+        $interpret->assertStatus(200);
+
+        $fields = collect($interpret->json('data.editable_fields'))->keyBy('key');
+        $this->assertArrayHasKey('date', $fields->all());
+        $this->assertArrayHasKey('due_at', $fields->all());
+        $this->assertArrayNotHasKey('time', $fields->all());
+        $this->assertEquals('2026-06-21', $fields['due_at']['value']);
+
+        $payload = $interpret->json('data.changes.0.payload');
+        $this->assertEquals('2026-06-21', $payload['due_at']);
+
+        // Execution
+        $proposalId = $interpret->json('data.id');
+        $this->postJson("/api/actions/{$proposalId}/confirm")->assertStatus(200);
+        $this->postJson("/api/actions/{$proposalId}/execute")->assertStatus(200);
+
+        $task = Task::first();
+        $this->assertNotNull($task->due_at);
+        $this->assertEquals('2026-06-21 00:00:00', $task->due_at->format('Y-m-d H:i:s'));
+
+        Carbon::setTestNow();
+    }
+
+    public function test_create_task_without_date_has_no_due_at(): void
+    {
+        $this->actingAsUser();
+
+        $interpret = $this->postJson('/api/actions/interpret', [
+            'text' => 'Create a task for Rossini',
+        ]);
+
+        $interpret->assertStatus(200);
+
+        $fields = collect($interpret->json('data.editable_fields'))->keyBy('key');
+        $this->assertArrayNotHasKey('date', $fields->all());
+        $this->assertArrayNotHasKey('time', $fields->all());
+        $this->assertArrayNotHasKey('due_at', $fields->all());
+
+        $payload = $interpret->json('data.changes.0.payload');
+        $this->assertArrayNotHasKey('due_at', $payload);
+
+        // Execution still works, just no due date
+        $proposalId = $interpret->json('data.id');
+        $this->postJson("/api/actions/{$proposalId}/confirm")->assertStatus(200);
+        $this->postJson("/api/actions/{$proposalId}/execute")->assertStatus(200);
+
+        $task = Task::first();
+        $this->assertNull($task->due_at);
+    }
+
+    // --- due_at refinement compatibility ---
+
+    public function test_create_task_due_at_updated_by_temporal_refinement(): void
+    {
+        Carbon::setTestNow('2026-06-20 12:00:00');
+        $this->actingAsUser();
+
+        // Create a task with initial due date
+        $interpret = $this->postJson('/api/actions/interpret', [
+            'text' => 'Create a task tomorrow at 10am',
+        ]);
+
+        $interpret->assertStatus(200);
+        $proposalId = $interpret->json('data.id');
+        $this->assertEquals('2026-06-21 10:00', $interpret->json('data.changes.0.payload.due_at'));
+
+        // Refine: "move it to the day after tomorrow at 3pm"
+        // 2026-06-20 + 2 days = 2026-06-22; "at 3pm" → 15:00
+        $refine = $this->postJson("/api/actions/{$proposalId}/refine", [
+            'text' => 'move it to the day after tomorrow at 3pm',
+        ]);
+
+        $refine->assertStatus(200);
+
+        // due_at in payload is updated
+        $this->assertEquals('2026-06-22 15:00', $refine->json('data.changes.0.payload.due_at'));
+        $this->assertEquals('2026-06-22', $refine->json('data.changes.0.payload.date'));
+        $this->assertEquals('15:00', $refine->json('data.changes.0.payload.time'));
+
+        // Execution persists the updated due_at
+        $this->postJson("/api/actions/{$proposalId}/confirm")->assertStatus(200);
+        $this->postJson("/api/actions/{$proposalId}/execute")->assertStatus(200);
+
+        $task = Task::first();
+        $this->assertNotNull($task->due_at);
+        $this->assertEquals('2026-06-22 15:00:00', $task->due_at->format('Y-m-d H:i:s'));
+
+        Carbon::setTestNow();
+    }
+
+    public function test_create_task_due_at_stays_coherent_when_only_date_is_refined(): void
+    {
+        Carbon::setTestNow('2026-06-20 12:00:00');
+        $this->actingAsUser();
+
+        // Create a task with date and time
+        $interpret = $this->postJson('/api/actions/interpret', [
+            'text' => 'Create a task tomorrow at 10am',
+        ]);
+
+        $interpret->assertStatus(200);
+        $proposalId = $interpret->json('data.id');
+        $this->assertEquals('2026-06-21 10:00', $interpret->json('data.changes.0.payload.due_at'));
+
+        // Refine only the date — "move it to the day after tomorrow"
+        // Parser extracts date=2026-06-22, no time → old time=10:00 stays
+        $refine = $this->postJson("/api/actions/{$proposalId}/refine", [
+            'text' => 'move it to the day after tomorrow',
+        ]);
+
+        $refine->assertStatus(200);
+
+        // due_at merges new date (2026-06-22) with old time (10:00)
+        $this->assertEquals('2026-06-22 10:00', $refine->json('data.changes.0.payload.due_at'));
+        $this->assertEquals('2026-06-22', $refine->json('data.changes.0.payload.date'));
+        $this->assertEquals('10:00', $refine->json('data.changes.0.payload.time'));
+
+        // due_at is present in editable_fields
+        $fields = collect($refine->json('data.editable_fields'))->keyBy('key');
+        $this->assertArrayHasKey('due_at', $fields->all());
+        $this->assertEquals('2026-06-22 10:00', $fields['due_at']['value']);
+
+        // Execution persists the correct due_at
+        $this->postJson("/api/actions/{$proposalId}/confirm")->assertStatus(200);
+        $this->postJson("/api/actions/{$proposalId}/execute")->assertStatus(200);
+
+        $task = Task::first();
+        $this->assertNotNull($task->due_at);
+        $this->assertEquals('2026-06-22 10:00:00', $task->due_at->format('Y-m-d H:i:s'));
+
+        Carbon::setTestNow();
+    }
+
+    // --- due_at injected via refinement (proposal originally had no date) ---
+
+    public function test_due_at_injected_when_temporal_info_added_via_refinement(): void
+    {
+        Carbon::setTestNow('2026-06-20 12:00:00');
+        $this->actingAsUser();
+
+        // 1. Create a task without any temporal info
+        $interpret = $this->postJson('/api/actions/interpret', [
+            'text' => 'Create a task for Mario Rossi',
+        ]);
+
+        $interpret->assertStatus(200)
+            ->assertJsonPath('data.intent', 'create_task');
+
+        $proposalId = $interpret->json('data.id');
+
+        // No date/time/due_at anywhere
+        $fields = collect($interpret->json('data.editable_fields'))->keyBy('key');
+        $this->assertArrayNotHasKey('date', $fields->all());
+        $this->assertArrayNotHasKey('time', $fields->all());
+        $this->assertArrayNotHasKey('due_at', $fields->all());
+        $this->assertArrayNotHasKey('due_at', $interpret->json('data.changes.0.payload'));
+
+        // 2. Refine to add temporal info
+        $refine = $this->postJson("/api/actions/{$proposalId}/refine", [
+            'text' => 'Tomorrow at 10am',
+        ]);
+
+        $refine->assertStatus(200);
+
+        // date and time appear in editable_fields
+        $refinedFields = collect($refine->json('data.editable_fields'))->keyBy('key');
+        $this->assertArrayHasKey('date', $refinedFields->all());
+        $this->assertArrayHasKey('time', $refinedFields->all());
+        $this->assertEquals('2026-06-21', $refinedFields['date']['value']);
+        $this->assertEquals('10:00', $refinedFields['time']['value']);
+
+        // due_at is INJECTED into both editable_fields and changes.payload
+        $this->assertArrayHasKey('due_at', $refinedFields->all());
+        $this->assertEquals('2026-06-21 10:00', $refinedFields['due_at']['value']);
+        $this->assertArrayHasKey('due_at', $refine->json('data.changes.0.payload'));
+        $this->assertEquals('2026-06-21 10:00', $refine->json('data.changes.0.payload.due_at'));
+
+        // 3. Execution persists due_at
+        $this->postJson("/api/actions/{$proposalId}/confirm")->assertStatus(200);
+        $this->postJson("/api/actions/{$proposalId}/execute")->assertStatus(200);
+
+        $task = Task::first();
+        $this->assertNotNull($task->due_at);
+        $this->assertEquals('2026-06-21 10:00:00', $task->due_at->format('Y-m-d H:i:s'));
+
+        Carbon::setTestNow();
+    }
+
+    public function test_due_at_remains_coherent_across_incremental_temporal_refinements(): void
+    {
+        Carbon::setTestNow('2026-06-20 12:00:00');
+        $this->actingAsUser();
+
+        // 1. Create a task with no temporal info
+        $interpret = $this->postJson('/api/actions/interpret', [
+            'text' => 'Create a task for Mario Rossi',
+        ]);
+
+        $proposalId = $interpret->json('data.id');
+        $this->assertArrayNotHasKey('due_at', $interpret->json('data.changes.0.payload'));
+
+        // 2. Refine: add date only
+        $r1 = $this->postJson("/api/actions/{$proposalId}/refine", [
+            'text' => 'Tomorrow',
+        ]);
+
+        $r1->assertStatus(200);
+
+        // due_at injected into payload (date only, no time yet)
+        $this->assertArrayHasKey('due_at', $r1->json('data.changes.0.payload'));
+        $this->assertEquals('2026-06-21', $r1->json('data.changes.0.payload.due_at'));
+
+        // date and due_at in editable_fields; time not yet present
+        $r1fields = collect($r1->json('data.editable_fields'))->keyBy('key');
+        $this->assertArrayHasKey('date', $r1fields->all());
+        $this->assertArrayHasKey('due_at', $r1fields->all());
+        $this->assertArrayNotHasKey('time', $r1fields->all());
+        $this->assertEquals('2026-06-21', $r1fields['due_at']['value']);
+
+        // 3. Refine: add time
+        $r2 = $this->postJson("/api/actions/{$proposalId}/refine", [
+            'text' => 'At 10am',
+        ]);
+
+        $r2->assertStatus(200);
+        $this->assertArrayHasKey('due_at', $r2->json('data.changes.0.payload'));
+        $this->assertEquals('2026-06-21 10:00', $r2->json('data.changes.0.payload.due_at'));
+
+        // date, time, and due_at all present in editable_fields
+        $fields = collect($r2->json('data.editable_fields'))->keyBy('key');
+        $this->assertArrayHasKey('date', $fields->all());
+        $this->assertArrayHasKey('time', $fields->all());
+        $this->assertArrayHasKey('due_at', $fields->all());
+        $this->assertEquals('2026-06-21', $fields['date']['value']);
+        $this->assertEquals('10:00', $fields['time']['value']);
+        $this->assertEquals('2026-06-21 10:00', $fields['due_at']['value']);
+
+        // 4. Execution
+        $this->postJson("/api/actions/{$proposalId}/confirm")->assertStatus(200);
+        $this->postJson("/api/actions/{$proposalId}/execute")->assertStatus(200);
+
+        $task = Task::first();
+        $this->assertNotNull($task->due_at);
+        $this->assertEquals('2026-06-21 10:00:00', $task->due_at->format('Y-m-d H:i:s'));
+
+        Carbon::setTestNow();
     }
 
     // --- not found / auth ---

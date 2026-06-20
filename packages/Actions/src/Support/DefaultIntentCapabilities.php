@@ -32,7 +32,7 @@ final class DefaultIntentCapabilities
             new IntentCapability(
                 intent: 'create_task',
                 mutations: [
-                    new MutationCapability(operation: 'replace', fields: ['date', 'time', 'priority', 'lead'], collection: false),
+                    new MutationCapability(operation: 'replace', fields: ['date', 'time', 'due_at', 'priority', 'lead'], collection: false),
                     new MutationCapability(operation: 'clear', fields: ['priority'], collection: false),
                 ],
                 refinements: [

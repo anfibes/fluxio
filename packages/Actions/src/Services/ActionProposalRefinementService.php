@@ -802,6 +802,18 @@ class ActionProposalRefinementService
             }
         }
 
+        // Sync due_at from date + time in entities for create_task proposals.
+        // The executor reads due_at from changes.payload; refinements on date/time
+        // update those keys in the payload via syncChangePayloads above, but due_at
+        // must be re-derived to stay coherent after a date/time change.
+        // When date is absent, stale due_at is removed from both payloads and
+        // editable_fields so execution cannot persist an old value.
+        $proposedChanges = $this->syncDueAtFromTemporalEntities($proposal, $entities, $proposedChanges);
+
+        if ($proposal->intent === 'create_task') {
+            $editableFields = $this->syncDueAtEditableField($editableFields, $entities);
+        }
+
         // Recompute status
         $status = $this->hasBlockingConditions($proposal, $missing, $ambiguities)
             ? $previousStatus
@@ -881,6 +893,150 @@ class ActionProposalRefinementService
 
             return $change;
         }, $changes);
+    }
+
+    /**
+     * Remove a key from all ProposedChange payloads that declare it.
+     *
+     * @param  array<int, mixed>  $changes
+     * @return array<int, mixed>
+     */
+    private function removeFromChangePayloads(array $changes, string $field): array
+    {
+        return array_map(function ($change) use ($field) {
+            if (
+                is_array($change)
+                && isset($change['payload'])
+                && is_array($change['payload'])
+                && array_key_exists($field, $change['payload'])
+            ) {
+                unset($change['payload'][$field]);
+            }
+
+            return $change;
+        }, $changes);
+    }
+
+    /**
+     * Re-derive due_at from date + time entities and sync it into change payloads
+     * for create_task proposals. This runs after all field mutations are applied
+     * so a refinement that changes date or time keeps due_at coherent.
+     *
+     * When date is present: derives due_at from date + time and syncs it into
+     * any payload that already declares it. When date is absent: removes stale
+     * due_at from all payloads so execution cannot persist an old value.
+     *
+     * Only operates when the proposal intent is create_task. Never injects due_at
+     * into a payload that didn't already declare it.
+     *
+     * @param  array<int, mixed>  $changes
+     * @return array<int, mixed>
+     */
+    private function syncDueAtFromTemporalEntities(ActionProposal $proposal, array $entities, array $changes): array
+    {
+        if ($proposal->intent !== 'create_task') {
+            return $changes;
+        }
+
+        if (! isset($entities['date'])) {
+            return $this->removeFromChangePayloads($changes, 'due_at');
+        }
+
+        $dueAt = $entities['date'];
+        if (isset($entities['time'])) {
+            $dueAt .= ' ' . $entities['time'];
+        }
+
+        // First pass: update due_at in payloads that already declare it.
+        $changes = $this->syncChangePayloads($changes, 'due_at', $dueAt);
+
+        // Second pass: if due_at still isn't in any payload (temporal info was
+        // added via refinement to a proposal that originally had none), inject it
+        // into the first create-type change payload.
+        return $this->injectDueAtIntoCreatePayload($changes, $dueAt);
+    }
+
+    /**
+     * Inject due_at into the first create-type change payload that does not
+     * already contain it. Used when temporal information appears for the first
+     * time via refinement on a proposal that originally had no date/time.
+     *
+     * @param  array<int, mixed>  $changes
+     * @return array<int, mixed>
+     */
+    private function injectDueAtIntoCreatePayload(array $changes, string $dueAt): array
+    {
+        $injected = false;
+
+        return array_map(function ($change) use ($dueAt, &$injected) {
+            if (
+                ! $injected
+                && is_array($change)
+                && isset($change['payload'])
+                && is_array($change['payload'])
+                && ! array_key_exists('due_at', $change['payload'])
+                && ($change['type'] ?? '') === 'create'
+            ) {
+                $change['payload']['due_at'] = $dueAt;
+                $injected = true;
+            }
+
+            return $change;
+        }, $changes);
+    }
+
+    /**
+     * Keep the due_at editable field coherent with the current entities after a
+     * temporal refinement. When date is present, upsert due_at with the merged
+     * date+time value. When date is absent, remove any stale due_at field.
+     *
+     * @param  array<int, array<string, mixed>>  $editableFields
+     * @return array<int, array<string, mixed>>
+     */
+    private function syncDueAtEditableField(array $editableFields, array $entities): array
+    {
+        $hasDueAtField = collect($editableFields)->contains('key', 'due_at');
+
+        if (! isset($entities['date'])) {
+            if ($hasDueAtField) {
+                return array_values(array_filter(
+                    $editableFields,
+                    fn (array $f) => $f['key'] !== 'due_at',
+                ));
+            }
+
+            return $editableFields;
+        }
+
+        $dueAt = $entities['date'];
+        if (isset($entities['time'])) {
+            $dueAt .= ' ' . $entities['time'];
+        }
+
+        if ($hasDueAtField) {
+            return array_map(
+                function (array $f) use ($dueAt): array {
+                    if ($f['key'] === 'due_at') {
+                        $f['value'] = $dueAt;
+                    }
+
+                    return $f;
+                },
+                $editableFields,
+            );
+        }
+
+        // due_at was not in editable_fields before (interpretation without date)
+        // but a refinement added date — inject it.
+        $editableFields[] = [
+            'key' => 'due_at',
+            'label' => 'Due',
+            'value' => $dueAt,
+            'source' => 'derived',
+            'required' => false,
+        ];
+
+        return $editableFields;
     }
 
     /**

@@ -232,9 +232,67 @@ class ActionInterpreterService
             );
         }
 
+        // Date / Time — extracted by the parser for all intents, surfaced as
+        // editable fields here so refinements (e.g. "move it to Friday") can
+        // target them via the existing ReplaceDate/ReplaceTime machinery.
+        foreach (['date' => 'Date', 'time' => 'Time'] as $key => $label) {
+            if (isset($entities[$key])) {
+                $editableFields[] = new EditableField(
+                    key: $key,
+                    label: $label,
+                    value: $entities[$key],
+                    source: 'detected',
+                    required: false,
+                );
+            }
+        }
+
+        // due_at — derived from date + time for executor consumption.
+        // The executor reads due_at directly from payload; date/time are kept
+        // alongside so the refinement syncChangePayloads path stays coherent.
+        $dueAt = null;
+        if (isset($entities['date'])) {
+            $dueAt = $entities['date'];
+            if (isset($entities['time'])) {
+                $dueAt .= ' ' . $entities['time'];
+            }
+        }
+        if ($dueAt !== null) {
+            $editableFields[] = new EditableField(
+                key: 'due_at',
+                label: 'Due',
+                value: $dueAt,
+                source: 'derived',
+                required: false,
+            );
+        }
+
+        // Priority
+        if (isset($entities['priority'])) {
+            $editableFields[] = new EditableField(
+                key: 'priority',
+                label: 'Priority',
+                value: $entities['priority'],
+                source: 'detected',
+                required: false,
+            );
+        }
+
         $payload = ['title' => 'Follow-up task'];
         if ($hasLead) {
             $payload['lead'] = $entities['lead'];
+        }
+        if (isset($entities['date'])) {
+            $payload['date'] = $entities['date'];
+        }
+        if (isset($entities['time'])) {
+            $payload['time'] = $entities['time'];
+        }
+        if ($dueAt !== null) {
+            $payload['due_at'] = $dueAt;
+        }
+        if (isset($entities['priority'])) {
+            $payload['priority'] = $entities['priority'];
         }
 
         $changes = [
