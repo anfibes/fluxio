@@ -83,6 +83,13 @@ const displayPhrase = computed(() => {
   return phrase && phrase.length > 0 ? phrase : null
 })
 
+const cardHeadline = computed(() => {
+  if (displayPhrase.value) return displayPhrase.value
+  const p = props.proposal
+  if (!p) return null
+  return p.intent ? p.intent.replace(/_/g, ' ') : null
+})
+
 // ── Fail-safe accessors (resilient to backend shape evolution) ──
 
 const editableFields = computed(() => props.proposal?.editable_fields ?? [])
@@ -90,28 +97,39 @@ const changesList = computed(() => props.proposal?.changes ?? [])
 const warningsList = computed(() => props.proposal?.warnings ?? [])
 const sourceText = computed(() => props.proposal?.source_text ?? '')
 
+const populatedFields = computed(() =>
+  editableFields.value.filter(f => f.value != null && f.value !== ''),
+)
+
+const missingFields = computed(() =>
+  editableFields.value.filter(f => f.value == null || f.value === ''),
+)
+
 // ── Value formatter (safe render for any field type) ──────────────
 
 function formatFieldValue(value: unknown): string {
-    if (value === null || value === undefined || value === '') {
-        return '—'
-    }
+  if (value === null || value === undefined || value === '') return '—'
+  if (Array.isArray(value)) return value.length ? value.map(item => formatFieldValue(item)).join(', ') : '—'
+  if (typeof value === 'object') {
+    try { return JSON.stringify(value) } catch { return '—' }
+  }
+  return String(value)
+}
 
-    if (Array.isArray(value)) {
-        return value.length
-            ? value.map(item => formatFieldValue(item)).join(', ')
-            : '—'
-    }
+// ── Field source badge (subtle provenance indicator) ──────────────
 
-    if (typeof value === 'object') {
-        try {
-            return JSON.stringify(value)
-        } catch {
-            return '—'
-        }
-    }
+const sourceLabel: Record<string, string> = {
+  detected: 'detected',
+  inferred:  'inferred',
+  guessed:   'guessed',
+  computed:  'computed',
+  derived:   'derived',
+  edited:    'edited',
+  missing:   'missing',
+}
 
-    return String(value)
+function sourceBadge(source: string): string {
+  return sourceLabel[source] ?? 'detected'
 }
 </script>
 
@@ -119,14 +137,16 @@ function formatFieldValue(value: unknown): string {
   <div class="mob-exp flex h-full flex-col bg-bg">
 
     <!-- ═══════════════ EMPTY STATE ═══════════════ -->
-    <div v-if="!proposal" class="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
-      <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-raised text-xl">
+    <div v-if="!proposal" class="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+      <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/10 text-2xl">
         ⚡
       </div>
-      <p class="text-sm font-semibold text-text-muted">No proposal yet</p>
-      <p class="max-w-60 text-xs leading-relaxed text-muted">
-        Enter a command above to create an action proposal.
-      </p>
+      <div class="flex flex-col gap-1.5">
+        <p class="text-base font-semibold text-text">What would you like to do?</p>
+        <p class="max-w-64 text-sm leading-relaxed text-muted">
+          Type a command above to propose an action. Fluxio will interpret it and show you a proposal to review.
+        </p>
+      </div>
     </div>
 
     <!-- ═══════════════ PROPOSAL CONTENT ═══════════════ -->
@@ -136,13 +156,6 @@ function formatFieldValue(value: unknown): string {
 
         <!-- ── Status banner ────────────────────────── -->
         <ProposalStatusBanner :proposal="proposal" />
-
-        <!-- ── Canonical phrase (primary headline) ──── -->
-        <div v-if="displayPhrase" class="px-4 pt-4 pb-2">
-          <p class="text-lg font-semibold leading-snug text-text">
-            {{ displayPhrase }}
-          </p>
-        </div>
 
         <!-- ── Blocking items (unresolved) ──────────── -->
         <template v-if="hasBlockingItems">
@@ -158,71 +171,115 @@ function formatFieldValue(value: unknown): string {
           />
         </template>
 
-        <!-- ── Proposal Card: compact operational view ── -->
-        <div class="mx-4 mt-3 overflow-hidden rounded-xl border border-border bg-surface">
-          <!-- Card header -->
-          <div class="border-b border-border px-4 py-2.5">
-            <p class="text-xs font-medium uppercase tracking-wide text-muted">Proposal</p>
+        <!-- ── Executed: completion header ──────────── -->
+        <div
+          v-if="isExecuted"
+          class="mx-4 mt-4 flex flex-col items-center gap-2 rounded-xl bg-emerald-500/6 px-4 py-6 text-center"
+        >
+          <div class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/15 text-lg text-emerald-400">
+            ✓
           </div>
+          <p class="text-sm font-semibold text-emerald-400">Action complete</p>
+          <p v-if="displayPhrase" class="text-xs leading-relaxed text-emerald-400/70">
+            {{ displayPhrase }}
+          </p>
+        </div>
 
-          <!-- Source text -->
-          <div class="border-b border-border-subtle px-4 py-3">
-            <p class="text-xs italic leading-relaxed text-text-muted">
+        <!-- ── Proposal Card ─────────────────────────── -->
+        <div
+          class="mx-4 mt-3 overflow-hidden rounded-xl border border-border bg-surface"
+          :class="{ 'opacity-60': isExecuted }"
+        >
+          <!-- Card hero: headline + source text -->
+          <div class="px-4 pt-4 pb-3">
+            <p
+              v-if="cardHeadline"
+              class="text-base font-semibold leading-snug text-text"
+            >
+              {{ cardHeadline }}
+            </p>
+            <p v-if="sourceText" class="mt-1 text-xs italic text-muted">
               "{{ sourceText }}"
             </p>
           </div>
 
-          <!-- Editable fields summary -->
-          <div v-if="editableFields.length" class="px-4 py-3">
-            <p class="mb-2 text-xs font-medium text-muted">Details</p>
+          <div class="border-t border-border-subtle" />
+
+          <!-- Populated fields -->
+          <div v-if="populatedFields.length" class="px-4 py-3">
+            <p class="mb-2.5 text-[10px] font-medium uppercase tracking-widest text-muted/50">
+              Details
+            </p>
             <div class="flex flex-col gap-2">
               <div
-                v-for="field in editableFields"
+                v-for="field in populatedFields"
                 :key="field.key"
-                class="flex items-start justify-between gap-3"
+                class="flex items-center justify-between gap-3"
               >
-                <span class="text-xs text-muted">{{ field.label }}</span>
-                <span
-                  class="text-xs font-medium"
-                  :class="field.value != null ? 'text-text' : 'italic text-muted'"
-                >
+                <span class="min-w-0 text-xs text-muted">{{ field.label }}</span>
+                <span class="shrink-0 text-right text-xs font-medium text-text">
                   {{ formatFieldValue(field.value) }}
                 </span>
               </div>
             </div>
           </div>
 
+          <!-- Missing fields -->
+          <div v-if="missingFields.length" class="border-t border-border-subtle px-4 py-3">
+            <p class="mb-2.5 text-[10px] font-medium uppercase tracking-widest text-muted/50">
+              Missing
+            </p>
+            <div class="flex flex-col gap-1.5">
+              <div
+                v-for="field in missingFields"
+                :key="field.key"
+                class="flex items-center gap-2 text-xs text-muted italic"
+              >
+                <span class="text-[10px] text-muted/40">·</span>
+                <span>{{ field.label }}</span>
+              </div>
+            </div>
+          </div>
+
           <!-- Proposed changes -->
           <div v-if="changesList.length" class="border-t border-border-subtle px-4 py-3">
-            <p class="mb-2 text-xs font-medium text-muted">Actions</p>
+            <p class="mb-2.5 text-[10px] font-medium uppercase tracking-widest text-muted/50">
+              Will
+            </p>
             <div class="flex flex-col gap-1.5">
               <div
                 v-for="(change, i) in changesList"
                 :key="i"
                 class="flex items-center gap-2 rounded-md bg-surface-raised px-2.5 py-1.5"
               >
-                <span class="rounded bg-accent/15 px-1.5 py-0.5 font-mono text-xs uppercase text-accent">
+                <span class="shrink-0 rounded bg-accent/15 px-1.5 py-0.5 font-mono text-[10px] uppercase text-accent">
                   {{ change.type }}
                 </span>
-                <span class="flex-1 text-xs text-text">{{ change.label }}</span>
-                <span class="text-xs text-muted">{{ change.module }}</span>
+                <span class="min-w-0 flex-1 truncate text-xs text-text">{{ change.label }}</span>
               </div>
             </div>
           </div>
         </div>
 
+        <!-- ── Refinement hints ──────────────────────── -->
+        <ProposalRefinementHints
+          v-if="proposal"
+          :proposal="proposal"
+          class="mt-3"
+        />
+
         <!-- ── Warnings ──────────────────────────────── -->
         <div
           v-if="warningsList.length"
-          class="mx-4 mt-3 rounded-lg border border-amber-500/25 bg-amber-500/8 px-3.5 py-3"
+          class="mx-4 mt-3 rounded-lg border border-amber-500/20 bg-amber-500/6 px-3.5 py-3"
         >
           <ul class="flex flex-col gap-1">
             <li
               v-for="(warning, i) in warningsList"
               :key="i"
-              class="flex items-start gap-2 text-xs text-muted"
+              class="flex items-start gap-2 text-xs text-amber-400/80"
             >
-              <span class="mt-0.5 shrink-0 text-amber-500/70">⚠</span>
+              <span class="mt-0.5 shrink-0 text-amber-500/60">⚠</span>
               <span class="leading-relaxed">{{ warning }}</span>
             </li>
           </ul>
@@ -250,13 +307,16 @@ function formatFieldValue(value: unknown): string {
           </p>
         </div>
 
-        <!-- ── Developer Drawer ──────────────────────── -->
+        <!-- ── Technical details drawer ───────────────── -->
         <details class="dev-drawer mx-4 mt-3 mb-4">
           <summary class="dev-drawer-summary">
-            <span>Developer</span>
+            <span>Technical details</span>
             <span class="dev-drawer-chevron">▸</span>
           </summary>
           <div class="dev-drawer-body">
+            <p class="mb-2 text-[10px] leading-relaxed text-muted/50">
+              Metadata about this proposal. Not part of the primary workflow.
+            </p>
             <dl class="flex flex-col gap-2">
               <div
                 v-for="row in devDrawerSections"
@@ -330,7 +390,7 @@ function formatFieldValue(value: unknown): string {
   color: var(--color-muted);
   cursor: pointer;
   user-select: none;
-  list-style: none; /* hide default marker */
+  list-style: none;
 }
 
 .dev-drawer-summary::-webkit-details-marker {
