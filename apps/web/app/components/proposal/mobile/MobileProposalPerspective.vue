@@ -74,6 +74,46 @@ const warningsList = computed(() => props.proposal?.warnings ?? [])
 const executionFailureMessage = computed(() =>
   props.proposal?.execution_failure?.message ?? props.proposal?.failure_reason ?? '',
 )
+
+// ── Narrative layer (human-readable proposal state) ────────────────
+
+interface NarrativeCue {
+  eyebrow: string
+  message: string
+  variant: 'info' | 'ready' | 'incomplete' | 'success' | 'error'
+}
+
+const narrativeCue = computed<NarrativeCue>(() => {
+  const p = props.proposal
+  if (!p) return { eyebrow: '', message: '', variant: 'info' }
+
+  const status = p.status
+  const hasMissing = missingRequiredFields.value.length > 0
+  const hasAmbiguities = blockingAmbiguities.value.length > 0
+
+  if (status === 'executed') {
+    return { eyebrow: 'Action complete',  message: 'This proposal was executed successfully.',       variant: 'success' }
+  }
+  if (status === 'failed') {
+    return { eyebrow: 'Action failed',    message: 'This action could not be completed.',             variant: 'error' }
+  }
+  if (status === 'ready') {
+    return { eyebrow: 'Ready to execute', message: 'Fluxio is ready to execute this proposal.',       variant: 'ready' }
+  }
+  if (status === 'confirmed') {
+    return { eyebrow: 'Confirmed',        message: 'This proposal has been confirmed.',                variant: 'info' }
+  }
+  if (status === 'draft') {
+    if (hasMissing) {
+      return { eyebrow: 'Needs details',   message: 'Add the missing information to make this proposal ready.', variant: 'incomplete' }
+    }
+    if (hasAmbiguities) {
+      return { eyebrow: 'Needs clarification', message: 'Choose the right match to continue.',               variant: 'incomplete' }
+    }
+    return { eyebrow: 'Fluxio understood', message: 'Review the proposal. Refine or add details as needed.',  variant: 'info' }
+  }
+  return { eyebrow: '', message: '', variant: 'info' }
+})
 </script>
 
 <template>
@@ -98,6 +138,23 @@ const executionFailureMessage = computed(() =>
       :class="{ 'opacity-60': isExecuted }"
     >
       <div class="px-4 pt-5 pb-4">
+        <!-- Narrative cue -->
+        <div v-if="narrativeCue.eyebrow" class="flex items-start gap-2 mb-3">
+          <span
+            class="shrink-0 mt-px rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+            :class="{
+              'bg-accent/12 text-accent': narrativeCue.variant === 'info',
+              'bg-emerald-500/12 text-emerald-400': narrativeCue.variant === 'ready' || narrativeCue.variant === 'success',
+              'bg-amber-500/12 text-amber-400': narrativeCue.variant === 'incomplete',
+              'bg-red-500/12 text-red-400': narrativeCue.variant === 'error',
+            }"
+          >
+            {{ narrativeCue.eyebrow }}
+          </span>
+          <span class="text-[11px] leading-relaxed text-muted">{{ narrativeCue.message }}</span>
+        </div>
+
+        <!-- Headline -->
         <p v-if="cardHeadline" class="text-lg font-semibold leading-snug text-text">
           {{ cardHeadline }}
         </p>
