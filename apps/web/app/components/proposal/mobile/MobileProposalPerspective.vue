@@ -60,6 +60,14 @@ const missingFields = computed(() =>
   allFields.value.filter(f => f.value == null || f.value === ''),
 )
 
+const missingRequiredFields = computed(() =>
+  missingFields.value.filter(f => f.required),
+)
+
+const missingOptionalFields = computed(() =>
+  missingFields.value.filter(f => !f.required),
+)
+
 const changesList = computed(() => props.proposal?.changes ?? [])
 const warningsList = computed(() => props.proposal?.warnings ?? [])
 
@@ -101,40 +109,57 @@ const executionFailureMessage = computed(() =>
       <div class="border-t border-border-subtle" />
 
       <!-- Populated fields -->
-      <div v-if="populatedFields.length" class="px-4 py-3">
-        <p class="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-muted/60">Details</p>
-        <div class="flex flex-col gap-2">
+      <div v-if="populatedFields.length" class="px-4 py-3.5">
+        <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">Details</p>
+        <div class="flex flex-col gap-2.5">
           <div
             v-for="field in populatedFields"
             :key="field.key"
-            class="flex items-center justify-between gap-3"
+            class="flex items-baseline justify-between gap-3"
           >
-            <span class="min-w-0 text-xs text-muted">{{ field.label }}</span>
-            <span class="shrink-0 text-right text-xs font-medium text-text">
+            <span class="min-w-0 text-[11px] text-muted/70">{{ field.label }}</span>
+            <span class="shrink-0 text-right text-sm font-medium text-text">
               {{ formatFieldValue(field.value) }}
             </span>
           </div>
         </div>
       </div>
 
-      <!-- Missing fields -->
-      <div v-if="missingFields.length" class="border-t border-border-subtle px-4 py-3">
-        <p class="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-muted/60">Missing</p>
+      <!-- Missing: required fields -->
+      <div v-if="missingRequiredFields.length" class="border-t border-border-subtle px-4 py-3.5">
+        <p class="mb-1 text-xs font-medium text-amber-400">
+          Add the missing information to make this proposal ready.
+        </p>
+        <div class="mt-2.5 flex flex-col gap-2">
+          <div
+            v-for="field in missingRequiredFields"
+            :key="field.key"
+            class="flex items-center gap-2.5 rounded-md bg-amber-500/6 px-3 py-2"
+          >
+            <span class="text-xs text-amber-500/60">+</span>
+            <span class="text-xs font-medium text-amber-400/90">{{ field.label }}</span>
+            <span v-if="field.required" class="ml-auto text-[10px] text-amber-500/40">required</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Missing: optional fields -->
+      <div v-if="missingOptionalFields.length" class="border-t border-border-subtle px-4 py-3">
         <div class="flex flex-col gap-1.5">
           <div
-            v-for="field in missingFields"
+            v-for="field in missingOptionalFields"
             :key="field.key"
-            class="flex items-center gap-2 text-xs text-muted italic"
+            class="flex items-center gap-2 text-xs text-muted/50"
           >
-            <span class="text-[10px] text-muted/40">·</span>
+            <span class="text-[10px] text-muted/30">·</span>
             <span>{{ field.label }}</span>
           </div>
         </div>
       </div>
 
       <!-- Proposed changes -->
-      <div v-if="changesList.length" class="border-t border-border-subtle px-4 py-3">
-        <p class="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-muted/60">Will</p>
+      <div v-if="changesList.length" class="border-t border-border-subtle px-4 py-3.5">
+        <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">Will</p>
         <div class="flex flex-col gap-1.5">
           <div
             v-for="(change, i) in changesList"
