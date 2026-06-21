@@ -10,9 +10,15 @@ const { items: leadItems, loading: leadsLoading, error: leadsError, refresh: ref
 const { items: taskItems, loading: tasksLoading, error: tasksError, refresh: refreshTasks } = useTasks()
 
 const items = computed<ContextItem[]>(() => {
-  if (active.value === 'Tasks') return taskItems.value
-  if (active.value === 'Leads') return leadItems.value
-  return []
+    if (active.value === 'Tasks') {
+        return [...taskItems.value]
+    }
+
+    if (active.value === 'Leads') {
+        return [...leadItems.value]
+    }
+
+    return []
 })
 
 const loading = computed<boolean>(() => {

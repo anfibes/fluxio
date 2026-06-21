@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { mockProposalDraft, mockProposalExecuted, mockProposalReady } from '~/mocks/actionProposals'
 import type { ActionProposal } from '~/types/actions'
+import MobileActionProposalExperience from '~/components/proposal/mobile/MobileActionProposalExperience.vue'
 
 // ── dev mock switcher ────────────────────────────────────────
 const mockState = ref<'ready' | 'draft' | 'executed' | null>(null)
