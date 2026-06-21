@@ -89,11 +89,11 @@ const executionFailureMessage = computed(() =>
       class="mx-4 mt-3 overflow-hidden rounded-xl border border-border bg-surface"
       :class="{ 'opacity-60': isExecuted }"
     >
-      <div class="px-4 pt-4 pb-3">
-        <p v-if="cardHeadline" class="text-base font-semibold leading-snug text-text">
+      <div class="px-4 pt-5 pb-4">
+        <p v-if="cardHeadline" class="text-lg font-semibold leading-snug text-text">
           {{ cardHeadline }}
         </p>
-        <p v-if="sourceText" class="mt-1 text-xs italic text-muted">
+        <p v-if="sourceText" class="mt-1.5 text-xs italic text-muted/70">
           "{{ sourceText }}"
         </p>
       </div>
@@ -102,7 +102,7 @@ const executionFailureMessage = computed(() =>
 
       <!-- Populated fields -->
       <div v-if="populatedFields.length" class="px-4 py-3">
-        <p class="mb-2.5 text-[10px] font-medium uppercase tracking-widest text-muted/50">Details</p>
+        <p class="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-muted/60">Details</p>
         <div class="flex flex-col gap-2">
           <div
             v-for="field in populatedFields"
@@ -119,7 +119,7 @@ const executionFailureMessage = computed(() =>
 
       <!-- Missing fields -->
       <div v-if="missingFields.length" class="border-t border-border-subtle px-4 py-3">
-        <p class="mb-2.5 text-[10px] font-medium uppercase tracking-widest text-muted/50">Missing</p>
+        <p class="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-muted/60">Missing</p>
         <div class="flex flex-col gap-1.5">
           <div
             v-for="field in missingFields"
@@ -134,7 +134,7 @@ const executionFailureMessage = computed(() =>
 
       <!-- Proposed changes -->
       <div v-if="changesList.length" class="border-t border-border-subtle px-4 py-3">
-        <p class="mb-2.5 text-[10px] font-medium uppercase tracking-widest text-muted/50">Will</p>
+        <p class="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-muted/60">Will</p>
         <div class="flex flex-col gap-1.5">
           <div
             v-for="(change, i) in changesList"

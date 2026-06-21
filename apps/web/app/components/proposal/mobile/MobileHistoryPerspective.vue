@@ -80,7 +80,7 @@ const hasHistoryData = computed(() =>
     <!-- Original command -->
     <div v-if="sourceText" class="mx-4 mt-3 overflow-hidden rounded-xl border border-border bg-surface">
       <div class="border-b border-border px-4 py-2.5">
-        <p class="text-[10px] font-medium uppercase tracking-widest text-muted/50">Original command</p>
+        <p class="text-[11px] font-medium uppercase tracking-wider text-muted/60">Original command</p>
       </div>
       <div class="px-4 py-3">
         <p class="text-sm italic leading-relaxed text-text-muted">"{{ sourceText }}"</p>
@@ -90,7 +90,7 @@ const hasHistoryData = computed(() =>
     <!-- Last refinement -->
     <div v-if="hasRefinement" class="mx-4 mt-3 overflow-hidden rounded-xl border border-border bg-surface">
       <div class="border-b border-border px-4 py-2.5">
-        <p class="text-[10px] font-medium uppercase tracking-widest text-muted/50">Last refinement</p>
+        <p class="text-[11px] font-medium uppercase tracking-wider text-muted/60">Last refinement</p>
       </div>
       <div class="px-4 py-3 flex flex-col gap-3">
         <!-- Refinement text -->
@@ -137,7 +137,7 @@ const hasHistoryData = computed(() =>
     <!-- Lifecycle timestamps -->
     <div v-if="lifecycleTimestamps.length" class="mx-4 mt-3 overflow-hidden rounded-xl border border-border bg-surface">
       <div class="border-b border-border px-4 py-2.5">
-        <p class="text-[10px] font-medium uppercase tracking-widest text-muted/50">Lifecycle</p>
+        <p class="text-[11px] font-medium uppercase tracking-wider text-muted/60">Lifecycle</p>
       </div>
       <div class="px-4 py-3">
         <div class="flex flex-col gap-2">

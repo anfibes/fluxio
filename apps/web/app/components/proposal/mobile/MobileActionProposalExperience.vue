@@ -124,28 +124,30 @@ const displayPhrase = computed(() => {
 /* ── Segmented control ──────────────────────────────── */
 .mob-segmented {
   display: flex;
-  border-radius: 0.625rem;
+  border-radius: 0.75rem;
   background-color: var(--color-surface-raised);
-  padding: 0.1875rem;
+  padding: 0.25rem;
+  gap: 0.125rem;
 }
 
 .mob-segmented-btn {
   flex: 1;
-  padding: 0.4375rem 0.5rem;
-  border-radius: 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 500;
+  padding: 0.625rem 0.5rem;
+  border-radius: 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
   color: var(--color-muted);
   text-align: center;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
   cursor: pointer;
   background: none;
   border: none;
+  letter-spacing: -0.01em;
 }
 
 .mob-segmented-btn--active {
   background-color: var(--color-surface);
   color: var(--color-text);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 </style>

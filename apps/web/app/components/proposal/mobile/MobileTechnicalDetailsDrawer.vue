@@ -24,7 +24,7 @@ const sections = computed(() => {
       <span class="dev-drawer-chevron">▸</span>
     </summary>
     <div class="dev-drawer-body">
-      <p class="mb-2 text-[10px] leading-relaxed text-muted/50">
+      <p class="mb-2 text-[11px] leading-relaxed text-muted/60">
         Metadata about this proposal. Not part of the primary workflow.
       </p>
       <dl class="flex flex-col gap-2">

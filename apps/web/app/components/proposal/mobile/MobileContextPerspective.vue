@@ -41,7 +41,7 @@ const hasContextData = computed(() =>
     <!-- Entities -->
     <div v-if="entityEntries.length" class="mx-4 mt-3 overflow-hidden rounded-xl border border-border bg-surface">
       <div class="border-b border-border px-4 py-2.5">
-        <p class="text-[10px] font-medium uppercase tracking-widest text-muted/50">Entities</p>
+        <p class="text-[11px] font-medium uppercase tracking-wider text-muted/60">Entities</p>
       </div>
       <div class="px-4 py-3">
         <div class="flex flex-col gap-2">
@@ -62,7 +62,7 @@ const hasContextData = computed(() =>
     <!-- Operational fields -->
     <div v-if="populatedFields.length" class="mx-4 mt-3 overflow-hidden rounded-xl border border-border bg-surface">
       <div class="border-b border-border px-4 py-2.5">
-        <p class="text-[10px] font-medium uppercase tracking-widest text-muted/50">Fields</p>
+        <p class="text-[11px] font-medium uppercase tracking-wider text-muted/60">Fields</p>
       </div>
       <div class="px-4 py-3">
         <div class="flex flex-col gap-2">
@@ -83,7 +83,7 @@ const hasContextData = computed(() =>
     <!-- Proposed changes -->
     <div v-if="changesList.length" class="mx-4 mt-3 overflow-hidden rounded-xl border border-border bg-surface">
       <div class="border-b border-border px-4 py-2.5">
-        <p class="text-[10px] font-medium uppercase tracking-widest text-muted/50">Actions</p>
+        <p class="text-[11px] font-medium uppercase tracking-wider text-muted/60">Actions</p>
       </div>
       <div class="px-4 py-3">
         <div class="flex flex-col gap-1.5">
