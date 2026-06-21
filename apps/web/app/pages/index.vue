@@ -29,8 +29,25 @@ function handleGlobalKey(e: KeyboardEvent) {
   }
 }
 
-onMounted(() => document.addEventListener('keydown', handleGlobalKey))
-onUnmounted(() => document.removeEventListener('keydown', handleGlobalKey))
+// ── Viewport breakpoint (1024px = Tailwind lg) ──────────────
+const isDesktop = ref(true)
+
+function updateBreakpoint() {
+  if (typeof window !== 'undefined') {
+    isDesktop.value = window.innerWidth >= 1024
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleGlobalKey)
+  updateBreakpoint()
+  window.addEventListener('resize', updateBreakpoint)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleGlobalKey)
+  window.removeEventListener('resize', updateBreakpoint)
+})
 
 // ── proposal display ─────────────────────────────────────────
 // cast needed: mock objects are deeply readonly, not assignable to mutable ActionProposal
@@ -112,17 +129,18 @@ function handleReset() {
         @clear="handleClear"
       />
 
-      <!-- Canonical phrase summary (read-only narration projection, near the input) -->
-      <CommandCanonicalSummary :canonical-phrase="displayProposal?.canonical_phrase ?? null" />
+      <!-- Canonical phrase summary (desktop only; mobile uses the phrase inside the proposal card) -->
+      <CommandCanonicalSummary v-if="isDesktop" :canonical-phrase="displayProposal?.canonical_phrase ?? null" />
 
-      <!-- Recent command history -->
+      <!-- Recent command history (desktop only) -->
       <CommandRecentHistory
+        v-if="isDesktop"
         :history="history"
         @select="fillFromHistory"
       />
 
-      <!-- Parsing feedback (appears after interpretation) -->
-      <CommandLiveParsingFeedback :proposal="displayProposal" />
+      <!-- Parsing feedback (desktop only) -->
+      <CommandLiveParsingFeedback v-if="isDesktop" :proposal="displayProposal" />
 
       <!-- API error banner (dismissible) -->
       <div
@@ -140,11 +158,11 @@ function handleReset() {
         </button>
       </div>
 
-      <CommandQuickStarters />
-      <ContextTabs />
+      <CommandQuickStarters v-if="isDesktop" />
+      <ContextTabs v-if="isDesktop" />
 
-      <!-- Dev: mock switcher (collapsible) -->
-      <details class="border-t border-border-subtle pt-4">
+      <!-- Dev: mock switcher (desktop only) -->
+      <details v-if="isDesktop" class="border-t border-border-subtle pt-4">
         <summary class="cursor-pointer select-none text-xs text-muted hover:text-text-muted">
           Dev preview
         </summary>
@@ -175,9 +193,8 @@ function handleReset() {
       </details>
     </div>
 
-    <!-- Proposal rail: full-width below workspace on mobile, fixed-width sidebar on desktop. -->
-    <!-- min-h-[28rem] ensures h-full inside the rail resolves correctly on mobile. -->
-    <div class="flex min-h-112 flex-col border-t border-border bg-surface lg:min-h-0 lg:w-110 lg:shrink-0 lg:border-l lg:border-t-0 lg:overflow-hidden">
+    <!-- Desktop proposal rail: fixed-width sidebar (unchanged). -->
+    <div v-if="isDesktop" class="flex min-h-112 flex-col border-t border-border bg-surface lg:min-h-0 lg:w-110 lg:shrink-0 lg:border-l lg:border-t-0 lg:overflow-hidden">
       <div class="border-b border-border px-4 py-3">
         <p class="text-xs font-medium uppercase tracking-wide text-muted">
           {{ $t('proposal.title') }}
@@ -194,5 +211,17 @@ function handleReset() {
         />
       </div>
     </div>
+
+    <!-- Mobile proposal experience (new, full-width). -->
+    <MobileActionProposalExperience
+      v-else
+      class="min-h-112 flex-1"
+      :proposal="displayProposal"
+      :loading="loading"
+      :confirming="confirming"
+      @confirm-execute="confirmAndExecute"
+      @resolve-ambiguity="handleResolveAmbiguity"
+      @reset="handleReset"
+    />
   </div>
 </template>
