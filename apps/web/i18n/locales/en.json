@@ -137,7 +137,11 @@
     "propose": "Propose",
     "interpreting": "Interpreting…",
     "recent": "Recent",
-    "summary": "Summary"
+    "summary": "Summary",
+    "trail": {
+      "title": "This session",
+      "you": "You"
+    }
   },
   "auth": {
     "email": "Email",

@@ -17,7 +17,7 @@ const { isAuthenticated } = useAuth()
 
 // ── live state ───────────────────────────────────────────────
 const commandText = ref('')
-const { proposal, loading, confirming, error, submitCommand, confirmAndExecute, resolveAmbiguity, setError, clear } = useActionProposal()
+const { proposal, loading, confirming, error, conversationTrail, submitCommand, confirmAndExecute, resolveAmbiguity, setError, clear } = useActionProposal()
 const { history, push: pushHistory } = useCommandHistory()
 
 // ── composer keyboard shortcut ───────────────────────────────
@@ -126,6 +126,7 @@ function handleReset() {
         v-model="commandText"
         :loading="loading"
         :placeholder="composerPlaceholder"
+        :trail="conversationTrail"
         @submit="handleSubmit"
         @clear="handleClear"
       />

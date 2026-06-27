@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import type { ProposalConversationTurn } from '~/composables/useActionProposal'
+
 const props = defineProps<{
   modelValue: string
   loading?: boolean
   placeholder?: string
+  trail?: readonly ProposalConversationTurn[]
 }>()
 
 const emit = defineEmits<{
@@ -34,6 +37,17 @@ function handleKeydown(e: KeyboardEvent) {
 
 <template>
   <div class="composer-wrap" :class="{ 'composer-wrap--loading': loading }">
+    <!-- Conversation trail (current session, user turns only) -->
+    <div v-if="trail && trail.length" class="composer-trail">
+      <p class="composer-trail-title">{{ $t('command.trail.title') }}</p>
+      <ul class="composer-trail-list">
+        <li v-for="turn in trail" :key="turn.id" class="composer-trail-turn">
+          <span class="composer-trail-role">{{ $t('command.trail.you') }}</span>
+          <span class="composer-trail-text">{{ turn.text }}</span>
+        </li>
+      </ul>
+    </div>
+
     <textarea
       ref="textareaEl"
       :value="modelValue"
@@ -79,6 +93,53 @@ function handleKeydown(e: KeyboardEvent) {
 .composer-wrap--loading {
   opacity: 0.75;
   pointer-events: none;
+}
+
+/* ── Conversation trail ─────────────────────────────────── */
+.composer-trail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  max-height: 9rem;
+  overflow-y: auto;
+  padding: 0.625rem 1.125rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background-color: var(--color-surface-raised);
+  border-top-left-radius: 0.875rem;
+  border-top-right-radius: 0.875rem;
+}
+
+.composer-trail-title {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+}
+
+.composer-trail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.composer-trail-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.0625rem;
+}
+
+.composer-trail-role {
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.composer-trail-text {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+  word-break: break-word;
 }
 
 .composer-input {

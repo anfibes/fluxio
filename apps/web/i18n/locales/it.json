@@ -137,7 +137,11 @@
     "propose": "Proponi",
     "interpreting": "Interpretazione in corso…",
     "recent": "Recenti",
-    "summary": "Riepilogo"
+    "summary": "Riepilogo",
+    "trail": {
+      "title": "Questa sessione",
+      "you": "Tu"
+    }
   },
   "auth": {
     "email": "Email",
