@@ -139,8 +139,8 @@
     "recent": "Recenti",
     "summary": "Riepilogo",
     "trail": {
-      "title": "Questa sessione",
-      "you": "Tu"
+      "you": "Tu",
+      "fluxio": "Fluxio"
     }
   },
   "auth": {
