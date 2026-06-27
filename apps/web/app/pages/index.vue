@@ -118,7 +118,7 @@ function handleReset() {
 
   <!-- ── Main UI ───────────────────────────────────────────── -->
   <!-- Mobile: single scrollable column. Desktop: side-by-side with internal scroll. -->
-  <div v-else class="flex flex-col overflow-y-auto lg:h-full lg:flex-row lg:overflow-hidden">
+  <div v-else class="flex h-full flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
     <!-- Workspace column -->
     <div class="flex min-w-0 flex-col gap-5 px-4 py-5 lg:flex-1 lg:overflow-y-auto lg:px-6 lg:py-6">
       <CommandComposer

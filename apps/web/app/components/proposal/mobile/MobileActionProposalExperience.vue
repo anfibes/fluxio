@@ -85,7 +85,7 @@ const displayPhrase = computed(() => {
       </div>
 
       <!-- Scrollable body -->
-      <div class="flex-1 overflow-y-auto pb-24">
+      <div class="min-h-0 flex-1 overflow-y-auto pb-24">
 
         <MobileProposalPerspective
           v-if="activeTab === 'proposal'"
