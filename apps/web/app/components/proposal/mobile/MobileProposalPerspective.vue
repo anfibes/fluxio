@@ -167,7 +167,7 @@ const narrativeCue = computed<NarrativeCue>(() => {
 
       <!-- Populated fields -->
       <div v-if="populatedFields.length" class="px-4 py-3.5">
-        <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">Details</p>
+        <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">What I found</p>
         <div class="flex flex-col gap-2.5">
           <div
             v-for="field in populatedFields"
@@ -184,10 +184,8 @@ const narrativeCue = computed<NarrativeCue>(() => {
 
       <!-- Missing: required fields -->
       <div v-if="missingRequiredFields.length" class="border-t border-border-subtle px-4 py-3.5">
-        <p class="mb-1 text-xs font-medium text-amber-400">
-          Add the missing information to make this proposal ready.
-        </p>
-        <div class="mt-2.5 flex flex-col gap-2">
+        <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">Still needed</p>
+        <div class="flex flex-col gap-2">
           <div
             v-for="field in missingRequiredFields"
             :key="field.key"
@@ -216,7 +214,7 @@ const narrativeCue = computed<NarrativeCue>(() => {
 
       <!-- Proposed changes -->
       <div v-if="changesList.length" class="border-t border-border-subtle px-4 py-3.5">
-        <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">Will</p>
+        <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">When you confirm</p>
         <div class="flex flex-col gap-1.5">
           <div
             v-for="(change, i) in changesList"
