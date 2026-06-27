@@ -44,9 +44,9 @@ const displayPhrase = computed(() => {
         ⚡
       </div>
       <div class="flex flex-col gap-1.5">
-        <p class="text-base font-semibold text-text">What would you like to do?</p>
+        <p class="text-base font-semibold text-text">{{ $t('proposal.empty_state.title') }}</p>
         <p class="max-w-64 text-sm leading-relaxed text-muted">
-          Type a command above to propose an action. Fluxio will interpret it and show you a proposal to review.
+          {{ $t('proposal.empty_state.subtitle') }}
         </p>
       </div>
     </div>
@@ -64,7 +64,7 @@ const displayPhrase = computed(() => {
         <div class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/15 text-lg text-emerald-400">
           ✓
         </div>
-        <p class="text-sm font-semibold text-emerald-400">Action complete</p>
+        <p class="text-sm font-semibold text-emerald-400">{{ $t('proposal.narrative.executed.eyebrow') }}</p>
         <p v-if="displayPhrase" class="text-xs leading-relaxed text-emerald-400/70">
           {{ displayPhrase }}
         </p>
@@ -80,7 +80,7 @@ const displayPhrase = computed(() => {
           :class="{ 'mob-segmented-btn--active': activeTab === tab }"
           @click="activeTab = tab"
         >
-          {{ tab.charAt(0).toUpperCase() + tab.slice(1) }}
+          {{ $t(`proposal.tabs.${tab}`) }}
         </button>
       </div>
 

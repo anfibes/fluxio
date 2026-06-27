@@ -7,6 +7,8 @@ const props = defineProps<{
   proposal: ActionProposal | null
 }>()
 
+const { t } = useI18n()
+
 // ── Safe derived data (no non-null assertions in templates) ───────
 
 const sourceText = computed(() => props.proposal?.source_text ?? '')
@@ -28,18 +30,18 @@ const refinementChanges = computed(() => lastRefinement.value?.changes ?? [])
 const ambiguityOutcomeLabel = computed(() => {
   const outcome = lastRefinement.value?.ambiguity_outcome
   if (!outcome) return null
-  const detail = outcome.label ?? outcome.ambiguity_key ?? 'Ambiguity'
+  const detail = outcome.label ?? outcome.ambiguity_key ?? t('proposal.history.ambiguity.fallback')
   switch (outcome.kind) {
     case 'resolved':
-      return `Ambiguity resolved: ${detail}`
+      return t('proposal.history.ambiguity.resolved', { detail })
     case 'narrowed':
       return outcome.from_count != null && outcome.to_count != null
-        ? `Ambiguity narrowed: ${detail} candidates ${outcome.from_count} → ${outcome.to_count}`
-        : `Ambiguity narrowed: ${detail}`
+        ? t('proposal.history.ambiguity.narrowed_counts', { detail, from: outcome.from_count, to: outcome.to_count })
+        : t('proposal.history.ambiguity.narrowed', { detail })
     case 'unresolved':
-      return 'Ambiguity could not be resolved'
+      return t('proposal.history.ambiguity.unresolved')
     case 'inapplicable':
-      return 'Clarification did not affect ambiguities'
+      return t('proposal.history.ambiguity.inapplicable')
     default:
       return null
   }
@@ -54,9 +56,9 @@ const lifecycleTimestamps = computed<LifecycleEvent[]>(() => {
   const p = props.proposal
   if (!p) return []
   const items: LifecycleEvent[] = []
-  if (p.confirmed_at) items.push({ label: 'Confirmed', value: p.confirmed_at })
-  if (p.executed_at) items.push({ label: 'Executed', value: p.executed_at })
-  if (p.failed_at) items.push({ label: 'Failed', value: p.failed_at })
+  if (p.confirmed_at) items.push({ label: t('proposal.status.confirmed'), value: p.confirmed_at })
+  if (p.executed_at) items.push({ label: t('proposal.status.executed'), value: p.executed_at })
+  if (p.failed_at) items.push({ label: t('proposal.status.failed'), value: p.failed_at })
   return items
 })
 
@@ -71,16 +73,16 @@ const hasHistoryData = computed(() =>
   <div>
     <!-- Empty state -->
     <div v-if="!hasHistoryData" class="mx-4 mt-4 rounded-xl border border-border bg-surface px-4 py-6 text-center">
-      <p class="text-sm font-medium text-text-muted">No history yet</p>
+      <p class="text-sm font-medium text-text-muted">{{ $t('proposal.history.empty_title') }}</p>
       <p class="mt-1 text-xs leading-relaxed text-muted">
-        Refinement and lifecycle events will appear here as the proposal evolves.
+        {{ $t('proposal.history.empty_subtitle') }}
       </p>
     </div>
 
     <!-- Original command -->
     <div v-if="sourceText" class="mx-4 mt-3 overflow-hidden rounded-xl border border-border bg-surface">
       <div class="border-b border-border px-4 py-2.5">
-        <p class="text-[11px] font-medium uppercase tracking-wider text-muted/60">Original command</p>
+        <p class="text-[11px] font-medium uppercase tracking-wider text-muted/60">{{ $t('proposal.history.original_command') }}</p>
       </div>
       <div class="px-4 py-3">
         <p class="text-sm italic leading-relaxed text-text-muted">"{{ sourceText }}"</p>
@@ -90,7 +92,7 @@ const hasHistoryData = computed(() =>
     <!-- Last refinement -->
     <div v-if="hasRefinement" class="mx-4 mt-3 overflow-hidden rounded-xl border border-border bg-surface">
       <div class="border-b border-border px-4 py-2.5">
-        <p class="text-[11px] font-medium uppercase tracking-wider text-muted/60">Last refinement</p>
+        <p class="text-[11px] font-medium uppercase tracking-wider text-muted/60">{{ $t('proposal.history.last_refinement') }}</p>
       </div>
       <div class="px-4 py-3 flex flex-col gap-3">
         <!-- Refinement text -->
@@ -102,7 +104,7 @@ const hasHistoryData = computed(() =>
             v-if="refinementEffectiveText"
             class="mt-1 text-xs italic leading-relaxed text-muted"
           >
-            Effective: "{{ refinementEffectiveText }}"
+            {{ $t('proposal.history.effective', { text: refinementEffectiveText }) }}
           </p>
         </div>
 
@@ -137,7 +139,7 @@ const hasHistoryData = computed(() =>
     <!-- Lifecycle timestamps -->
     <div v-if="lifecycleTimestamps.length" class="mx-4 mt-3 overflow-hidden rounded-xl border border-border bg-surface">
       <div class="border-b border-border px-4 py-2.5">
-        <p class="text-[11px] font-medium uppercase tracking-wider text-muted/60">Lifecycle</p>
+        <p class="text-[11px] font-medium uppercase tracking-wider text-muted/60">{{ $t('proposal.history.lifecycle') }}</p>
       </div>
       <div class="px-4 py-3">
         <div class="flex flex-col gap-2">

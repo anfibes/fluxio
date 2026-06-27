@@ -5,14 +5,16 @@ const props = defineProps<{
   proposal: ActionProposal | null
 }>()
 
+const { t } = useI18n()
+
 const sections = computed(() => {
   const p = props.proposal
   if (!p) return []
   return [
-    { label: 'Status',     value: p.status },
-    { label: 'Intent',     value: p.intent ? p.intent.replace(/_/g, ' ') : '—' },
-    { label: 'Proposal ID', value: p.id },
-    { label: 'Confidence', value: typeof p.confidence === 'number' ? `${Math.round(p.confidence * 100)}%` : '—' },
+    { label: t('proposal.drawer.status'),      value: p.status },
+    { label: t('proposal.drawer.intent'),      value: p.intent ? p.intent.replace(/_/g, ' ') : '—' },
+    { label: t('proposal.drawer.proposal_id'), value: p.id },
+    { label: t('proposal.drawer.confidence'),  value: typeof p.confidence === 'number' ? `${Math.round(p.confidence * 100)}%` : '—' },
   ]
 })
 </script>
@@ -20,12 +22,12 @@ const sections = computed(() => {
 <template>
   <details class="dev-drawer mx-4 mt-3 mb-4">
     <summary class="dev-drawer-summary">
-      <span>Technical details</span>
+      <span>{{ $t('proposal.drawer.technical_details') }}</span>
       <span class="dev-drawer-chevron">▸</span>
     </summary>
     <div class="dev-drawer-body">
       <p class="mb-2 text-[11px] leading-relaxed text-muted/60">
-        Metadata about this proposal. Not part of the primary workflow.
+        {{ $t('proposal.drawer.metadata_note') }}
       </p>
       <dl class="flex flex-col gap-2">
         <div

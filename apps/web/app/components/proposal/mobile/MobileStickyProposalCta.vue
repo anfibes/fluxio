@@ -10,6 +10,8 @@ const emit = defineEmits<{
   'confirm-execute': []
 }>()
 
+const { t } = useI18n()
+
 interface CtaState {
   visible: boolean
   label: string
@@ -19,18 +21,18 @@ interface CtaState {
 
 const ctaState = computed<CtaState>(() => {
   if (props.confirming) {
-    return { visible: true, label: 'Confirming…', disabled: true, variant: 'loading' }
+    return { visible: true, label: t('proposal.cta.confirming'), disabled: true, variant: 'loading' }
   }
   switch (props.status) {
     case 'draft':
-      return { visible: true, label: 'Complete Proposal', disabled: true, variant: 'subtle' }
+      return { visible: true, label: t('proposal.cta.complete'), disabled: true, variant: 'subtle' }
     case 'ready':
-      return { visible: true, label: 'Confirm & Execute', disabled: false, variant: 'primary' }
+      return { visible: true, label: t('proposal.cta.confirm'), disabled: false, variant: 'primary' }
     case 'confirmed':
     case 'executed':
       return { visible: false, label: '', disabled: true, variant: 'subtle' }
     case 'failed':
-      return { visible: true, label: 'Execution Failed', disabled: true, variant: 'error' }
+      return { visible: true, label: t('proposal.cta.failed'), disabled: true, variant: 'error' }
     default:
       return { visible: false, label: '', disabled: true, variant: 'subtle' }
   }

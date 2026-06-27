@@ -40,8 +40,12 @@
     "sections": {
       "blocking": "Da risolvere",
       "informational": "Contesto aggiuntivo",
-      "outcome": "Risultato"
+      "outcome": "Risultato",
+      "what_found": "Cosa ho trovato",
+      "still_needed": "Ancora necessario",
+      "when_confirm": "Quando confermi"
     },
+    "field_required": "obbligatorio",
     "ambiguity": {
       "title": "Risolvi ambiguità",
       "query": "Corrispondenza a \"{query}\"",
@@ -64,6 +68,64 @@
       "title": "Affinamenti suggeriti",
       "add_missing": "Aggiungi {field} mancante",
       "resolve_ambiguity": "Risolvi ambiguità"
+    },
+    "narrative": {
+      "understood":          { "eyebrow": "Fluxio ha capito", "message": "Rivedi la proposta. Affina o aggiungi dettagli se necessario." },
+      "needs_details":       { "eyebrow": "Servono dettagli", "message": "Aggiungi le informazioni mancanti per rendere pronta questa proposta." },
+      "needs_clarification": { "eyebrow": "Serve chiarimento", "message": "Scegli la corrispondenza giusta per continuare." },
+      "ready":               { "eyebrow": "Pronta da eseguire", "message": "Fluxio è pronto a eseguire questa proposta." },
+      "confirmed":           { "eyebrow": "Confermata", "message": "Questa proposta è stata confermata." },
+      "executed":            { "eyebrow": "Azione completata", "message": "Questa proposta è stata eseguita con successo." },
+      "failed":              { "eyebrow": "Azione fallita", "message": "Non è stato possibile completare questa azione." }
+    },
+    "tabs": {
+      "proposal": "Proposta",
+      "context": "Contesto",
+      "history": "Cronologia"
+    },
+    "empty_state": {
+      "title": "Cosa vuoi fare?",
+      "subtitle": "Scrivi un comando qui sopra per proporre un'azione. Fluxio lo interpreterà e ti mostrerà una proposta da rivedere."
+    },
+    "cta": {
+      "complete": "Completa proposta",
+      "confirm": "Conferma & Esegui",
+      "confirming": "Conferma in corso…",
+      "failed": "Esecuzione fallita"
+    },
+    "failure": {
+      "title": "Esecuzione fallita"
+    },
+    "context": {
+      "empty_title": "Ancora nessun dato di contesto",
+      "empty_subtitle": "Le informazioni di contesto appariranno qui man mano che la proposta viene interpretata e le entità risolte.",
+      "entities": "Entità",
+      "fields": "Campi",
+      "actions": "Azioni"
+    },
+    "history": {
+      "empty_title": "Ancora nessuna cronologia",
+      "empty_subtitle": "Gli affinamenti e gli eventi del ciclo di vita appariranno qui man mano che la proposta evolve.",
+      "original_command": "Comando originale",
+      "last_refinement": "Ultimo affinamento",
+      "effective": "Effettivo: \"{text}\"",
+      "lifecycle": "Ciclo di vita",
+      "ambiguity": {
+        "fallback": "Ambiguità",
+        "resolved": "Ambiguità risolta: {detail}",
+        "narrowed": "Ambiguità ristretta: {detail}",
+        "narrowed_counts": "Ambiguità ristretta: {detail} candidati {from} → {to}",
+        "unresolved": "Impossibile risolvere l'ambiguità",
+        "inapplicable": "Il chiarimento non ha influito sulle ambiguità"
+      }
+    },
+    "drawer": {
+      "technical_details": "Dettagli tecnici",
+      "metadata_note": "Metadati su questa proposta. Non fanno parte del flusso principale.",
+      "status": "Stato",
+      "intent": "Intento",
+      "proposal_id": "ID proposta",
+      "confidence": "Confidenza"
     }
   },
   "command": {

@@ -32,16 +32,16 @@ const hasContextData = computed(() =>
   <div>
     <!-- Empty state -->
     <div v-if="!hasContextData" class="mx-4 mt-4 rounded-xl border border-border bg-surface px-4 py-6 text-center">
-      <p class="text-sm font-medium text-text-muted">No context data yet</p>
+      <p class="text-sm font-medium text-text-muted">{{ $t('proposal.context.empty_title') }}</p>
       <p class="mt-1 text-xs leading-relaxed text-muted">
-        Context information will appear here as the proposal is interpreted and entities are resolved.
+        {{ $t('proposal.context.empty_subtitle') }}
       </p>
     </div>
 
     <!-- Entities -->
     <div v-if="entityEntries.length" class="mx-4 mt-3 overflow-hidden rounded-xl border border-border bg-surface">
       <div class="border-b border-border px-4 py-2.5">
-        <p class="text-[11px] font-medium uppercase tracking-wider text-muted/60">Entities</p>
+        <p class="text-[11px] font-medium uppercase tracking-wider text-muted/60">{{ $t('proposal.context.entities') }}</p>
       </div>
       <div class="px-4 py-3">
         <div class="flex flex-col gap-2">
@@ -62,7 +62,7 @@ const hasContextData = computed(() =>
     <!-- Operational fields -->
     <div v-if="populatedFields.length" class="mx-4 mt-3 overflow-hidden rounded-xl border border-border bg-surface">
       <div class="border-b border-border px-4 py-2.5">
-        <p class="text-[11px] font-medium uppercase tracking-wider text-muted/60">Fields</p>
+        <p class="text-[11px] font-medium uppercase tracking-wider text-muted/60">{{ $t('proposal.context.fields') }}</p>
       </div>
       <div class="px-4 py-3">
         <div class="flex flex-col gap-2">
@@ -83,7 +83,7 @@ const hasContextData = computed(() =>
     <!-- Proposed changes -->
     <div v-if="changesList.length" class="mx-4 mt-3 overflow-hidden rounded-xl border border-border bg-surface">
       <div class="border-b border-border px-4 py-2.5">
-        <p class="text-[11px] font-medium uppercase tracking-wider text-muted/60">Actions</p>
+        <p class="text-[11px] font-medium uppercase tracking-wider text-muted/60">{{ $t('proposal.context.actions') }}</p>
       </div>
       <div class="px-4 py-3">
         <div class="flex flex-col gap-1.5">

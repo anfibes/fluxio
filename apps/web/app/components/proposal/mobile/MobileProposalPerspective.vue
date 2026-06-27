@@ -83,6 +83,12 @@ interface NarrativeCue {
   variant: 'info' | 'ready' | 'incomplete' | 'success' | 'error'
 }
 
+const { t } = useI18n()
+
+function cue(key: string, variant: NarrativeCue['variant']): NarrativeCue {
+  return { eyebrow: t(`proposal.narrative.${key}.eyebrow`), message: t(`proposal.narrative.${key}.message`), variant }
+}
+
 const narrativeCue = computed<NarrativeCue>(() => {
   const p = props.proposal
   if (!p) return { eyebrow: '', message: '', variant: 'info' }
@@ -91,26 +97,14 @@ const narrativeCue = computed<NarrativeCue>(() => {
   const hasMissing = missingRequiredFields.value.length > 0
   const hasAmbiguities = blockingAmbiguities.value.length > 0
 
-  if (status === 'executed') {
-    return { eyebrow: 'Action complete',  message: 'This proposal was executed successfully.',       variant: 'success' }
-  }
-  if (status === 'failed') {
-    return { eyebrow: 'Action failed',    message: 'This action could not be completed.',             variant: 'error' }
-  }
-  if (status === 'ready') {
-    return { eyebrow: 'Ready to execute', message: 'Fluxio is ready to execute this proposal.',       variant: 'ready' }
-  }
-  if (status === 'confirmed') {
-    return { eyebrow: 'Confirmed',        message: 'This proposal has been confirmed.',                variant: 'info' }
-  }
+  if (status === 'executed') return cue('executed', 'success')
+  if (status === 'failed')   return cue('failed', 'error')
+  if (status === 'ready')    return cue('ready', 'ready')
+  if (status === 'confirmed') return cue('confirmed', 'info')
   if (status === 'draft') {
-    if (hasMissing) {
-      return { eyebrow: 'Needs details',   message: 'Add the missing information to make this proposal ready.', variant: 'incomplete' }
-    }
-    if (hasAmbiguities) {
-      return { eyebrow: 'Needs clarification', message: 'Choose the right match to continue.',               variant: 'incomplete' }
-    }
-    return { eyebrow: 'Fluxio understood', message: 'Review the proposal. Refine or add details as needed.',  variant: 'info' }
+    if (hasMissing)      return cue('needs_details', 'incomplete')
+    if (hasAmbiguities)  return cue('needs_clarification', 'incomplete')
+    return cue('understood', 'info')
   }
   return { eyebrow: '', message: '', variant: 'info' }
 })
@@ -167,7 +161,7 @@ const narrativeCue = computed<NarrativeCue>(() => {
 
       <!-- Populated fields -->
       <div v-if="populatedFields.length" class="px-4 py-3.5">
-        <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">What I found</p>
+        <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">{{ $t('proposal.sections.what_found') }}</p>
         <div class="flex flex-col gap-2.5">
           <div
             v-for="field in populatedFields"
@@ -184,7 +178,7 @@ const narrativeCue = computed<NarrativeCue>(() => {
 
       <!-- Missing: required fields -->
       <div v-if="missingRequiredFields.length" class="border-t border-border-subtle px-4 py-3.5">
-        <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">Still needed</p>
+        <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">{{ $t('proposal.sections.still_needed') }}</p>
         <div class="flex flex-col gap-2">
           <div
             v-for="field in missingRequiredFields"
@@ -193,7 +187,7 @@ const narrativeCue = computed<NarrativeCue>(() => {
           >
             <span class="text-xs text-amber-500/60">+</span>
             <span class="text-xs font-medium text-amber-400/90">{{ field.label }}</span>
-            <span v-if="field.required" class="ml-auto text-[10px] text-amber-500/40">required</span>
+            <span v-if="field.required" class="ml-auto text-[10px] text-amber-500/40">{{ $t('proposal.field_required') }}</span>
           </div>
         </div>
       </div>
@@ -214,7 +208,7 @@ const narrativeCue = computed<NarrativeCue>(() => {
 
       <!-- Proposed changes -->
       <div v-if="changesList.length" class="border-t border-border-subtle px-4 py-3.5">
-        <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">When you confirm</p>
+        <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">{{ $t('proposal.sections.when_confirm') }}</p>
         <div class="flex flex-col gap-1.5">
           <div
             v-for="(change, i) in changesList"
@@ -266,7 +260,7 @@ const narrativeCue = computed<NarrativeCue>(() => {
       v-if="isFailed && executionFailureMessage"
       class="mx-4 mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3.5 py-3"
     >
-      <p class="mb-1 text-xs font-semibold text-red-400">Execution Failed</p>
+      <p class="mb-1 text-xs font-semibold text-red-400">{{ $t('proposal.failure.title') }}</p>
       <p class="text-xs leading-relaxed text-red-400/80">
         {{ executionFailureMessage }}
       </p>
