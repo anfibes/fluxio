@@ -120,7 +120,7 @@ function handleReset() {
   <!-- Mobile: single scrollable column. Desktop: side-by-side with internal scroll. -->
   <div v-else class="flex h-full flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
     <!-- Workspace column -->
-    <div class="flex min-w-0 flex-col gap-5 px-4 py-5 lg:flex-1 lg:overflow-y-auto lg:px-6 lg:py-6">
+    <div class="flex min-w-0 flex-col gap-3 px-4 py-3 lg:flex-1 lg:gap-5 lg:overflow-y-auto lg:px-6 lg:py-6">
       <CommandComposer
         ref="composerRef"
         v-model="commandText"

@@ -141,9 +141,24 @@ function handleKeydown(e: KeyboardEvent) {
   color: var(--color-muted);
 }
 
-@media (max-width: 767px) {
+/* Mobile (below the 1024px mobile/desktop experience switch): compact
+   command-palette footprint. Two visible lines invite a command without
+   reading as a form; Shift+Enter still grows nothing — longer commands
+   scroll inside the input. */
+@media (max-width: 1023px) {
   .composer-hint {
     display: none;
+  }
+
+  .composer-input {
+    height: 4rem; /* ~2 lines of 0.9375rem/1.6 + paddings (border-box) */
+    padding: 0.625rem 1rem 0.375rem;
+  }
+
+  .composer-footer {
+    justify-content: flex-end; /* hint is hidden — keep the CTA anchored right */
+    padding: 0.375rem 0.625rem 0.5rem;
+    border-top: none; /* one quiet block, not a two-row form */
   }
 
   .composer-btn {
