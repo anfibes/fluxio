@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { ActionProposal } from '~/types/actions'
-import ProposalStatusBanner from '../ProposalStatusBanner.vue'
 import MobileProposalPerspective from './MobileProposalPerspective.vue'
 import MobileContextPerspective from './MobileContextPerspective.vue'
 import MobileHistoryPerspective from './MobileHistoryPerspective.vue'
@@ -53,9 +52,6 @@ const displayPhrase = computed(() => {
 
     <!-- ═══════════════ PROPOSAL CONTENT ═══════════════ -->
     <template v-else>
-      <!-- Status banner (always visible) -->
-      <ProposalStatusBanner :proposal="proposal" />
-
       <!-- Executed: completion header (always visible) -->
       <div
         v-if="isExecuted"

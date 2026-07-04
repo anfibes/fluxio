@@ -137,11 +137,7 @@
     "propose": "Propose",
     "interpreting": "Interpreting…",
     "recent": "Recent",
-    "summary": "Summary",
-    "trail": {
-      "you": "You",
-      "fluxio": "Fluxio"
-    }
+    "summary": "Summary"
   },
   "auth": {
     "email": "Email",

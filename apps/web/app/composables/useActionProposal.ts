@@ -1,18 +1,5 @@
 import type { ActionProposal } from '~/types/actions'
 
-/**
- * A single turn in the current proposal session's conversation trail.
- * UI-only, ephemeral state — never the source of truth for proposal state.
- *
- * - `user`   turns hold the raw text the user submitted.
- * - `fluxio` turns hold the backend `canonical_phrase` verbatim (never reconstructed).
- */
-export interface ProposalConversationTurn {
-  id: string
-  role: 'user' | 'fluxio'
-  text: string
-}
-
 export function useActionProposal() {
   const api = useApi()
 
@@ -20,27 +7,6 @@ export function useActionProposal() {
   const loading = ref(false)
   const confirming = ref(false)
   const error = ref<string | null>(null)
-
-  // ── Conversation trail (UI-only, current session) ──────────────────
-  // Records only the commands/refinements the user submitted successfully.
-  // Reset when the session resets; never authoritative for proposal state.
-  const conversationTrail = ref<ProposalConversationTurn[]>([])
-  let turnSeq = 0
-
-  function appendTurn(role: ProposalConversationTurn['role'], text: string) {
-    conversationTrail.value.push({ id: `turn-${Date.now()}-${turnSeq++}`, role, text })
-  }
-
-  /**
-   * Record a successful exchange: the user's submitted text, followed by
-   * Fluxio's reply using the updated proposal's canonical_phrase verbatim.
-   * The Fluxio turn is skipped when canonical_phrase is null/empty.
-   */
-  function recordExchange(text: string, data: ActionProposal) {
-    appendTurn('user', text)
-    const phrase = data.canonical_phrase
-    if (phrase && phrase.trim().length > 0) appendTurn('fluxio', phrase)
-  }
 
   async function runProposalAction(id: string, action: 'confirm' | 'execute'): Promise<void> {
     const response = await api.post<ActionProposal>(`/actions/${id}/${action}`, {})
@@ -53,12 +19,7 @@ export function useActionProposal() {
     error.value = null
     try {
       const response = await api.post<ActionProposal>('/actions/interpret', { text })
-      if (response.success) {
-        proposal.value = response.data
-        // interpret() always begins a fresh session — reset, then record exchange 1.
-        conversationTrail.value = []
-        recordExchange(text, response.data)
-      }
+      if (response.success) proposal.value = response.data
       else error.value = response.message
     }
     catch (err: unknown) {
@@ -74,10 +35,7 @@ export function useActionProposal() {
     error.value = null
     try {
       const response = await api.post<ActionProposal>(`/actions/${id}/refine`, { text })
-      if (response.success) {
-        proposal.value = response.data
-        recordExchange(text, response.data)
-      }
+      if (response.success) proposal.value = response.data
       else error.value = response.message
     }
     catch (err: unknown) {
@@ -124,14 +82,13 @@ export function useActionProposal() {
   function setProposal(p: ActionProposal | null) { proposal.value = p }
   function setLoading(value: boolean) { loading.value = value }
   function setError(message: string | null) { error.value = message }
-  function clear() { proposal.value = null; error.value = null; loading.value = false; confirming.value = false; conversationTrail.value = [] }
+  function clear() { proposal.value = null; error.value = null; loading.value = false; confirming.value = false }
 
   return {
     proposal: readonly(proposal),
     loading: readonly(loading),
     confirming: readonly(confirming),
     error: readonly(error),
-    conversationTrail: readonly(conversationTrail),
     interpret,
     refine,
     resolveAmbiguity,

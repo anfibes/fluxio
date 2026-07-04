@@ -137,11 +137,7 @@
     "propose": "Proponi",
     "interpreting": "Interpretazione in corso…",
     "recent": "Recenti",
-    "summary": "Riepilogo",
-    "trail": {
-      "you": "Tu",
-      "fluxio": "Fluxio"
-    }
+    "summary": "Riepilogo"
   },
   "auth": {
     "email": "Email",
