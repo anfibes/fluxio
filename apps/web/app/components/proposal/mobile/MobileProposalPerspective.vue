@@ -30,10 +30,6 @@ const requiredMissingFields = computed(() =>
   props.proposal?.missing?.filter(f => f.required) ?? [],
 )
 
-const hasBlockingItems = computed(() =>
-  blockingAmbiguities.value.length > 0 || requiredMissingFields.value.length > 0,
-)
-
 // ── Card data ──────────────────────────────────────────────────────
 
 const displayPhrase = computed(() => {
@@ -129,18 +125,20 @@ const narrativeCue = computed<NarrativeCue>(() => {
 <template>
   <div>
     <!-- Blocking items -->
-    <template v-if="hasBlockingItems">
+    <Transition name="section">
       <ProposalAmbiguityPanel
         v-if="blockingAmbiguities.length"
         :ambiguities="blockingAmbiguities"
         :loading="loading"
         @resolve="emit('resolve-ambiguity', $event)"
       />
+    </Transition>
+    <Transition name="section">
       <ProposalMissingInformationPanel
         v-if="requiredMissingFields.length"
         :fields="requiredMissingFields"
       />
-    </template>
+    </Transition>
 
     <!-- Proposal Card -->
     <div
@@ -176,116 +174,132 @@ const narrativeCue = computed<NarrativeCue>(() => {
       <div class="border-t border-border-subtle" />
 
       <!-- Populated fields -->
-      <div v-if="populatedFields.length" class="px-4 py-3.5">
-        <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">{{ $t('proposal.sections.what_found') }}</p>
-        <!-- Fields discovered by a refinement enter with a subtle motion.
-          Initial proposal render is NOT animated (no `appear`) — the card
-          itself appearing is sufficient feedback. Removed fields use a short
-          fade-out only to avoid transition artifacts during layout updates. -->
-        <TransitionGroup tag="div" name="field-row" class="flex flex-col gap-1.5">
-          <div
-            v-for="field in populatedFields"
-            :key="field.key"
-            class="-mx-2 flex items-baseline justify-between gap-3 rounded-md px-2 py-1 transition-colors duration-700"
-            :class="{ 'bg-accent/8': isRecentlyChanged(field.key) }"
-          >
-            <span class="min-w-0 text-[11px] text-muted/70">{{ field.label }}</span>
-            <span class="shrink-0 text-right text-sm font-medium text-text">
-              {{ formatFieldValue(field.value) }}
-            </span>
-          </div>
-        </TransitionGroup>
-      </div>
+      <Transition name="section">
+        <div v-if="populatedFields.length" class="px-4 py-3.5">
+          <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">{{ $t('proposal.sections.what_found') }}</p>
+          <!-- Fields discovered by a refinement enter with a subtle motion.
+            Initial proposal render is NOT animated (no `appear`) — the card
+            itself appearing is sufficient feedback. Removed fields use a short
+            fade-out only to avoid transition artifacts during layout updates. -->
+          <TransitionGroup tag="div" name="field-row" class="flex flex-col gap-1.5">
+            <div
+              v-for="field in populatedFields"
+              :key="field.key"
+              class="-mx-2 flex items-baseline justify-between gap-3 rounded-md px-2 py-1 transition-colors duration-700"
+              :class="{ 'bg-accent/8': isRecentlyChanged(field.key) }"
+            >
+              <span class="min-w-0 text-[11px] text-muted/70">{{ field.label }}</span>
+              <span class="shrink-0 text-right text-sm font-medium text-text">
+                {{ formatFieldValue(field.value) }}
+              </span>
+            </div>
+          </TransitionGroup>
+        </div>
+      </Transition>
 
       <!-- Missing: required fields -->
-      <div v-if="missingRequiredFields.length" class="border-t border-border-subtle px-4 py-3.5">
-        <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">{{ $t('proposal.sections.still_needed') }}</p>
-        <div class="flex flex-col gap-2">
-          <div
-            v-for="field in missingRequiredFields"
-            :key="field.key"
-            class="flex items-center gap-2.5 rounded-md bg-amber-500/6 px-3 py-2"
-          >
-            <span class="text-xs text-amber-500/60">+</span>
-            <span class="text-xs font-medium text-amber-400/90">{{ field.label }}</span>
-            <span v-if="field.required" class="ml-auto text-[10px] text-amber-500/40">{{ $t('proposal.field_required') }}</span>
+      <Transition name="section">
+        <div v-if="missingRequiredFields.length" class="border-t border-border-subtle px-4 py-3.5">
+          <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">{{ $t('proposal.sections.still_needed') }}</p>
+          <div class="flex flex-col gap-2">
+            <div
+              v-for="field in missingRequiredFields"
+              :key="field.key"
+              class="flex items-center gap-2.5 rounded-md bg-amber-500/6 px-3 py-2"
+            >
+              <span class="text-xs text-amber-500/60">+</span>
+              <span class="text-xs font-medium text-amber-400/90">{{ field.label }}</span>
+              <span v-if="field.required" class="ml-auto text-[10px] text-amber-500/40">{{ $t('proposal.field_required') }}</span>
+            </div>
           </div>
         </div>
-      </div>
+      </Transition>
 
       <!-- Missing: optional fields -->
-      <div v-if="missingOptionalFields.length" class="border-t border-border-subtle px-4 py-3">
-        <div class="flex flex-col gap-1.5">
-          <div
-            v-for="field in missingOptionalFields"
-            :key="field.key"
-            class="flex items-center gap-2 text-xs text-muted/50"
-          >
-            <span class="text-[10px] text-muted/30">·</span>
-            <span>{{ field.label }}</span>
+      <Transition name="section">
+        <div v-if="missingOptionalFields.length" class="border-t border-border-subtle px-4 py-3">
+          <div class="flex flex-col gap-1.5">
+            <div
+              v-for="field in missingOptionalFields"
+              :key="field.key"
+              class="flex items-center gap-2 text-xs text-muted/50"
+            >
+              <span class="text-[10px] text-muted/30">·</span>
+              <span>{{ field.label }}</span>
+            </div>
           </div>
         </div>
-      </div>
+      </Transition>
 
       <!-- Proposed changes -->
-      <div v-if="changesList.length" class="border-t border-border-subtle px-4 py-3.5">
-        <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">{{ $t('proposal.sections.when_confirm') }}</p>
-        <div class="flex flex-col gap-1.5">
-          <div
-            v-for="(change, i) in changesList"
-            :key="i"
-            class="flex items-center gap-2 rounded-md bg-surface-raised px-2.5 py-1.5"
-          >
-            <span class="shrink-0 rounded bg-accent/15 px-1.5 py-0.5 font-mono text-[10px] uppercase text-accent">
-              {{ change.type }}
-            </span>
-            <span class="min-w-0 flex-1 truncate text-xs text-text">{{ change.label }}</span>
+      <Transition name="section">
+        <div v-if="changesList.length" class="border-t border-border-subtle px-4 py-3.5">
+          <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">{{ $t('proposal.sections.when_confirm') }}</p>
+          <div class="flex flex-col gap-1.5">
+            <div
+              v-for="(change, i) in changesList"
+              :key="i"
+              class="flex items-center gap-2 rounded-md bg-surface-raised px-2.5 py-1.5"
+            >
+              <span class="shrink-0 rounded bg-accent/15 px-1.5 py-0.5 font-mono text-[10px] uppercase text-accent">
+                {{ change.type }}
+              </span>
+              <span class="min-w-0 flex-1 truncate text-xs text-text">{{ change.label }}</span>
+            </div>
           </div>
         </div>
-      </div>
+      </Transition>
     </div>
 
     <!-- Refinement hints -->
     <ProposalRefinementHints v-if="proposal" :proposal="proposal" class="mt-3" />
 
     <!-- Warnings -->
-    <div
-      v-if="warningsList.length"
-      class="mx-4 mt-3 rounded-lg border border-amber-500/20 bg-amber-500/6 px-3.5 py-3"
-    >
-      <ul class="flex flex-col gap-1">
-        <li
-          v-for="(warning, i) in warningsList"
-          :key="i"
-          class="flex items-start gap-2 text-xs text-amber-400/80"
-        >
-          <span class="mt-0.5 shrink-0 text-amber-500/60">⚠</span>
-          <span class="leading-relaxed">{{ warning }}</span>
-        </li>
-      </ul>
-    </div>
+    <Transition name="section">
+      <div
+        v-if="warningsList.length"
+        class="mx-4 mt-3 rounded-lg border border-amber-500/20 bg-amber-500/6 px-3.5 py-3"
+      >
+        <ul class="flex flex-col gap-1">
+          <li
+            v-for="(warning, i) in warningsList"
+            :key="i"
+            class="flex items-start gap-2 text-xs text-amber-400/80"
+          >
+            <span class="mt-0.5 shrink-0 text-amber-500/60">⚠</span>
+            <span class="leading-relaxed">{{ warning }}</span>
+          </li>
+        </ul>
+      </div>
+    </Transition>
 
     <!-- Last refinement -->
-    <div v-if="proposal?.last_refinement" class="mt-3">
-      <ProposalLastRefinementPanel :refinement="proposal.last_refinement" />
-    </div>
+    <Transition name="section">
+      <div v-if="proposal?.last_refinement" class="mt-3">
+        <ProposalLastRefinementPanel :refinement="proposal.last_refinement" />
+      </div>
+    </Transition>
 
     <!-- Execution result -->
-    <ProposalExecutionResultPanel
-      v-if="isExecuted && proposal?.execution_result"
-      :result="proposal.execution_result"
-    />
+    <Transition name="section">
+      <ProposalExecutionResultPanel
+        v-if="isExecuted && proposal?.execution_result"
+        :result="proposal.execution_result"
+      />
+    </Transition>
 
     <!-- Execution failure -->
-    <div
-      v-if="isFailed && executionFailureMessage"
-      class="mx-4 mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3.5 py-3"
-    >
-      <p class="mb-1 text-xs font-semibold text-red-400">{{ $t('proposal.failure.title') }}</p>
-      <p class="text-xs leading-relaxed text-red-400/80">
-        {{ executionFailureMessage }}
-      </p>
-    </div>
+    <Transition name="section">
+      <div
+        v-if="isFailed && executionFailureMessage"
+        class="mx-4 mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3.5 py-3"
+      >
+        <p class="mb-1 text-xs font-semibold text-red-400">{{ $t('proposal.failure.title') }}</p>
+        <p class="text-xs leading-relaxed text-red-400/80">
+          {{ executionFailureMessage }}
+        </p>
+      </div>
+    </Transition>
 
     <!-- Technical details -->
     <MobileTechnicalDetailsDrawer :proposal="proposal" />
@@ -318,10 +332,33 @@ const narrativeCue = computed<NarrativeCue>(() => {
   opacity: 0;
 }
 
+/* Section-level appearance: a section that becomes relevant inside an
+   already-visible proposal fades in gently. No `appear` anywhere, so the
+   initial proposal render (and tab switches, which remount this component)
+   stays calm. Disappearing sections use the same quick fade as field rows. */
+.section-enter-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.section-enter-from {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.section-leave-active {
+  transition: opacity 0.15s ease;
+}
+
+.section-leave-to {
+  opacity: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .field-row-enter-active,
   .field-row-move,
-  .field-row-leave-active {
+  .field-row-leave-active,
+  .section-enter-active,
+  .section-leave-active {
     transition: none;
   }
 }
