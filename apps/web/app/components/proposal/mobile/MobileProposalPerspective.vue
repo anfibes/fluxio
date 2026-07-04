@@ -178,7 +178,11 @@ const narrativeCue = computed<NarrativeCue>(() => {
       <!-- Populated fields -->
       <div v-if="populatedFields.length" class="px-4 py-3.5">
         <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">{{ $t('proposal.sections.what_found') }}</p>
-        <div class="flex flex-col gap-1.5">
+        <!-- Fields discovered by a refinement enter with a subtle motion.
+          Initial proposal render is NOT animated (no `appear`) — the card
+          itself appearing is sufficient feedback. Removed fields use a short
+          fade-out only to avoid transition artifacts during layout updates. -->
+        <TransitionGroup tag="div" name="field-row" class="flex flex-col gap-1.5">
           <div
             v-for="field in populatedFields"
             :key="field.key"
@@ -190,7 +194,7 @@ const narrativeCue = computed<NarrativeCue>(() => {
               {{ formatFieldValue(field.value) }}
             </span>
           </div>
-        </div>
+        </TransitionGroup>
       </div>
 
       <!-- Missing: required fields -->
@@ -287,3 +291,38 @@ const narrativeCue = computed<NarrativeCue>(() => {
     <MobileTechnicalDetailsDrawer :proposal="proposal" />
   </div>
 </template>
+
+<style scoped>
+/* Newly discovered field rows enter calmly; siblings reflow smoothly. */
+.field-row-enter-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.field-row-enter-from {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+.field-row-move {
+  transition: transform 0.25s ease;
+}
+
+/* Cleared fields leave with a quick fade. Without this, the row's own
+   700ms color transition would make Vue hold the removed element frozen
+   on screen while waiting for a transitionend that never fires. */
+.field-row-leave-active {
+  transition: opacity 0.15s ease;
+}
+
+.field-row-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .field-row-enter-active,
+  .field-row-move,
+  .field-row-leave-active {
+    transition: none;
+  }
+}
+</style>
