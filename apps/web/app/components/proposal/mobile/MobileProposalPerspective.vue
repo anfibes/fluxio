@@ -71,6 +71,22 @@ const missingOptionalFields = computed(() =>
 const changesList = computed(() => props.proposal?.changes ?? [])
 const warningsList = computed(() => props.proposal?.warnings ?? [])
 
+// ── Visual memory (field-level) ────────────────────────────────────
+// Keys of the fields touched by the most recent refinement, derived purely
+// from `last_refinement.changes[].field` (replaced wholesale by the backend
+// on the next refinement turn — no local timing state). Only shown while the
+// proposal is still being shaped: once confirmed/executed/failed the moment
+// has passed and nothing may compete with the CTA / execution surfaces.
+const recentlyChangedFieldKeys = computed<ReadonlySet<string>>(() => {
+  const p = props.proposal
+  if (!p || (p.status !== 'draft' && p.status !== 'ready')) return new Set()
+  return new Set((p.last_refinement?.changes ?? []).map(c => c.field))
+})
+
+function isRecentlyChanged(fieldKey: string): boolean {
+  return recentlyChangedFieldKeys.value.has(fieldKey)
+}
+
 const executionFailureMessage = computed(() =>
   props.proposal?.execution_failure?.message ?? props.proposal?.failure_reason ?? '',
 )
@@ -162,11 +178,12 @@ const narrativeCue = computed<NarrativeCue>(() => {
       <!-- Populated fields -->
       <div v-if="populatedFields.length" class="px-4 py-3.5">
         <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">{{ $t('proposal.sections.what_found') }}</p>
-        <div class="flex flex-col gap-2.5">
+        <div class="flex flex-col gap-1.5">
           <div
             v-for="field in populatedFields"
             :key="field.key"
-            class="flex items-baseline justify-between gap-3"
+            class="-mx-2 flex items-baseline justify-between gap-3 rounded-md px-2 py-1 transition-colors duration-700"
+            :class="{ 'bg-accent/8': isRecentlyChanged(field.key) }"
           >
             <span class="min-w-0 text-[11px] text-muted/70">{{ field.label }}</span>
             <span class="shrink-0 text-right text-sm font-medium text-text">
