@@ -46,7 +46,11 @@
       "when_confirm": "When you confirm"
     },
     "field_required": "required",
-    "unknown_headline": "Command not recognized",
+    "unknown": {
+      "eyebrow": "No action",
+      "headline": "No actionable command found",
+      "message": "Rephrase it as an operational command."
+    },
     "ambiguity": {
       "title": "Resolve ambiguity",
       "query": "Matching \"{query}\"",
@@ -72,7 +76,6 @@
     },
     "narrative": {
       "understood":          { "eyebrow": "Fluxio understood", "message": "Review the proposal. Refine or add details as needed." },
-      "not_understood":      { "eyebrow": "Not understood", "message": "Fluxio couldn't match this to an action. Rephrase it as a new command." },
       "needs_details":       { "eyebrow": "Needs details", "message": "Add the missing information to make this proposal ready." },
       "needs_clarification": { "eyebrow": "Needs clarification", "message": "Choose the right match to continue." },
       "ready":               { "eyebrow": "Ready to execute", "message": "Fluxio is ready to execute this proposal." },

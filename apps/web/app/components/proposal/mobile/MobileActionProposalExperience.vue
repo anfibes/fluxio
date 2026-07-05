@@ -4,6 +4,7 @@ import MobileProposalPerspective from './MobileProposalPerspective.vue'
 import MobileContextPerspective from './MobileContextPerspective.vue'
 import MobileHistoryPerspective from './MobileHistoryPerspective.vue'
 import MobileStickyProposalCta from './MobileStickyProposalCta.vue'
+import MobileTechnicalDetailsDrawer from './MobileTechnicalDetailsDrawer.vue'
 
 const props = defineProps<{
   proposal: ActionProposal | null
@@ -24,9 +25,15 @@ const activeTab = ref<Perspective>('proposal')
 
 // ── Status derivations (shared across tabs) ────────────────────────
 
-const isDraft    = computed(() => props.proposal?.status === 'draft')
-const isReady    = computed(() => props.proposal?.status === 'ready')
 const isExecuted = computed(() => props.proposal?.status === 'executed')
+
+// The Proposal Workspace (tabs, perspectives, CTA) exists only for proposals
+// Fluxio can actually act on. An unknown-intent proposal is a failed
+// interpretation attempt, not a workspace: it renders as a standalone
+// non-actionable card, and the next command re-enters interpret (not refine).
+const isActionableProposal = computed(
+  () => !!props.proposal && props.proposal.intent !== 'unknown',
+)
 
 const displayPhrase = computed(() => {
   const phrase = props.proposal?.canonical_phrase?.trim()
@@ -50,7 +57,29 @@ const displayPhrase = computed(() => {
       </div>
     </div>
 
-    <!-- ═══════════════ PROPOSAL CONTENT ═══════════════ -->
+    <!-- ═══════════════ UNKNOWN INTENT (non-actionable) ═══════════════ -->
+    <!-- Not a workspace: no tabs, no CTA, no refinement hints. -->
+    <div v-else-if="!isActionableProposal" class="min-h-0 flex-1 overflow-y-auto">
+      <div class="mx-4 mt-3 rounded-xl border border-border bg-surface px-4 py-5">
+        <span class="inline-block rounded-full bg-amber-500/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-400">
+          {{ $t('proposal.unknown.eyebrow') }}
+        </span>
+        <p class="mt-3 text-lg font-semibold leading-snug text-text">
+          {{ $t('proposal.unknown.headline') }}
+        </p>
+        <p v-if="proposal.source_text" class="mt-1.5 text-xs italic text-muted/70">
+          "{{ proposal.source_text }}"
+        </p>
+        <p class="mt-3 text-sm leading-relaxed text-muted">
+          {{ $t('proposal.unknown.message') }}
+        </p>
+      </div>
+
+      <!-- Metadata only — deliberately detached from any workspace chrome. -->
+      <MobileTechnicalDetailsDrawer :proposal="proposal" />
+    </div>
+
+    <!-- ═══════════════ PROPOSAL WORKSPACE (actionable) ═══════════════ -->
     <template v-else>
       <!-- Executed: completion header (always visible) -->
       <div
@@ -106,7 +135,6 @@ const displayPhrase = computed(() => {
       <MobileStickyProposalCta
         :status="proposal.status"
         :confirming="confirming"
-        :unknown="proposal.intent === 'unknown'"
         @confirm-execute="emit('confirm-execute')"
       />
     </template>

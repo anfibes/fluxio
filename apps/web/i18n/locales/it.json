@@ -46,7 +46,11 @@
       "when_confirm": "Quando confermi"
     },
     "field_required": "obbligatorio",
-    "unknown_headline": "Comando non riconosciuto",
+    "unknown": {
+      "eyebrow": "Nessuna azione",
+      "headline": "Non ho trovato un'azione da eseguire",
+      "message": "Riformula il testo come comando operativo."
+    },
     "ambiguity": {
       "title": "Risolvi ambiguità",
       "query": "Corrispondenza a \"{query}\"",
@@ -72,7 +76,6 @@
     },
     "narrative": {
       "understood":          { "eyebrow": "Fluxio ha capito", "message": "Rivedi la proposta. Affina o aggiungi dettagli se necessario." },
-      "not_understood":      { "eyebrow": "Non compreso", "message": "Fluxio non ha riconosciuto un'azione in questo comando. Riformulalo come nuovo comando." },
       "needs_details":       { "eyebrow": "Servono dettagli", "message": "Aggiungi le informazioni mancanti per rendere pronta questa proposta." },
       "needs_clarification": { "eyebrow": "Serve chiarimento", "message": "Scegli la corrispondenza giusta per continuare." },
       "ready":               { "eyebrow": "Pronta da eseguire", "message": "Fluxio è pronto a eseguire questa proposta." },

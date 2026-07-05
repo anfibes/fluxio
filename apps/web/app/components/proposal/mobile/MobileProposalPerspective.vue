@@ -43,9 +43,8 @@ const cardHeadline = computed(() => {
   if (displayPhrase.value) return displayPhrase.value
   const p = props.proposal
   if (!p) return null
-  // The raw intent name is a reasonable fallback headline for actionable
-  // intents, but "unknown" would read as a proposal title — label it honestly.
-  if (p.intent === 'unknown') return t('proposal.unknown_headline')
+  // Only actionable proposals reach this perspective (unknown intent renders
+  // its own card upstream), so the raw intent name is a safe fallback.
   return p.intent ? p.intent.replace(/_/g, ' ') : null
 })
 
@@ -116,9 +115,6 @@ const narrativeCue = computed<NarrativeCue>(() => {
   if (status === 'failed')   return cue('failed', 'error')
   if (status === 'ready')    return cue('ready', 'ready')
   if (status === 'confirmed') return cue('confirmed', 'info')
-  // Unknown intent: interpretation failed — this draft is not refinable, so it
-  // must never read as "Fluxio understood". The next command starts over.
-  if (p.intent === 'unknown') return cue('not_understood', 'incomplete')
   if (status === 'draft') {
     if (hasMissing)      return cue('needs_details', 'incomplete')
     if (hasAmbiguities)  return cue('needs_clarification', 'incomplete')
