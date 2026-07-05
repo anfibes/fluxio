@@ -7,7 +7,7 @@ export interface ContextItem {
 }
 
 defineProps<{
-  items: ContextItem[]
+  items: readonly ContextItem[]
   emptyLabel?: string
 }>()
 </script>

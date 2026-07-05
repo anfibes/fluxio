@@ -169,9 +169,11 @@
     "retry": "Riprova"
   },
   "leads": {
+    "subtitle": "Contatti e aziende nella tua pipeline.",
     "empty": "Ancora nessun lead."
   },
   "tasks": {
+    "subtitle": "Attività operative e relative scadenze.",
     "empty": "Ancora nessuna attività."
   },
   "errors": {

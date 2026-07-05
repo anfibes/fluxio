@@ -169,9 +169,11 @@
     "retry": "Retry"
   },
   "leads": {
+    "subtitle": "Contacts and companies in your pipeline.",
     "empty": "No leads yet."
   },
   "tasks": {
+    "subtitle": "Operational work items and their deadlines.",
     "empty": "No tasks yet."
   },
   "errors": {

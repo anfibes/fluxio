@@ -15,31 +15,15 @@ watch(isAuthenticated, (authed) => {
     <AuthLoginPanel />
   </div>
 
-  <!-- ── Leads list ───────────────────────────────────────── -->
-  <div v-else class="h-full overflow-y-auto">
-    <div class="mx-auto flex max-w-3xl flex-col gap-3 px-4 py-4 lg:px-6 lg:py-6">
-      <h1 class="text-sm font-semibold text-text">
-        {{ $t('nav.leads') }}
-      </h1>
-
-      <div class="rounded-xl border border-border bg-surface px-4 py-1">
-        <div v-if="loading" class="py-6 text-center text-xs text-muted">
-          {{ $t('common.loading') }}
-        </div>
-
-        <div v-else-if="error" class="flex flex-col items-center gap-2 py-4">
-          <p class="text-xs text-red-400">{{ error }}</p>
-          <button
-            type="button"
-            class="rounded border border-border px-2 py-1 text-xs text-muted transition-colors hover:text-text-muted"
-            @click="refresh"
-          >
-            {{ $t('common.retry') }}
-          </button>
-        </div>
-
-        <ContextList v-else :items="[...items]" :empty-label="$t('leads.empty')" />
-      </div>
-    </div>
-  </div>
+  <!-- ── Leads section ────────────────────────────────────── -->
+  <SectionsOperationalSectionPage
+    v-else
+    :title="$t('nav.leads')"
+    :subtitle="$t('leads.subtitle')"
+    :items="items"
+    :loading="loading"
+    :error="error"
+    :empty-label="$t('leads.empty')"
+    @retry="refresh"
+  />
 </template>
