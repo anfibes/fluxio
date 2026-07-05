@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ActionProposal } from '~/types/actions'
 import { formatFieldValue } from './mobileProposalFormatters'
+import ProposalExecutionResultPanel from '../ExecutionResultPanel.vue'
 import MobileTechnicalDetailsDrawer from './MobileTechnicalDetailsDrawer.vue'
 
 const props = defineProps<{
@@ -63,6 +64,10 @@ const lifecycleTimestamps = computed<LifecycleEvent[]>(() => {
 })
 
 const hasRefinement = computed(() => lastRefinement.value !== null)
+
+const executionResult = computed(() =>
+  props.proposal?.status === 'executed' ? props.proposal.execution_result ?? null : null,
+)
 
 const hasHistoryData = computed(() =>
   !!sourceText.value || hasRefinement.value || lifecycleTimestamps.value.length > 0,
@@ -153,6 +158,11 @@ const hasHistoryData = computed(() =>
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Execution result (what the execution actually produced) -->
+    <div v-if="executionResult" class="mt-3">
+      <ProposalExecutionResultPanel :result="executionResult" />
     </div>
 
     <!-- Technical details -->

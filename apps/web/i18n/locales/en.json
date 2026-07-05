@@ -40,8 +40,7 @@
       "informational": "Additional context",
       "outcome": "Outcome",
       "what_found": "What I found",
-      "still_needed": "Still needed",
-      "when_confirm": "When you confirm"
+      "still_needed": "Still needed"
     },
     "field_required": "required",
     "unknown": {

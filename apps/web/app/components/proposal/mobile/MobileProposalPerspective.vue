@@ -3,8 +3,6 @@ import type { ActionProposal } from '~/types/actions'
 import ProposalAmbiguityPanel from '../AmbiguityPanel.vue'
 import ProposalMissingInformationPanel from '../MissingInformationPanel.vue'
 import ProposalRefinementHints from '../ProposalRefinementHints.vue'
-import ProposalLastRefinementPanel from '../LastRefinementPanel.vue'
-import ProposalExecutionResultPanel from '../ExecutionResultPanel.vue'
 import MobileTechnicalDetailsDrawer from './MobileTechnicalDetailsDrawer.vue'
 import { formatFieldValue } from './mobileProposalFormatters'
 
@@ -68,7 +66,6 @@ const missingOptionalFields = computed(() =>
   missingFields.value.filter(f => !f.required),
 )
 
-const changesList = computed(() => props.proposal?.changes ?? [])
 const warningsList = computed(() => props.proposal?.warnings ?? [])
 
 // ── Visual memory (field-level) ────────────────────────────────────
@@ -233,24 +230,6 @@ const narrativeCue = computed<NarrativeCue>(() => {
         </div>
       </Transition>
 
-      <!-- Proposed changes -->
-      <Transition name="section">
-        <div v-if="changesList.length" class="border-t border-border-subtle px-4 py-3.5">
-          <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">{{ $t('proposal.sections.when_confirm') }}</p>
-          <div class="flex flex-col gap-1.5">
-            <div
-              v-for="(change, i) in changesList"
-              :key="i"
-              class="flex items-center gap-2 rounded-md bg-surface-raised px-2.5 py-1.5"
-            >
-              <span class="shrink-0 rounded bg-accent/15 px-1.5 py-0.5 font-mono text-[10px] uppercase text-accent">
-                {{ change.type }}
-              </span>
-              <span class="min-w-0 flex-1 truncate text-xs text-text">{{ change.label }}</span>
-            </div>
-          </div>
-        </div>
-      </Transition>
     </div>
 
     <!-- Refinement hints -->
@@ -273,21 +252,6 @@ const narrativeCue = computed<NarrativeCue>(() => {
           </li>
         </ul>
       </div>
-    </Transition>
-
-    <!-- Last refinement -->
-    <Transition name="section">
-      <div v-if="proposal?.last_refinement" class="mt-3">
-        <ProposalLastRefinementPanel :refinement="proposal.last_refinement" />
-      </div>
-    </Transition>
-
-    <!-- Execution result -->
-    <Transition name="section">
-      <ProposalExecutionResultPanel
-        v-if="isExecuted && proposal?.execution_result"
-        :result="proposal.execution_result"
-      />
     </Transition>
 
     <!-- Execution failure -->
