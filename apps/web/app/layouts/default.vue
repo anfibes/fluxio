@@ -1,3 +1,7 @@
+<script setup lang="ts">
+const { isAuthenticated } = useAuth()
+</script>
+
 <template>
   <div class="app-shell">
     <LayoutAppSidebar />
@@ -6,6 +10,9 @@
       <main class="app-content">
         <slot />
       </main>
+      <!-- Takes real layout space (not an overlay), so the proposal
+           workspace's sticky CTA lands directly above it. -->
+      <LayoutAppMobilePrimaryNav v-if="isAuthenticated" />
     </div>
   </div>
 </template>

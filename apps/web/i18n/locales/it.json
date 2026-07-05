@@ -1,5 +1,7 @@
 {
   "nav": {
+    "primary": "Navigazione principale",
+    "proposal": "Proposta",
     "actions": "Azioni",
     "dashboard": "Dashboard",
     "leads": "Lead",
