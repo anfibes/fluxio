@@ -22,6 +22,13 @@ const emit = defineEmits<{
 type Perspective = 'proposal' | 'context' | 'history'
 const activeTab = ref<Perspective>('proposal')
 
+// A change of proposal identity (new proposal, or cleared to null) always
+// reopens the Proposal tab. Refinements replace the proposal object but keep
+// its id, so the watcher doesn't fire and the user's perspective is kept.
+watch(() => props.proposal?.id, () => {
+  activeTab.value = 'proposal'
+})
+
 // ── Status derivations (shared across tabs) ────────────────────────
 
 const isExecuted = computed(() => props.proposal?.status === 'executed')
