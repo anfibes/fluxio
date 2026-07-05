@@ -165,6 +165,16 @@
     "theme": "Theme",
     "soon": "Coming soon"
   },
+  "common": {
+    "loading": "Loading…",
+    "retry": "Retry"
+  },
+  "leads": {
+    "empty": "No leads yet."
+  },
+  "tasks": {
+    "empty": "No tasks yet."
+  },
   "errors": {
     "generic": "Something went wrong. Please try again.",
     "unauthorized": "You are not authorized to perform this action.",

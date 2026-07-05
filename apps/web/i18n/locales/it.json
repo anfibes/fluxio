@@ -165,6 +165,16 @@
     "theme": "Tema",
     "soon": "In arrivo"
   },
+  "common": {
+    "loading": "Caricamento…",
+    "retry": "Riprova"
+  },
+  "leads": {
+    "empty": "Ancora nessun lead."
+  },
+  "tasks": {
+    "empty": "Ancora nessuna attività."
+  },
   "errors": {
     "generic": "Si è verificato un errore. Riprova.",
     "unauthorized": "Non sei autorizzato a eseguire questa azione.",

@@ -1,20 +1,21 @@
 <script setup lang="ts">
-// Slice 1: only sections with a real route are listed. Leads/Tasks/Calendar
-// join once they have routes — the desktop sidebar still shows them as
-// placeholders, but the bottom nav never links to nowhere.
+import { primaryNavigation } from '~/components/layout/primaryNavigation'
+
 const route = useRoute()
 </script>
 
 <template>
   <nav class="mobile-nav" :aria-label="$t('nav.primary')">
     <NuxtLink
-      to="/"
+      v-for="item in primaryNavigation"
+      :key="item.to"
+      :to="item.to"
       class="mobile-nav-item"
-      :class="{ 'mobile-nav-item--active': route.path === '/' }"
-      :aria-current="route.path === '/' ? 'page' : undefined"
+      :class="{ 'mobile-nav-item--active': route.path === item.to }"
+      :aria-current="route.path === item.to ? 'page' : undefined"
     >
-      <span class="mobile-nav-icon" aria-hidden="true">⚡</span>
-      <span class="mobile-nav-label">{{ $t('nav.proposal') }}</span>
+      <span class="mobile-nav-icon" aria-hidden="true">{{ item.icon }}</span>
+      <span class="mobile-nav-label">{{ $t(item.mobileLabelKey ?? item.labelKey) }}</span>
     </NuxtLink>
   </nav>
 </template>

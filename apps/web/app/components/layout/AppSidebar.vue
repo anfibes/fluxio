@@ -1,3 +1,9 @@
+<script setup lang="ts">
+import { primaryNavigation } from '~/components/layout/primaryNavigation'
+
+const route = useRoute()
+</script>
+
 <template>
   <aside class="sidebar">
     <div class="sidebar-brand">
@@ -5,29 +11,23 @@
       <span class="brand-name">Fluxio</span>
     </div>
     <nav class="sidebar-nav">
-      <a class="nav-item nav-item--active" href="#">
-        <span class="nav-icon">⚡</span>
-        <span>{{ $t('nav.actions') }}</span>
-      </a>
-      <a class="nav-item" href="#">
-        <span class="nav-icon">◎</span>
-        <span>{{ $t('nav.leads') }}</span>
-      </a>
-      <a class="nav-item" href="#">
-        <span class="nav-icon">✓</span>
-        <span>{{ $t('nav.tasks') }}</span>
-      </a>
-      <a class="nav-item" href="#">
+      <NuxtLink
+        v-for="item in primaryNavigation"
+        :key="item.to"
+        class="nav-item"
+        :class="{ 'nav-item--active': route.path === item.to }"
+        :to="item.to"
+        :aria-current="route.path === item.to ? 'page' : undefined"
+      >
+        <span class="nav-icon">{{ item.icon }}</span>
+        <span>{{ $t(item.labelKey) }}</span>
+      </NuxtLink>
+      <!-- Calendar has no real page yet — pre-existing placeholder. -->
+      <a class="nav-item nav-item--disabled" href="#" aria-disabled="true">
         <span class="nav-icon">⊞</span>
         <span>{{ $t('nav.calendar') }}</span>
       </a>
     </nav>
-    <div class="sidebar-footer">
-      <a class="nav-item" href="#">
-        <span class="nav-icon">⊙</span>
-        <span>{{ $t('nav.settings') }}</span>
-      </a>
-    </div>
   </aside>
 </template>
 
@@ -89,11 +89,6 @@
   gap: 0.125rem;
 }
 
-.sidebar-footer {
-  padding: 0.5rem;
-  border-top: 1px solid var(--color-border);
-}
-
 .nav-item {
   display: flex;
   align-items: center;
@@ -116,6 +111,16 @@
 .nav-item--active {
   background-color: rgb(99 102 241 / 0.12);
   color: var(--color-accent);
+}
+
+.nav-item--disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.nav-item--disabled:hover {
+  background-color: transparent;
+  color: var(--color-muted);
 }
 
 .nav-icon {
