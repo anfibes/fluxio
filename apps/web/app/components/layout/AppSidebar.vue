@@ -22,11 +22,6 @@ const route = useRoute()
         <span class="nav-icon">{{ item.icon }}</span>
         <span>{{ $t(item.labelKey) }}</span>
       </NuxtLink>
-      <!-- Calendar has no real page yet — pre-existing placeholder. -->
-      <a class="nav-item nav-item--disabled" href="#" aria-disabled="true">
-        <span class="nav-icon">⊞</span>
-        <span>{{ $t('nav.calendar') }}</span>
-      </a>
     </nav>
   </aside>
 </template>
@@ -111,16 +106,6 @@ const route = useRoute()
 .nav-item--active {
   background-color: rgb(99 102 241 / 0.12);
   color: var(--color-accent);
-}
-
-.nav-item--disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.nav-item--disabled:hover {
-  background-color: transparent;
-  color: var(--color-muted);
 }
 
 .nav-icon {
