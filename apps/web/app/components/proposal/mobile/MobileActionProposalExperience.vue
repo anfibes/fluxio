@@ -15,7 +15,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   'confirm-execute': []
   'resolve-ambiguity': [text: string]
-  'reset': []
 }>()
 
 // ── Perspective (local UI state only) ──────────────────────────────

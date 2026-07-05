@@ -2,7 +2,7 @@
 import type { ActionProposal } from '~/types/actions'
 
 const props = defineProps<{ proposal: ActionProposal | null; loading?: boolean; confirming?: boolean }>()
-const emit = defineEmits<{ 'confirm-execute': []; 'resolve-ambiguity': [text: string]; 'reset': [] }>()
+const emit = defineEmits<{ 'confirm-execute': []; 'resolve-ambiguity': [text: string] }>()
 
 const isReady    = computed(() => props.proposal?.status === 'ready')
 const isDraft    = computed(() => props.proposal?.status === 'draft')
@@ -84,23 +84,8 @@ const exampleCommands = [
       <!-- ── Proposal content ──────────────────────────────── -->
       <div v-else key="content" class="flex h-full flex-col">
 
-        <!-- Status header -->
-        <ProposalStatusBanner :proposal="proposal">
-          <template #actions>
-            <button
-              type="button"
-              class="flex h-6 w-6 items-center justify-center rounded text-muted/50 transition-colors hover:bg-surface-raised hover:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-              :title="$t('proposal.reset_proposal')"
-              :aria-label="$t('proposal.reset_proposal')"
-              @click="emit('reset')"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5">
-                <polyline points="1 4 1 10 7 10" />
-                <path d="M3.51 15a9 9 0 1 0 .49-4.99" />
-              </svg>
-            </button>
-          </template>
-        </ProposalStatusBanner>
+        <!-- Status header ("New Proposal" lives in the Composer footer) -->
+        <ProposalStatusBanner :proposal="proposal" />
 
         <!-- Scrollable body -->
         <div class="flex-1 overflow-y-auto">

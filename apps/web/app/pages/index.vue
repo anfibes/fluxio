@@ -106,7 +106,9 @@ async function handleResolveAmbiguity(text: string) {
   }
 }
 
-function handleReset() {
+// "New Proposal": abandon the current proposal and return to the empty
+// state. Pure client-side clear — no backend call.
+function handleNewProposal() {
   clear()
   commandText.value = ''
   nextTick(() => composerRef.value?.focus())
@@ -129,8 +131,10 @@ function handleReset() {
         v-model="commandText"
         :loading="loading"
         :placeholder="composerPlaceholder"
+        :show-new-proposal="displayProposal !== null"
         @submit="handleSubmit"
         @clear="handleClear"
+        @new-proposal="handleNewProposal"
       />
 
       <!-- Canonical phrase summary (desktop only; mobile uses the phrase inside the proposal card) -->
@@ -211,7 +215,6 @@ function handleReset() {
           :confirming="confirming"
           @confirm-execute="confirmAndExecute"
           @resolve-ambiguity="handleResolveAmbiguity"
-          @reset="handleReset"
         />
       </div>
     </div>
@@ -225,7 +228,6 @@ function handleReset() {
       :confirming="confirming"
       @confirm-execute="confirmAndExecute"
       @resolve-ambiguity="handleResolveAmbiguity"
-      @reset="handleReset"
     />
   </div>
 </template>

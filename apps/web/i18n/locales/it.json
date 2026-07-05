@@ -28,8 +28,6 @@
     "confirm_execute": "Conferma & Esegui",
     "confirming": "Conferma in corso…",
     "complete_to_confirm": "Completa per confermare",
-    "reset": "Reimposta",
-    "reset_proposal": "Reimposta proposta",
     "status": {
       "draft": "Bozza",
       "ready": "Pronta",
@@ -140,6 +138,8 @@
     "placeholder_refine": "Affina la proposta corrente…",
     "hint": "↵ per proporre · ⇧↵ per a capo · Esc per cancellare",
     "propose": "Proponi",
+    "new_proposal": "Nuova proposta",
+    "new_proposal_short": "Nuova",
     "interpreting": "Interpretazione in corso…",
     "recent": "Recenti",
     "summary": "Riepilogo"

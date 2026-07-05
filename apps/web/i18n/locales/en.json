@@ -28,8 +28,6 @@
     "confirm_execute": "Confirm & Execute",
     "confirming": "Confirming…",
     "complete_to_confirm": "Complete to confirm",
-    "reset": "Reset",
-    "reset_proposal": "Reset proposal",
     "status": {
       "draft": "Draft",
       "ready": "Ready",
@@ -140,6 +138,8 @@
     "placeholder_refine": "Refine current proposal…",
     "hint": "↵ to propose · ⇧↵ for newline · Esc to clear",
     "propose": "Propose",
+    "new_proposal": "New Proposal",
+    "new_proposal_short": "New",
     "interpreting": "Interpreting…",
     "recent": "Recent",
     "summary": "Summary"

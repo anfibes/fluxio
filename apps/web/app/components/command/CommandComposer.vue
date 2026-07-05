@@ -3,12 +3,15 @@ const props = defineProps<{
   modelValue: string
   loading?: boolean
   placeholder?: string
+  /** A proposal exists — offer to abandon it and start a new one. */
+  showNewProposal?: boolean
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
   submit: []
   clear: []
+  'new-proposal': []
 }>()
 
 const textareaEl = ref<HTMLTextAreaElement | null>(null)
@@ -46,7 +49,18 @@ function handleKeydown(e: KeyboardEvent) {
       @keydown="handleKeydown"
     />
     <div class="composer-footer">
-      <span class="composer-hint">{{ $t('command.hint') }}</span>
+      <div class="composer-footer-left">
+        <button
+          v-if="showNewProposal"
+          type="button"
+          class="composer-btn composer-btn--ghost"
+          @click="emit('new-proposal')"
+        >
+          <span class="hidden lg:inline">{{ $t('command.new_proposal') }}</span>
+          <span class="lg:hidden">{{ $t('command.new_proposal_short') }}</span>
+        </button>
+        <span class="composer-hint">{{ $t('command.hint') }}</span>
+      </div>
       <button
         type="button"
         :disabled="!canSubmit"
@@ -105,6 +119,13 @@ function handleKeydown(e: KeyboardEvent) {
   border-top: 1px solid var(--color-border-subtle);
 }
 
+.composer-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
 .composer-hint {
   font-size: 0.6875rem;
   color: var(--color-muted);
@@ -141,6 +162,18 @@ function handleKeydown(e: KeyboardEvent) {
   color: var(--color-muted);
 }
 
+/* Quiet secondary action: present but never competing with Propose. */
+.composer-btn--ghost {
+  background: transparent;
+  color: var(--color-muted);
+  border: 1px solid var(--color-border);
+}
+
+.composer-btn--ghost:hover {
+  background-color: var(--color-surface-raised);
+  color: var(--color-text-muted, var(--color-text));
+}
+
 /* Mobile (below the 1024px mobile/desktop experience switch): compact
    command-palette footprint. Two visible lines invite a command without
    reading as a form; Shift+Enter still grows nothing — longer commands
@@ -156,7 +189,8 @@ function handleKeydown(e: KeyboardEvent) {
   }
 
   .composer-footer {
-    justify-content: flex-end; /* hint is hidden — keep the CTA anchored right */
+    /* hint is hidden — space-between keeps "New" left and the CTA right
+       (the left group stays in the DOM, so a lone CTA still lands right) */
     padding: 0.375rem 0.625rem 0.5rem;
     border-top: none; /* one quiet block, not a two-row form */
   }
