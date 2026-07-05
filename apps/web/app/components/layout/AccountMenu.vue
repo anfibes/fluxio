@@ -1,14 +1,5 @@
 <script setup lang="ts">
-import type { ThemePreference } from '~/composables/useTheme'
-
 const { user, logout } = useAuth()
-const { themePreference, setThemePreference } = useTheme()
-
-const themeOptions: { value: ThemePreference; labelKey: string }[] = [
-  { value: 'system', labelKey: 'settings.theme.system' },
-  { value: 'light',  labelKey: 'settings.theme.light' },
-  { value: 'dark',   labelKey: 'settings.theme.dark' },
-]
 
 const open = ref(false)
 const rootRef = ref<HTMLElement | null>(null)
@@ -89,27 +80,9 @@ async function handleLogout(): Promise<void> {
         <span class="account-email">{{ user.email }}</span>
       </div>
 
-      <button type="button" class="account-item" role="menuitem" disabled>
-        <span>{{ $t('nav.settings') }}</span>
-        <span class="account-soon">{{ $t('account.soon') }}</span>
-      </button>
-
-      <div class="account-section">
-        <span class="account-section-label">{{ $t('account.theme') }}</span>
-        <div class="theme-options" role="group" :aria-label="$t('account.theme')">
-          <button
-            v-for="option in themeOptions"
-            :key="option.value"
-            type="button"
-            class="theme-option"
-            :class="{ 'theme-option--active': themePreference === option.value }"
-            :aria-pressed="themePreference === option.value"
-            @click="setThemePreference(option.value)"
-          >
-            {{ $t(option.labelKey) }}
-          </button>
-        </div>
-      </div>
+      <NuxtLink to="/settings" class="account-item" role="menuitem" @click="close">
+        {{ $t('nav.settings') }}
+      </NuxtLink>
 
       <div class="account-divider" />
 
@@ -199,68 +172,14 @@ async function handleLogout(): Promise<void> {
   font-size: 0.8125rem;
   color: var(--color-text-muted);
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.account-item:hover:not(:disabled) {
+.account-item:hover {
   background-color: var(--color-surface-raised);
   color: var(--color-text);
-}
-
-.account-item:disabled {
-  color: var(--color-muted);
-  cursor: default;
-  opacity: 0.7;
-}
-
-.account-soon {
-  font-size: 0.625rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-muted);
-  border: 1px solid var(--color-border);
-  border-radius: 0.25rem;
-  padding: 0.0625rem 0.3125rem;
-}
-
-.account-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-  padding: 0.5rem 0.625rem;
-}
-
-.account-section-label {
-  font-size: 0.6875rem;
-  color: var(--color-muted);
-}
-
-.theme-options {
-  display: flex;
-  gap: 1px;
-  padding: 0.125rem;
-  border-radius: 0.375rem;
-  border: 1px solid var(--color-border);
-}
-
-.theme-option {
-  flex: 1;
-  padding: 0.25rem 0.375rem;
-  border-radius: 0.25rem;
-  font-size: 0.6875rem;
-  color: var(--color-muted);
-  cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.theme-option:hover {
-  color: var(--color-text-muted);
-}
-
-.theme-option--active {
-  background-color: var(--color-surface-raised);
-  color: var(--color-text-muted);
 }
 
 .account-divider {

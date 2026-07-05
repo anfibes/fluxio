@@ -153,16 +153,18 @@
     "sign_in_to_continue": "Accedi per continuare"
   },
   "settings": {
+    "subtitle": "Preferenze personali per il tuo spazio Fluxio.",
+    "appearance": "Aspetto",
     "theme": {
+      "title": "Tema",
+      "description": "Scegli l'aspetto di Fluxio. Sistema segue il tuo dispositivo.",
       "system": "Sistema",
       "light": "Chiaro",
       "dark": "Scuro"
     }
   },
   "account": {
-    "label": "Account",
-    "theme": "Tema",
-    "soon": "In arrivo"
+    "label": "Account"
   },
   "common": {
     "loading": "Caricamento…",

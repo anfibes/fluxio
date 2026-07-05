@@ -153,16 +153,18 @@
     "sign_in_to_continue": "Sign in to continue"
   },
   "settings": {
+    "subtitle": "Personal preferences for your Fluxio workspace.",
+    "appearance": "Appearance",
     "theme": {
+      "title": "Theme",
+      "description": "Choose how Fluxio looks. System follows your device.",
       "system": "System",
       "light": "Light",
       "dark": "Dark"
     }
   },
   "account": {
-    "label": "Account",
-    "theme": "Theme",
-    "soon": "Coming soon"
+    "label": "Account"
   },
   "common": {
     "loading": "Loading…",
