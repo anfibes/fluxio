@@ -158,6 +158,11 @@
       "dark": "Dark"
     }
   },
+  "account": {
+    "label": "Account",
+    "theme": "Theme",
+    "soon": "Coming soon"
+  },
   "errors": {
     "generic": "Something went wrong. Please try again.",
     "unauthorized": "You are not authorized to perform this action.",

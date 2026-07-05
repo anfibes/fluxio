@@ -158,6 +158,11 @@
       "dark": "Scuro"
     }
   },
+  "account": {
+    "label": "Account",
+    "theme": "Tema",
+    "soon": "In arrivo"
+  },
   "errors": {
     "generic": "Si è verificato un errore. Riprova.",
     "unauthorized": "Non sei autorizzato a eseguire questa azione.",

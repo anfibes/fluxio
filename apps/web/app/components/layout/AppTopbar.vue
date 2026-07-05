@@ -1,14 +1,5 @@
 <script setup lang="ts">
-import type { ThemePreference } from '~/composables/useTheme'
-
-const { user, isAuthenticated, logout } = useAuth()
-const { themePreference, setThemePreference } = useTheme()
-
-const themeOptions: { value: ThemePreference; labelKey: string }[] = [
-  { value: 'system', labelKey: 'settings.theme.system' },
-  { value: 'light',  labelKey: 'settings.theme.light' },
-  { value: 'dark',   labelKey: 'settings.theme.dark' },
-]
+const { isAuthenticated } = useAuth()
 </script>
 
 <template>
@@ -17,33 +8,7 @@ const themeOptions: { value: ThemePreference; labelKey: string }[] = [
       <slot name="title" />
     </div>
     <div class="topbar-right">
-      <!-- Theme control -->
-      <div class="flex items-center gap-px rounded-md border border-border p-0.5">
-        <button
-          v-for="option in themeOptions"
-          :key="option.value"
-          type="button"
-          class="rounded px-2 py-1 text-xs transition-colors"
-          :class="themePreference === option.value
-            ? 'bg-surface-raised text-text-muted'
-            : 'text-muted hover:text-text-muted'"
-          @click="setThemePreference(option.value)"
-        >
-          {{ $t(option.labelKey) }}
-        </button>
-      </div>
-
-      <template v-if="isAuthenticated">
-        <!-- Hide email on small screens to avoid overflow -->
-        <span v-if="user" class="hidden text-xs text-text-muted md:inline">{{ user.email }}</span>
-        <button
-          type="button"
-          class="rounded-md border border-border px-3 py-1.5 text-xs text-muted transition-colors hover:border-border-subtle hover:text-text-muted"
-          @click="logout"
-        >
-          {{ $t('auth.logout') }}
-        </button>
-      </template>
+      <LayoutAccountMenu v-if="isAuthenticated" />
     </div>
   </header>
 </template>
@@ -70,10 +35,6 @@ const themeOptions: { value: ThemePreference; labelKey: string }[] = [
 @media (max-width: 767px) {
   .topbar {
     padding: 0 0.875rem;
-  }
-
-  .topbar-right {
-    gap: 0.5rem;
   }
 }
 </style>
