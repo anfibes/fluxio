@@ -75,9 +75,9 @@
       "understood":          { "eyebrow": "Fluxio understood", "message": "Review the proposal. Refine or add details as needed." },
       "needs_details":       { "eyebrow": "Needs details", "message": "Add the missing information to make this proposal ready." },
       "needs_clarification": { "eyebrow": "Needs clarification", "message": "Choose the right match to continue." },
-      "ready":               { "eyebrow": "Ready to execute", "message": "Fluxio is ready to execute this proposal." },
-      "confirmed":           { "eyebrow": "Confirmed", "message": "This proposal has been confirmed." },
-      "executed":            { "eyebrow": "Action complete", "message": "This proposal was executed successfully." },
+      "ready":               { "eyebrow": "Ready to execute" },
+      "confirmed":           { "eyebrow": "Confirmed" },
+      "executed":            { "eyebrow": "Action complete" },
       "failed":              { "eyebrow": "Action failed", "message": "This action could not be completed." }
     },
     "tabs": {

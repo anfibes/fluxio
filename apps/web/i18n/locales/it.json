@@ -75,9 +75,9 @@
       "understood":          { "eyebrow": "Fluxio ha capito", "message": "Rivedi la proposta. Affina o aggiungi dettagli se necessario." },
       "needs_details":       { "eyebrow": "Servono dettagli", "message": "Aggiungi le informazioni mancanti per rendere pronta questa proposta." },
       "needs_clarification": { "eyebrow": "Serve chiarimento", "message": "Scegli la corrispondenza giusta per continuare." },
-      "ready":               { "eyebrow": "Pronta da eseguire", "message": "Fluxio è pronto a eseguire questa proposta." },
-      "confirmed":           { "eyebrow": "Confermata", "message": "Questa proposta è stata confermata." },
-      "executed":            { "eyebrow": "Azione completata", "message": "Questa proposta è stata eseguita con successo." },
+      "ready":               { "eyebrow": "Pronta da eseguire" },
+      "confirmed":           { "eyebrow": "Confermata" },
+      "executed":            { "eyebrow": "Azione completata" },
       "failed":              { "eyebrow": "Azione fallita", "message": "Non è stato possibile completare questa azione." }
     },
     "tabs": {

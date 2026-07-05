@@ -96,8 +96,16 @@ interface NarrativeCue {
   variant: 'info' | 'ready' | 'incomplete' | 'success' | 'error'
 }
 
-function cue(key: string, variant: NarrativeCue['variant']): NarrativeCue {
-  return { eyebrow: t(`proposal.narrative.${key}.eyebrow`), message: t(`proposal.narrative.${key}.message`), variant }
+// The message accompanies the badge only when it carries guidance the badge
+// alone can't ("add X", "choose a match", "why it failed"). Self-evident
+// states (ready / confirmed / executed) show just the badge — repeating
+// "ready to execute" in prose was noise next to the CTA.
+function cue(key: string, variant: NarrativeCue['variant'], guidance = false): NarrativeCue {
+  return {
+    eyebrow: t(`proposal.narrative.${key}.eyebrow`),
+    message: guidance ? t(`proposal.narrative.${key}.message`) : '',
+    variant,
+  }
 }
 
 const narrativeCue = computed<NarrativeCue>(() => {
@@ -109,13 +117,13 @@ const narrativeCue = computed<NarrativeCue>(() => {
   const hasAmbiguities = blockingAmbiguities.value.length > 0
 
   if (status === 'executed') return cue('executed', 'success')
-  if (status === 'failed')   return cue('failed', 'error')
+  if (status === 'failed')   return cue('failed', 'error', true)
   if (status === 'ready')    return cue('ready', 'ready')
   if (status === 'confirmed') return cue('confirmed', 'info')
   if (status === 'draft') {
-    if (hasMissing)      return cue('needs_details', 'incomplete')
-    if (hasAmbiguities)  return cue('needs_clarification', 'incomplete')
-    return cue('understood', 'info')
+    if (hasMissing)      return cue('needs_details', 'incomplete', true)
+    if (hasAmbiguities)  return cue('needs_clarification', 'incomplete', true)
+    return cue('understood', 'info', true)
   }
   return { eyebrow: '', message: '', variant: 'info' }
 })
@@ -146,7 +154,7 @@ const narrativeCue = computed<NarrativeCue>(() => {
     >
       <div class="px-4 pt-5 pb-4">
         <!-- Narrative cue -->
-        <div v-if="narrativeCue.eyebrow" class="flex items-start gap-2 mb-3">
+        <div v-if="narrativeCue.eyebrow" class="flex items-start gap-2 mb-2.5">
           <span
             class="shrink-0 mt-px rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
             :class="{
@@ -158,11 +166,11 @@ const narrativeCue = computed<NarrativeCue>(() => {
           >
             {{ narrativeCue.eyebrow }}
           </span>
-          <span class="text-[11px] leading-relaxed text-muted">{{ narrativeCue.message }}</span>
+          <span v-if="narrativeCue.message" class="text-[11px] leading-relaxed text-muted">{{ narrativeCue.message }}</span>
         </div>
 
-        <!-- Headline -->
-        <p v-if="cardHeadline" class="text-lg font-semibold leading-snug text-text">
+        <!-- Headline: the visual anchor of the card -->
+        <p v-if="cardHeadline" class="text-xl font-semibold leading-snug tracking-tight text-text">
           {{ cardHeadline }}
         </p>
         <p v-if="sourceText" class="mt-1.5 text-xs italic text-muted/70">
@@ -175,16 +183,16 @@ const narrativeCue = computed<NarrativeCue>(() => {
       <!-- Populated fields -->
       <Transition name="section">
         <div v-if="populatedFields.length" class="px-4 py-3.5">
-          <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">{{ $t('proposal.sections.what_found') }}</p>
+          <p class="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted/50">{{ $t('proposal.sections.what_found') }}</p>
           <!-- Fields discovered by a refinement enter with a subtle motion.
             Initial proposal render is NOT animated (no `appear`) — the card
             itself appearing is sufficient feedback. Removed fields use a short
             fade-out only to avoid transition artifacts during layout updates. -->
-          <TransitionGroup tag="div" name="field-row" class="flex flex-col gap-1.5">
+          <TransitionGroup tag="div" name="field-row" class="flex flex-col gap-1">
             <div
               v-for="field in populatedFields"
               :key="field.key"
-              class="-mx-2 flex items-baseline justify-between gap-3 rounded-md px-2 py-1 transition-colors duration-700"
+              class="-mx-2 flex items-baseline justify-between gap-3 rounded-md px-2 py-0.5 transition-colors duration-700"
               :class="{ 'bg-accent/8': isRecentlyChanged(field.key) }"
             >
               <span class="min-w-0 text-[11px] text-muted/70">{{ field.label }}</span>
@@ -199,7 +207,7 @@ const narrativeCue = computed<NarrativeCue>(() => {
       <!-- Missing: required fields -->
       <Transition name="section">
         <div v-if="missingRequiredFields.length" class="border-t border-border-subtle px-4 py-3.5">
-          <p class="mb-3 text-[11px] font-medium uppercase tracking-wider text-muted/60">{{ $t('proposal.sections.still_needed') }}</p>
+          <p class="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted/50">{{ $t('proposal.sections.still_needed') }}</p>
           <div class="flex flex-col gap-2">
             <div
               v-for="field in missingRequiredFields"
