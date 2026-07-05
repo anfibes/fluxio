@@ -62,6 +62,9 @@ const { t } = useI18n()
 const composerPlaceholder = computed<string | undefined>(() => {
   const p = displayProposal.value
   if (!p) return undefined
+  // Unknown intent is not refinable — the next command starts over, so keep
+  // the default "describe what you want to do" placeholder.
+  if (p.intent === 'unknown') return undefined
   const blockingAmbiguities = p.ambiguities?.filter(a => a.blocking) ?? []
   if (blockingAmbiguities.length) return t('command.placeholder_resolve_ambiguity')
   const requiredMissing = p.missing?.filter(f => f.required) ?? []

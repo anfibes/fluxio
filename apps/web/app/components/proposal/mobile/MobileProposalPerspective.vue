@@ -32,6 +32,8 @@ const requiredMissingFields = computed(() =>
 
 // ── Card data ──────────────────────────────────────────────────────
 
+const { t } = useI18n()
+
 const displayPhrase = computed(() => {
   const phrase = props.proposal?.canonical_phrase?.trim()
   return phrase && phrase.length > 0 ? phrase : null
@@ -41,6 +43,9 @@ const cardHeadline = computed(() => {
   if (displayPhrase.value) return displayPhrase.value
   const p = props.proposal
   if (!p) return null
+  // The raw intent name is a reasonable fallback headline for actionable
+  // intents, but "unknown" would read as a proposal title — label it honestly.
+  if (p.intent === 'unknown') return t('proposal.unknown_headline')
   return p.intent ? p.intent.replace(/_/g, ' ') : null
 })
 
@@ -95,8 +100,6 @@ interface NarrativeCue {
   variant: 'info' | 'ready' | 'incomplete' | 'success' | 'error'
 }
 
-const { t } = useI18n()
-
 function cue(key: string, variant: NarrativeCue['variant']): NarrativeCue {
   return { eyebrow: t(`proposal.narrative.${key}.eyebrow`), message: t(`proposal.narrative.${key}.message`), variant }
 }
@@ -113,6 +116,9 @@ const narrativeCue = computed<NarrativeCue>(() => {
   if (status === 'failed')   return cue('failed', 'error')
   if (status === 'ready')    return cue('ready', 'ready')
   if (status === 'confirmed') return cue('confirmed', 'info')
+  // Unknown intent: interpretation failed — this draft is not refinable, so it
+  // must never read as "Fluxio understood". The next command starts over.
+  if (p.intent === 'unknown') return cue('not_understood', 'incomplete')
   if (status === 'draft') {
     if (hasMissing)      return cue('needs_details', 'incomplete')
     if (hasAmbiguities)  return cue('needs_clarification', 'incomplete')

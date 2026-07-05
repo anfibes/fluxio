@@ -39,6 +39,16 @@ class ActionProposalRefinementService
 
     public function refine(ActionProposal $proposal, string $text): ActionProposal
     {
+        // Unknown intent is an interpretation failure, not a refinable Action
+        // Proposal: no capability is registered for it, so no refinement could
+        // ever change its state. Reject before the status gate — the persisted
+        // record is a non-actionable attempt the user must re-phrase.
+        if ($proposal->intent === 'unknown') {
+            throw ValidationException::withMessages([
+                'proposal' => [__('actions::actions.cannot_refine_unknown')],
+            ]);
+        }
+
         if (! in_array($proposal->status, self::REFINABLE_STATUSES, true)) {
             throw ValidationException::withMessages([
                 'proposal' => [__('actions::actions.cannot_refine')],

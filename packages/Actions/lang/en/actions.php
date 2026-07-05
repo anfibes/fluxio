@@ -16,6 +16,7 @@ return [
     'invalid_lead_status' => 'The target status is not a valid lead status.',
     'refined' => 'Action proposal refined successfully.',
     'cannot_refine' => 'This action proposal cannot be refined.',
+    'cannot_refine_unknown' => 'This command was not understood, so there is nothing to refine. Please rephrase it as a new command.',
     'refinement_not_recognized' => 'The refinement could not be applied. The proposal was left unchanged.',
     'ambiguity_still_unresolved' => 'The clarification matches multiple candidates. Please be more specific.',
     'ambiguity_narrowed_type' => 'Multiple :type candidates still match: :candidates. Please choose one.',

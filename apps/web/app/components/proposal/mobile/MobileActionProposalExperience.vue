@@ -106,6 +106,7 @@ const displayPhrase = computed(() => {
       <MobileStickyProposalCta
         :status="proposal.status"
         :confirming="confirming"
+        :unknown="proposal.intent === 'unknown'"
         @confirm-execute="emit('confirm-execute')"
       />
     </template>

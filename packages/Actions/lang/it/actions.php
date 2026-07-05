@@ -16,6 +16,7 @@ return [
     'invalid_lead_status' => 'Lo stato di destinazione non è uno stato valido per il lead.',
     'refined' => 'Proposta di azione affinata correttamente.',
     'cannot_refine' => 'Questa proposta di azione non può essere affinata.',
+    'cannot_refine_unknown' => 'Questo comando non è stato compreso, quindi non c\'è nulla da affinare. Riformulalo come nuovo comando.',
     'refinement_not_recognized' => 'L\'affinamento non è stato applicato. La proposta è rimasta invariata.',
     'ambiguity_still_unresolved' => 'Il chiarimento corrisponde a più candidati. Sii più specifico.',
     'ambiguity_narrowed_type' => 'Ci sono ancora più :type corrispondenti: :candidates. Selezionane una.',

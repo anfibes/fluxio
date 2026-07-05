@@ -32,6 +32,12 @@ const hasResolvableBlockingAmbiguity = computed(() => {
 })
 
 const shouldRenderHints = computed(() => {
+  // Unknown intent is not refinable — suggesting refinements would contradict
+  // the recovery flow (rephrase as a new command). Today its empty capabilities
+  // already yield zero hints; this guard keeps that true if hint sources grow.
+  if (props.proposal.intent === 'unknown') {
+    return false
+  }
   if ((TERMINAL_STATUSES as readonly string[]).includes(props.proposal.status)) {
     return false
   }

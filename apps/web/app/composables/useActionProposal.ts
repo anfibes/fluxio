@@ -52,7 +52,9 @@ export function useActionProposal() {
 
   async function submitCommand(text: string): Promise<void> {
     const current = proposal.value
-    if (!current || current.status === 'confirmed' || current.status === 'executed' || current.status === 'failed') {
+    // An unknown-intent proposal is an interpretation failure, not a refinable
+    // draft: the next command is a fresh attempt, never a refinement of it.
+    if (!current || current.intent === 'unknown' || current.status === 'confirmed' || current.status === 'executed' || current.status === 'failed') {
       await interpret(text)
     }
     else {

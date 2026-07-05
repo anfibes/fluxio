@@ -378,6 +378,51 @@ class RefineActionProposalTest extends TestCase
         $this->assertDatabaseHas('action_proposals', ['id' => $proposal->id, 'status' => 'executed']);
     }
 
+    // --- unknown intent guard ---
+
+    private function unknownProposal(User $user): ActionProposal
+    {
+        return ActionProposal::create([
+            'user_id' => $user->id,
+            'intent' => 'unknown',
+            'status' => 'draft',
+            'confidence' => 0.2,
+            'source_text' => 'Show me the dashboard',
+            'entities' => [],
+            'missing' => [],
+            'warnings' => [],
+            'editable_fields' => [],
+            'changes' => [],
+            'needs_confirmation' => true,
+        ]);
+    }
+
+    public function test_unknown_proposal_cannot_be_refined(): void
+    {
+        $user = $this->actingAsUser();
+        $proposal = $this->unknownProposal($user);
+
+        $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Tomorrow morning'])
+            ->assertStatus(422)
+            ->assertJsonStructure(['errors' => ['proposal']])
+            ->assertJsonPath('errors.proposal.0', __('actions::actions.cannot_refine_unknown'));
+    }
+
+    public function test_unknown_proposal_is_unchanged_after_rejected_refine(): void
+    {
+        $user = $this->actingAsUser();
+        $proposal = $this->unknownProposal($user);
+
+        $this->postJson("/api/actions/{$proposal->id}/refine", ['text' => 'Tomorrow morning'])
+            ->assertStatus(422);
+
+        $fresh = $proposal->fresh();
+        $this->assertEquals('unknown', $fresh->intent);
+        $this->assertEquals('draft', $fresh->status);
+        $this->assertEquals([], $fresh->warnings ?? []);
+        $this->assertNull($fresh->last_refinement);
+    }
+
     // --- validation ---
 
     public function test_missing_text_returns_422(): void

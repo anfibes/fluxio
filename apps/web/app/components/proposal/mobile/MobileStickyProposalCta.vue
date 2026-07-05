@@ -4,6 +4,8 @@ import type { ActionProposalStatus } from '~/types/actions'
 const props = defineProps<{
   status: ActionProposalStatus
   confirming?: boolean
+  /** Unknown-intent proposals can never be completed — no CTA applies. */
+  unknown?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -20,6 +22,9 @@ interface CtaState {
 }
 
 const ctaState = computed<CtaState>(() => {
+  if (props.unknown) {
+    return { visible: false, label: '', disabled: true, variant: 'subtle' }
+  }
   if (props.confirming) {
     return { visible: true, label: t('proposal.cta.confirming'), disabled: true, variant: 'loading' }
   }
