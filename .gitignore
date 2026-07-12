@@ -14,3 +14,4 @@ apps/web/node_modules/
 apps/web/.nuxt/
 apps/web/.output/
 apps/web/dist/
+AGENTS.md
