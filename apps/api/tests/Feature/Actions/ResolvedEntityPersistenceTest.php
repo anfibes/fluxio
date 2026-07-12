@@ -7,6 +7,7 @@ use Fluxio\Actions\Contracts\CommandInterpreterInterface;
 use Fluxio\Actions\DTO\NormalizedCommand;
 use Fluxio\Actions\Models\ActionProposal;
 use Fluxio\Leads\Models\Lead;
+use Fluxio\Tasks\Models\Task;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -106,6 +107,56 @@ class ResolvedEntityPersistenceTest extends TestCase
         $this->assertSame(
             Lead::findOrFail($selectedId)->name,
             $proposal->resolved_entities['lead']['label'] ?? null,
+        );
+    }
+
+    // ── Task identity (update_task_status — slice 2) ─────────────────────────
+
+    public function test_auto_resolved_task_persists_server_owned_identity(): void
+    {
+        Task::factory()->create(['title' => 'Unrelated chores', 'status' => 'pending']);
+        $target = Task::factory()->create(['title' => 'Prepare quote Rossini', 'status' => 'pending']);
+        $this->actingAsUser();
+
+        $response = $this->postJson('/api/actions/interpret', ['text' => 'Mark the Prepare quote Rossini task as completed']);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.intent', 'update_task_status')
+            ->assertJsonPath('data.status', 'ready');
+
+        $proposal = ActionProposal::findOrFail($response->json('data.id'));
+
+        $this->assertSame($target->id, $proposal->resolved_entities['task']['id'] ?? null);
+        $this->assertSame('task', $proposal->resolved_entities['task']['type'] ?? null);
+        $this->assertSame('Prepare quote Rossini', $proposal->resolved_entities['task']['label'] ?? null);
+    }
+
+    public function test_ambiguous_task_selection_persists_matching_identity(): void
+    {
+        Task::factory()->count(2)->create(['title' => 'Follow-up', 'status' => 'pending']);
+        $this->actingAsUser();
+
+        $interpret = $this->postJson('/api/actions/interpret', ['text' => 'Mark the Follow-up task as completed']);
+        $interpret->assertStatus(200)->assertJsonPath('data.status', 'draft');
+
+        $proposalId = $interpret->json('data.id');
+
+        // Contract-bearing but identity-free until the user selects.
+        $this->assertSame([], ActionProposal::findOrFail($proposalId)->resolved_entities);
+
+        $resolve = $this->postJson("/api/actions/{$proposalId}/refine", ['text' => 'the second one']);
+        $resolve->assertStatus(200)
+            ->assertJsonPath('data.last_refinement.ambiguity_outcome.kind', 'resolved');
+
+        $proposal = ActionProposal::findOrFail($proposalId);
+        $selectedId = $resolve->json('data.ambiguities.0.selected_candidate_id');
+
+        // Invariant: both identity surfaces name the same selected candidate.
+        $this->assertNotNull($selectedId);
+        $this->assertSame($selectedId, $proposal->resolved_entities['task']['id'] ?? null);
+        $this->assertSame(
+            $interpret->json('data.ambiguities.0.candidates.1.id'),
+            $proposal->resolved_entities['task']['id'] ?? null,
         );
     }
 

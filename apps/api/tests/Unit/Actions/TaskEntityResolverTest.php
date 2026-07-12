@@ -97,6 +97,36 @@ class TaskEntityResolverTest extends TestCase
         $this->assertCount(2, $result->candidates);
     }
 
+    public function test_equal_confidence_candidates_are_ordered_by_ascending_id(): void
+    {
+        // Three homonymous tasks → identical confidence (exact match, 1.0). The
+        // base row order must be deterministic (orderBy id) so stable usort keeps
+        // ascending-id order and ordinal selectors stay stable across requests.
+        $created = [
+            Task::factory()->create(['title' => 'Follow-up']),
+            Task::factory()->create(['title' => 'Follow-up']),
+            Task::factory()->create(['title' => 'Follow-up']),
+        ];
+
+        // Expected order derived from the REAL persisted keys, sorted ascending —
+        // no hardcoded ids, no reliance on creation/collection order.
+        $expectedIds = collect($created)->pluck('id')->sort()->values()->all();
+
+        $result = $this->resolver->resolve('Follow-up', $this->context);
+
+        $this->assertFalse($result->resolved);
+        $this->assertCount(3, $result->candidates);
+
+        $confidences = array_map(fn ($c) => $c->confidence, $result->candidates);
+        $this->assertSame([1.0, 1.0, 1.0], $confidences, 'Homonyms must tie on confidence for this test to be meaningful.');
+
+        $this->assertSame(
+            $expectedIds,
+            array_map(fn ($c) => $c->id, $result->candidates),
+            'Equal-confidence candidates must surface in ascending-id order.',
+        );
+    }
+
     // ── No match ──────────────────────────────────────────────────────────────
 
     public function test_no_match_returns_no_match(): void

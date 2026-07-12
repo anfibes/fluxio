@@ -95,11 +95,19 @@ class TaskEntityResolver implements EntityResolverInterface
         return 0.0;
     }
 
-    /** @return array<int, array{id: int, label: string, description: string|null}> */
+    /**
+     * Real Task rows projected to the fields the resolver needs, ordered by id so
+     * the base order is deterministic: with equal confidence, PHP's stable usort
+     * preserves this ascending-id order, keeping ordinal selectors ("the first
+     * one", "the second one") stable across requests. Mirrors LeadEntityResolver.
+     *
+     * @return array<int, array{id: int, label: string, description: string|null}>
+     */
     private function tasks(): array
     {
         return Task::query()
             ->select(['id', 'title', 'status'])
+            ->orderBy('id')
             ->get()
             ->map(fn (Task $t) => [
                 'id' => $t->id,
