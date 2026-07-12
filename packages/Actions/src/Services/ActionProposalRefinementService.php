@@ -702,6 +702,13 @@ class ActionProposalRefinementService
                     array_filter($editableFields, fn (array $f) => $f['key'] !== $field)
                 );
 
+                // Symmetric with the scalar replace above: a cleared field leaves
+                // the operational proposal entirely, so drop its entities mirror
+                // and remove it from any change payload that declared it —
+                // otherwise execution would still see the cleared value.
+                unset($entities[$field]);
+                $proposedChanges = $this->removeFromChangePayloads($proposedChanges, $field);
+
                 if ($prevValue !== null) {
                     // Phase 8D.4: surface the descriptive semantic type, consistent
                     // with the replace/append/remove change entries.
@@ -812,6 +819,13 @@ class ActionProposalRefinementService
             }
         }
 
+        // Sync the create_task operational payload with the authoritative field
+        // state. CreateTaskActionExecutor reads changes[0].payload, so a scalar
+        // field introduced after interpretation (priority via refinement, lead via
+        // ambiguity resolution) must land in the payload — syncChangePayloads above
+        // only updates keys the payload already declared.
+        $proposedChanges = $this->syncCreateTaskPayloadFields($proposal, $entities, $proposedChanges);
+
         // Sync due_at from date + time in entities for create_task proposals.
         // The executor reads due_at from changes.payload; refinements on date/time
         // update those keys in the payload via syncChangePayloads above, but due_at
@@ -906,6 +920,54 @@ class ActionProposalRefinementService
     }
 
     /**
+     * The scalar fields the create_task operational payload mirrors from entities —
+     * exactly the conditional keys ActionInterpreterService::buildCreateTask() writes
+     * at build time. due_at is excluded: it has its own composition rule
+     * (syncDueAtFromTemporalEntities); title is unconditional and not refinable.
+     */
+    private const CREATE_TASK_PAYLOAD_FIELDS = ['lead', 'date', 'time', 'priority'];
+
+    /**
+     * Project the authoritative entities onto the create_task operational payload
+     * for the declared scalar field set: a field present in entities is written
+     * into the payload (even when the payload did not declare it — e.g. priority
+     * added via refinement, lead promoted by ambiguity resolution); a field absent
+     * from entities is removed. Only create-type changes of create_task proposals
+     * are touched, so no unrelated intent or payload ever gains a key, and
+     * collection values are never written (the declared set is scalar-only).
+     *
+     * @param  array<int, mixed>  $changes
+     * @return array<int, mixed>
+     */
+    private function syncCreateTaskPayloadFields(ActionProposal $proposal, array $entities, array $changes): array
+    {
+        if ($proposal->intent !== 'create_task') {
+            return $changes;
+        }
+
+        return array_map(function ($change) use ($entities) {
+            if (
+                ! is_array($change)
+                || ! isset($change['payload'])
+                || ! is_array($change['payload'])
+                || ($change['type'] ?? '') !== 'create'
+            ) {
+                return $change;
+            }
+
+            foreach (self::CREATE_TASK_PAYLOAD_FIELDS as $field) {
+                if (array_key_exists($field, $entities) && ! is_array($entities[$field])) {
+                    $change['payload'][$field] = $entities[$field];
+                } else {
+                    unset($change['payload'][$field]);
+                }
+            }
+
+            return $change;
+        }, $changes);
+    }
+
+    /**
      * Remove a key from all ProposedChange payloads that declare it.
      *
      * @param  array<int, mixed>  $changes
@@ -954,7 +1016,7 @@ class ActionProposalRefinementService
 
         $dueAt = $entities['date'];
         if (isset($entities['time'])) {
-            $dueAt .= ' ' . $entities['time'];
+            $dueAt .= ' '.$entities['time'];
         }
 
         // First pass: update due_at in payloads that already declare it.
@@ -1020,7 +1082,7 @@ class ActionProposalRefinementService
 
         $dueAt = $entities['date'];
         if (isset($entities['time'])) {
-            $dueAt .= ' ' . $entities['time'];
+            $dueAt .= ' '.$entities['time'];
         }
 
         if ($hasDueAtField) {
