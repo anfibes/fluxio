@@ -34,6 +34,7 @@ class ActionProposal extends Model
         'execution_result',
         'last_refinement',
         'ambiguities',
+        'resolved_entities',
     ];
 
     protected function casts(): array
@@ -52,6 +53,7 @@ class ActionProposal extends Model
             'execution_result' => 'array',
             'last_refinement' => 'array',
             'ambiguities' => 'array',
+            'resolved_entities' => 'array',
         ];
     }
 

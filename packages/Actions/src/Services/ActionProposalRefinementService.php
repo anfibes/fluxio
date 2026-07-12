@@ -10,6 +10,7 @@ use Fluxio\Actions\DTO\EditableFieldExplanation;
 use Fluxio\Actions\DTO\NormalizedMutation;
 use Fluxio\Actions\DTO\ProposalRuntimeContext;
 use Fluxio\Actions\DTO\RefinementAmbiguityOutcome;
+use Fluxio\Actions\DTO\ResolvedEntity;
 use Fluxio\Actions\DTO\SemanticOperation;
 use Fluxio\Actions\DTO\SemanticRefinementMutation;
 use Fluxio\Actions\Enums\SemanticMutationType;
@@ -26,6 +27,15 @@ use Illuminate\Validation\ValidationException;
 class ActionProposalRefinementService
 {
     private const REFINABLE_STATUSES = ['draft', 'ready'];
+
+    /**
+     * Operational role keys that carry a server-owned identity in
+     * resolved_entities. A field mutation on one of these keys invalidates the
+     * stored identity — a new label must never stay paired with an old id.
+     * (No interpreter path can currently emit such a mutation; the invalidation
+     * is a defensive coherence guarantee, not a live re-resolution feature.)
+     */
+    private const IDENTITY_BEARING_KEYS = ['lead', 'assignee', 'task'];
 
     public function __construct(
         private readonly RefinementInterpreterInterface $interpreter,
@@ -581,6 +591,9 @@ class ActionProposalRefinementService
         $ambiguities = $proposal->ambiguities ?? [];
         $entities = $proposal->entities ?? [];
         $proposedChanges = $proposal->changes ?? [];
+        // Identity continuity: null = legacy proposal (stays null unless this turn
+        // actually produces an identity); array = contract-bearing map.
+        $resolvedEntities = $proposal->resolved_entities;
         $previousStatus = $proposal->status;
         $confidence = $proposal->confidence;
         $changes = [];
@@ -681,6 +694,13 @@ class ActionProposalRefinementService
                 $entities[$field] = $newValue;
                 $proposedChanges = $this->syncChangePayloads($proposedChanges, $field, $newValue);
 
+                // A textual replace on an identity-bearing key invalidates the
+                // stored server-owned identity: the new label has not been resolved,
+                // so execution must not act on the previous id.
+                if ($resolvedEntities !== null && in_array($field, self::IDENTITY_BEARING_KEYS, true)) {
+                    unset($resolvedEntities[$field]);
+                }
+
                 if ($prevValue !== $newValue) {
                     // Phase 7C: surface the descriptive semantic type alongside the
                     // existing change metadata (e.g. shift_time vs replace_time).
@@ -708,6 +728,11 @@ class ActionProposalRefinementService
                 // otherwise execution would still see the cleared value.
                 unset($entities[$field]);
                 $proposedChanges = $this->removeFromChangePayloads($proposedChanges, $field);
+
+                // A cleared identity-bearing field loses its server-owned identity too.
+                if ($resolvedEntities !== null && in_array($field, self::IDENTITY_BEARING_KEYS, true)) {
+                    unset($resolvedEntities[$field]);
+                }
 
                 if ($prevValue !== null) {
                     // Phase 8D.4: surface the descriptive semantic type, consistent
@@ -790,6 +815,14 @@ class ActionProposalRefinementService
 
             $entities[$fieldKey] = $candidate['label'];
 
+            // Identity continuity: persist the selected candidate's server-owned
+            // identity under the operational role key. Invariant:
+            // selected_candidate_id === resolved_entities[key].id — same candidate,
+            // same authority, written in the same turn. A legacy proposal (null)
+            // acquiring an identity here becomes contract-bearing for this key.
+            $resolvedEntities = $resolvedEntities ?? [];
+            $resolvedEntities[$fieldKey] = ResolvedEntity::fromCandidateArray($candidate)->toArray();
+
             if (collect($editableFields)->contains('key', $fieldKey)) {
                 $editableFields = array_map(function (array $f) use ($fieldKey, $candidate): array {
                     if ($f['key'] === $fieldKey) {
@@ -852,6 +885,7 @@ class ActionProposalRefinementService
         $proposal->ambiguities = $ambiguities;
         $proposal->entities = $entities;
         $proposal->changes = $proposedChanges;
+        $proposal->resolved_entities = $resolvedEntities;
         $proposal->status = $status;
         $proposal->confidence = $confidence;
         $proposal->last_refinement = $this->buildLastRefinement(

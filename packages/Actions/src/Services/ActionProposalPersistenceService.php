@@ -7,6 +7,7 @@ use Fluxio\Actions\DTO\ActionProposalData;
 use Fluxio\Actions\DTO\EditableField;
 use Fluxio\Actions\DTO\MissingField;
 use Fluxio\Actions\DTO\ProposedChange;
+use Fluxio\Actions\DTO\ResolvedEntity;
 use Fluxio\Actions\Models\ActionProposal;
 
 class ActionProposalPersistenceService
@@ -26,6 +27,13 @@ class ActionProposalPersistenceService
             'changes' => array_map(fn (ProposedChange $c) => $c->toArray(), $proposalData->changes),
             'needs_confirmation' => $proposalData->needs_confirmation,
             'ambiguities' => $proposalData->ambiguities,
+            // Always persisted explicitly — [] (not null) marks a proposal built
+            // under the identity-continuity contract; null stays reserved for
+            // legacy rows created before the contract existed.
+            'resolved_entities' => array_map(
+                fn (ResolvedEntity $e) => $e->toArray(),
+                $proposalData->resolved_entities,
+            ),
         ]);
     }
 }

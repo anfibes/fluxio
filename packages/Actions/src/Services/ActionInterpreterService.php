@@ -9,6 +9,7 @@ use Fluxio\Actions\DTO\EditableFieldExplanation;
 use Fluxio\Actions\DTO\IntentDefinition;
 use Fluxio\Actions\DTO\MissingField;
 use Fluxio\Actions\DTO\ProposedChange;
+use Fluxio\Actions\DTO\ResolvedEntity;
 use Fluxio\Actions\EntityResolution\DTO\ResolutionCandidate;
 use Fluxio\Actions\EntityResolution\DTO\ResolutionContext;
 use Fluxio\Actions\EntityResolution\Registry\EntityResolverRegistry;
@@ -37,9 +38,15 @@ class ActionInterpreterService
         $entities = $command->entities;
         $prebuiltAmbiguities = [];
 
+        // Identity continuity (slice 1): server-owned identities captured at
+        // auto-resolution time, keyed by operational role. Persisted alongside the
+        // label promotion below — the resolver's primary key is no longer discarded.
+        $resolvedEntities = [];
+
         if (isset($entities['lead_query'])) {
-            [$entities, $leadAmbiguities] = $this->resolveEntityQuery('lead_query', $entities);
+            [$entities, $leadAmbiguities, $leadIdentity] = $this->resolveEntityQuery('lead_query', $entities);
             $prebuiltAmbiguities = array_merge($prebuiltAmbiguities, $leadAmbiguities);
+            $resolvedEntities += $leadIdentity;
         }
 
         // Resolve the assignee for assign_lead at interpretation time so an unknown or
@@ -47,8 +54,9 @@ class ActionInterpreterService
         // execution. The provider emits assignee as a parsed scalar (not a _query span)
         // so resolution is triggered here rather than from a query key.
         if ($command->intent === 'assign_lead' && isset($entities['assignee'])) {
-            [$entities, $assigneeAmbiguities] = $this->resolveAssignee($entities['assignee'], $entities);
+            [$entities, $assigneeAmbiguities, $assigneeIdentity] = $this->resolveAssignee($entities['assignee'], $entities);
             $prebuiltAmbiguities = array_merge($prebuiltAmbiguities, $assigneeAmbiguities);
+            $resolvedEntities += $assigneeIdentity;
         }
 
         // Resolve the target task for update_task_status at interpretation time so an
@@ -56,8 +64,9 @@ class ActionInterpreterService
         // at execution. The provider emits the task as a parsed scalar span (`task`),
         // not a _query key, so resolution is triggered here against TaskEntityResolver.
         if ($command->intent === 'update_task_status' && isset($entities['task'])) {
-            [$entities, $taskAmbiguities] = $this->resolveTask($entities['task'], $entities);
+            [$entities, $taskAmbiguities, $taskIdentity] = $this->resolveTask($entities['task'], $entities);
             $prebuiltAmbiguities = array_merge($prebuiltAmbiguities, $taskAmbiguities);
+            $resolvedEntities += $taskIdentity;
         }
 
         // Parser-local temporal provenance, derived once from the source text and
@@ -86,16 +95,18 @@ class ActionInterpreterService
             changes: $changes,
             needs_confirmation: true,
             ambiguities: $ambiguities,
+            resolved_entities: $resolvedEntities,
         );
     }
 
     // ── Entity resolution ────────────────────────────────────────────────────
 
     /**
-     * Run entity resolution for a query key, returning the updated entities array
-     * and any pre-built ambiguity objects for unresolved multi-match cases.
+     * Run entity resolution for a query key, returning the updated entities array,
+     * any pre-built ambiguity objects for unresolved multi-match cases, and the
+     * server-owned identity captured on auto-resolution (empty otherwise).
      *
-     * @return array{array, array}
+     * @return array{array, array, array<string, ResolvedEntity>}
      */
     private function resolveEntityQuery(string $queryKey, array $entities): array
     {
@@ -104,10 +115,13 @@ class ActionInterpreterService
 
         $result = $this->resolverRegistry->resolve($query, new ResolutionContext($queryKey));
         $ambiguities = [];
+        $identity = [];
 
         if ($result->resolved) {
-            // Single strong match — promote to a concrete entity value.
+            // Single strong match — promote to a concrete entity value and keep
+            // the resolver-produced identity (real primary key, never provider data).
             $entities['lead'] = $result->resolvedCandidate->label;
+            $identity['lead'] = ResolvedEntity::fromCandidate($result->resolvedCandidate);
         } elseif (! empty($result->candidates)) {
             // Multiple matches — emit a blocking ambiguity; the builder adds no missing field.
             $ambiguities[] = [
@@ -125,7 +139,7 @@ class ActionInterpreterService
         }
         // else: no match → entities['lead'] remains absent → builder treats as missing
 
-        return [$entities, $ambiguities];
+        return [$entities, $ambiguities, $identity];
     }
 
     /**
@@ -136,7 +150,7 @@ class ActionInterpreterService
      * in outcome: auto-resolved → entity kept as label; ambiguous → blocking ambiguity,
      * entity removed; no match → entity removed (builder treats as missing).
      *
-     * @return array{array, array}
+     * @return array{array, array, array<string, ResolvedEntity>}
      */
     private function resolveAssignee(string $assigneeValue, array $entities): array
     {
@@ -144,9 +158,11 @@ class ActionInterpreterService
 
         $result = $this->resolverRegistry->resolve($assigneeValue, new ResolutionContext('user_query'));
         $ambiguities = [];
+        $identity = [];
 
         if ($result->resolved) {
             $entities['assignee'] = $result->resolvedCandidate->label;
+            $identity['assignee'] = ResolvedEntity::fromCandidate($result->resolvedCandidate);
         } elseif (! empty($result->candidates)) {
             $ambiguities[] = [
                 'key' => 'assignee',
@@ -163,7 +179,7 @@ class ActionInterpreterService
         }
         // else: no match → assignee absent → builder treats it as a missing required field
 
-        return [$entities, $ambiguities];
+        return [$entities, $ambiguities, $identity];
     }
 
     /**
@@ -174,7 +190,7 @@ class ActionInterpreterService
      * builder then treats `task` as a missing required field). The resolver dispatch
      * key (`task_query`) lives only here, never in the provider's entity surface.
      *
-     * @return array{array, array}
+     * @return array{array, array, array<string, ResolvedEntity>}
      */
     private function resolveTask(string $taskValue, array $entities): array
     {
@@ -182,9 +198,11 @@ class ActionInterpreterService
 
         $result = $this->resolverRegistry->resolve($taskValue, new ResolutionContext('task_query'));
         $ambiguities = [];
+        $identity = [];
 
         if ($result->resolved) {
             $entities['task'] = $result->resolvedCandidate->label;
+            $identity['task'] = ResolvedEntity::fromCandidate($result->resolvedCandidate);
         } elseif (! empty($result->candidates)) {
             $ambiguities[] = [
                 'key' => 'task',
@@ -201,7 +219,7 @@ class ActionInterpreterService
         }
         // else: no match → task absent → builder treats it as a missing required field
 
-        return [$entities, $ambiguities];
+        return [$entities, $ambiguities, $identity];
     }
 
     // ── Intent builders ──────────────────────────────────────────────────────
@@ -254,7 +272,7 @@ class ActionInterpreterService
         if (isset($entities['date'])) {
             $dueAt = $entities['date'];
             if (isset($entities['time'])) {
-                $dueAt .= ' ' . $entities['time'];
+                $dueAt .= ' '.$entities['time'];
             }
         }
         if ($dueAt !== null) {

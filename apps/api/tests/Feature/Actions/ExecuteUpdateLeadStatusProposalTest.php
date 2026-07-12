@@ -21,6 +21,12 @@ class ExecuteUpdateLeadStatusProposalTest extends TestCase
         return $user;
     }
 
+    /**
+     * LEGACY FIXTURE (deliberate): no `resolved_entities` key → the column stays
+     * null, so these tests exercise the pre-identity-continuity textual fallback
+     * of UpdateLeadStatusActionExecutor. Contract-path coverage lives in
+     * ExecuteUpdateLeadStatusIdentityContinuityTest.
+     */
     private function confirmedProposal(User $owner, string $leadLabel, string $state): ActionProposal
     {
         return ActionProposal::create([

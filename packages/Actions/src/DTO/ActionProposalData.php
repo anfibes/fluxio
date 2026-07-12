@@ -5,9 +5,15 @@ namespace Fluxio\Actions\DTO;
 class ActionProposalData
 {
     /**
-     * @param MissingField[]   $missing
-     * @param EditableField[]  $editable_fields
-     * @param ProposedChange[] $changes
+     * `resolved_entities` is the server-owned identity map keyed by operational
+     * role (lead/assignee/task). It is always an array for proposals built by the
+     * runtime — the persisted [] (vs null) is what marks a proposal as built under
+     * the identity-continuity contract.
+     *
+     * @param  MissingField[]  $missing
+     * @param  EditableField[]  $editable_fields
+     * @param  ProposedChange[]  $changes
+     * @param  array<string, ResolvedEntity>  $resolved_entities
      */
     public function __construct(
         public readonly string $id,
@@ -22,6 +28,7 @@ class ActionProposalData
         public readonly array $changes = [],
         public readonly bool $needs_confirmation = true,
         public readonly array $ambiguities = [],
+        public readonly array $resolved_entities = [],
     ) {}
 
     public function toArray(): array
@@ -39,6 +46,7 @@ class ActionProposalData
             'changes' => array_map(fn (ProposedChange $c) => $c->toArray(), $this->changes),
             'needs_confirmation' => $this->needs_confirmation,
             'ambiguities' => $this->ambiguities,
+            'resolved_entities' => array_map(fn (ResolvedEntity $e) => $e->toArray(), $this->resolved_entities),
         ];
     }
 }
